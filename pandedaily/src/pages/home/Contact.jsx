@@ -1,51 +1,52 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 
-const Contact = () => {
+const Contact = ({ id }) => {
+  // Add id prop here
   const [formData, setFormData] = useState({
-    fullName: "",
-    contactNumber: "",
-    email: "",
-    message: "",
-  });
+    fullName: '',
+    contactNumber: '',
+    email: '',
+    message: '',
+  })
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }));
-  };
+    }))
+  }
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Form submitted:", formData);
-    alert("Thank you for your message! We'll get back to you soon.");
+    e.preventDefault()
+    console.log('Form submitted:', formData)
+    alert("Thank you for your message! We'll get back to you soon.")
     setFormData({
-      fullName: "",
-      contactNumber: "",
-      email: "",
-      message: "",
-    });
-  };
+      fullName: '',
+      contactNumber: '',
+      email: '',
+      message: '',
+    })
+  }
 
   const fadeInUp = {
     initial: { opacity: 0, y: 30 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.7, ease: "easeOut" },
-  };
+    transition: { duration: 0.7, ease: 'easeOut' },
+  }
 
   const fadeIn = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
-    transition: { duration: 0.8, ease: "easeOut" },
-  };
+    transition: { duration: 0.8, ease: 'easeOut' },
+  }
 
   const scaleIn = {
     initial: { opacity: 0, scale: 0.9 },
     animate: { opacity: 1, scale: 1 },
-    transition: { duration: 0.6, ease: "easeOut" },
-  };
+    transition: { duration: 0.6, ease: 'easeOut' },
+  }
 
   const formStagger = {
     initial: { opacity: 0 },
@@ -55,23 +56,27 @@ const Contact = () => {
         staggerChildren: 0.1,
       },
     },
-  };
+  }
 
   const formItem = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.5, ease: "easeOut" },
-  };
+    transition: { duration: 0.5, ease: 'easeOut' },
+  }
 
   return (
-    <section className="py-16" style={{ backgroundColor: "#F5EFE7" }}>
+    <section
+      id={id} // Use the id prop here
+      className="py-16"
+      style={{ backgroundColor: '#F5EFE7' }}
+    >
       <div className="container mx-auto px-4">
         <div className="max-w-3xl mx-auto">
           {/* Headline */}
           <div className="text-center mb-10">
             <motion.h2
               className="text-3xl md:text-4xl font-light mb-4 font-[titleFont]"
-              style={{ color: "#3F2305" }}
+              style={{ color: '#3F2305' }}
               initial="initial"
               whileInView="animate"
               viewport={{ once: true, amount: 0.2 }}
@@ -82,17 +87,16 @@ const Contact = () => {
             </motion.h2>
             <motion.p
               className="text-base max-w-2xl mx-auto font-[titleFont]"
-              style={{ color: "#9C4A15" }}
+              style={{ color: '#9C4A15' }}
               initial="initial"
               whileInView="animate"
               viewport={{ once: true, amount: 0.2 }}
               variants={fadeInUp}
               transition={{ ...fadeInUp.transition, delay: 0.2 }}
             >
-              At PandeDaily, we value your feedback as much as we value our
-              dough. For inquiries, feedback, or partnership opportunities,
-              reach out to us through our social media or the contact details
-              below. Looking forward to serving you fresh bakes soon!
+              At PandeDaily, we value your feedback as much as we value our dough. For inquiries,
+              feedback, or partnership opportunities, reach out to us through our social media or
+              the contact details below. Looking forward to serving you fresh bakes soon!
             </motion.p>
           </div>
 
@@ -111,7 +115,7 @@ const Contact = () => {
                 <label
                   htmlFor="fullName"
                   className="block text-sm font-medium mb-1 font-[titleFont]"
-                  style={{ color: "#3F2305" }}
+                  style={{ color: '#3F2305' }}
                 >
                   Full Name *
                 </label>
@@ -124,9 +128,9 @@ const Contact = () => {
                   required
                   className="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-1 focus:ring-[#9C4A15] transition-all duration-200 font-[titleFont] text-sm"
                   style={{
-                    borderColor: "#9C4A15",
-                    color: "#3F2305",
-                    backgroundColor: "#F5EFE7",
+                    borderColor: '#9C4A15',
+                    color: '#3F2305',
+                    backgroundColor: '#F5EFE7',
                   }}
                   placeholder="Enter your full name"
                 />
@@ -138,7 +142,7 @@ const Contact = () => {
                   <label
                     htmlFor="contactNumber"
                     className="block text-sm font-medium mb-1 font-[titleFont]"
-                    style={{ color: "#3F2305" }}
+                    style={{ color: '#3F2305' }}
                   >
                     Contact Number *
                   </label>
@@ -151,9 +155,9 @@ const Contact = () => {
                     required
                     className="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-1 focus:ring-[#9C4A15] transition-all duration-200 font-[titleFont] text-sm"
                     style={{
-                      borderColor: "#9C4A15",
-                      color: "#3F2305",
-                      backgroundColor: "#F5EFE7",
+                      borderColor: '#9C4A15',
+                      color: '#3F2305',
+                      backgroundColor: '#F5EFE7',
                     }}
                     placeholder="09XX XXX XXXX"
                   />
@@ -163,7 +167,7 @@ const Contact = () => {
                   <label
                     htmlFor="email"
                     className="block text-sm font-medium mb-1 font-[titleFont]"
-                    style={{ color: "#3F2305" }}
+                    style={{ color: '#3F2305' }}
                   >
                     Email Address *
                   </label>
@@ -176,9 +180,9 @@ const Contact = () => {
                     required
                     className="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-1 focus:ring-[#9C4A15] transition-all duration-200 font-[titleFont] text-sm"
                     style={{
-                      borderColor: "#9C4A15",
-                      color: "#3F2305",
-                      backgroundColor: "#F5EFE7",
+                      borderColor: '#9C4A15',
+                      color: '#3F2305',
+                      backgroundColor: '#F5EFE7',
                     }}
                     placeholder="your.email@example.com"
                   />
@@ -190,7 +194,7 @@ const Contact = () => {
                 <label
                   htmlFor="message"
                   className="block text-sm font-medium mb-1 font-[titleFont]"
-                  style={{ color: "#3F2305" }}
+                  style={{ color: '#3F2305' }}
                 >
                   Message *
                 </label>
@@ -203,9 +207,9 @@ const Contact = () => {
                   rows={4}
                   className="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-1 focus:ring-[#9C4A15] transition-all duration-200 font-[titleFont] text-sm resize-none"
                   style={{
-                    borderColor: "#9C4A15",
-                    color: "#3F2305",
-                    backgroundColor: "#F5EFE7",
+                    borderColor: '#9C4A15',
+                    color: '#3F2305',
+                    backgroundColor: '#F5EFE7',
                   }}
                   placeholder="Your message here..."
                 />
@@ -221,8 +225,8 @@ const Contact = () => {
                   type="submit"
                   className="font-medium py-2 px-7 rounded-full transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 cursor-pointer text-sm font-[titleFont]"
                   style={{
-                    backgroundColor: "#9C4A15",
-                    color: "#F5EFE7",
+                    backgroundColor: '#9C4A15',
+                    color: '#F5EFE7',
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -235,7 +239,7 @@ const Contact = () => {
         </div>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default Contact;
+export default Contact

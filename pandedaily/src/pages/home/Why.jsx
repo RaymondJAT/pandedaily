@@ -1,44 +1,18 @@
-import { motion } from "framer-motion";
-import traditionalImg from "../../assets/why-images/image1.png";
-import guaranteeImg from "../../assets/why-images/image2.png";
-import ingredientsImg from "../../assets/why-images/image3.png";
+import { motion } from 'framer-motion'
+import { features } from '../../mapping/features'
 
 const Why = () => {
-  const features = [
-    {
-      id: 1,
-      title: "Traditional Craftsmanship",
-      description:
-        "We don't believe in shortcuts. Using traditional kneading and rising methods, each pandesal is hand-crafted to achieve a slightly crunchy crust and a soft, airy center.",
-      image: traditionalImg,
-    },
-    {
-      id: 2,
-      title: `The "Mainit-init" Guarantee`,
-      description:
-        "Why settle for shelf bread? At PandeDaily, we bake in small batches every morning—so your pandesal arrives warm, fresh, and full of that bagong hango sa oven magic.",
-      image: guaranteeImg,
-    },
-    {
-      id: 3,
-      title: "Elevated Ingredients, Humble Roots",
-      description:
-        "We've elevated the classic Filipino pandesal using only the finest ingredients—no artificial preservatives, just flour, yeast, and a whole lot of love. Familiar, yet premium in every bite.",
-      image: ingredientsImg,
-    },
-  ];
-
   const fadeInUp = {
     initial: { opacity: 0, y: 30 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.7, ease: "easeOut" },
-  };
+    transition: { duration: 0.7, ease: 'easeOut' },
+  }
 
   const fadeIn = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
-    transition: { duration: 0.8, ease: "easeOut" },
-  };
+    transition: { duration: 0.8, ease: 'easeOut' },
+  }
 
   const staggerContainer = {
     initial: { opacity: 0 },
@@ -48,28 +22,28 @@ const Why = () => {
         staggerChildren: 0.2,
       },
     },
-  };
+  }
 
   const cardVariants = {
     initial: { opacity: 0, y: 40 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6, ease: "easeOut" },
-  };
+    transition: { duration: 0.6, ease: 'easeOut' },
+  }
 
   const imageVariants = {
     initial: { opacity: 0, scale: 0.9 },
     animate: { opacity: 1, scale: 1 },
-    transition: { duration: 0.5, ease: "easeOut" },
-  };
+    transition: { duration: 0.5, ease: 'easeOut' },
+  }
 
   return (
-    <section className="py-13" style={{ backgroundColor: "#F5EFE7" }}>
+    <section className="py-13" style={{ backgroundColor: '#F5EFE7' }}>
       <div className="container mx-auto px-4">
         {/* Headline */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <motion.h2
             className="text-3xl md:text-4xl lg:text-5xl font-light mb-4 font-[titleFont]"
-            style={{ color: "#3F2305" }}
+            style={{ color: '#3F2305' }}
             initial="initial"
             whileInView="animate"
             viewport={{ once: true, amount: 0.2 }}
@@ -80,15 +54,14 @@ const Why = () => {
           </motion.h2>
           <motion.p
             className="text-base md:text-lg max-w-2xl mx-auto font-[titleFont]"
-            style={{ color: "#9C4A15" }}
+            style={{ color: '#9C4A15' }}
             initial="initial"
             whileInView="animate"
             viewport={{ once: true, amount: 0.2 }}
             variants={fadeInUp}
             transition={{ ...fadeInUp.transition, delay: 0.2 }}
           >
-            Discover what makes our bread special and why our customers keep
-            coming back for more.
+            Discover what makes our bread special and why our customers keep coming back for more.
           </motion.p>
         </div>
 
@@ -129,7 +102,7 @@ const Why = () => {
 
                 <motion.h3
                   className="text-lg md:text-xl lg:text-2xl font-medium flex-1 font-[titleFont]"
-                  style={{ color: "#3F2305" }}
+                  style={{ color: '#3F2305' }}
                   initial={{ opacity: 0, x: -20 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
@@ -143,7 +116,7 @@ const Why = () => {
               <div className="flex-1">
                 <motion.p
                   className="text-sm md:text-base lg:text-lg font-[titleFont]"
-                  style={{ color: "#9C4A15" }}
+                  style={{ color: '#9C4A15' }}
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
@@ -157,7 +130,7 @@ const Why = () => {
         </motion.div>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default Why;
+export default Why

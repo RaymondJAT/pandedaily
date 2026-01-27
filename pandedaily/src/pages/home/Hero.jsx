@@ -1,41 +1,44 @@
-import { motion } from "framer-motion";
-import heroImage from "../../assets/hero-images/hero-image.png";
-import flourImage from "../../assets/hero-images/flour.png";
-import wheatImage from "../../assets/hero-images/wheat.png";
-import yeastImage from "../../assets/hero-images/yeast.png";
-import rollingImage from "../../assets/hero-images/rolling.png";
-import starIcon from "../../assets/hero-images/stars.png";
+import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import heroImage from '../../assets/hero-images/hero-image.png'
+import flourImage from '../../assets/hero-images/flour.png'
+import wheatImage from '../../assets/hero-images/wheat.png'
+import yeastImage from '../../assets/hero-images/yeast.png'
+import rollingImage from '../../assets/hero-images/rolling.png'
+import starIcon from '../../assets/hero-images/stars.png'
 
 const Hero = () => {
+  const navigate = useNavigate()
+
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.8, ease: "easeOut" },
-  };
+    transition: { duration: 0.8, ease: 'easeOut' },
+  }
 
   const fadeIn = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
-    transition: { duration: 1, ease: "easeOut" },
-  };
+    transition: { duration: 1, ease: 'easeOut' },
+  }
 
   const scaleIn = {
     initial: { opacity: 0, scale: 0.8 },
     animate: { opacity: 1, scale: 1 },
-    transition: { duration: 1, ease: "easeOut" },
-  };
+    transition: { duration: 1, ease: 'easeOut' },
+  }
 
   const slideInLeft = {
     initial: { opacity: 0, x: -50 },
     animate: { opacity: 1, x: 0 },
-    transition: { duration: 0.8, ease: "easeOut", delay: 0.3 },
-  };
+    transition: { duration: 0.8, ease: 'easeOut', delay: 0.3 },
+  }
 
   const slideInRight = {
     initial: { opacity: 0, x: 50 },
     animate: { opacity: 1, x: 0 },
-    transition: { duration: 0.8, ease: "easeOut", delay: 0.3 },
-  };
+    transition: { duration: 0.8, ease: 'easeOut', delay: 0.3 },
+  }
 
   const staggerContainer = {
     initial: { opacity: 0 },
@@ -45,7 +48,11 @@ const Hero = () => {
         staggerChildren: 0.1,
       },
     },
-  };
+  }
+
+  const handleOrderNow = () => {
+    navigate('/order')
+  }
 
   return (
     <section className="relative min-h-[calc(100vh-4rem)] md:min-h-[calc(100vh-5rem)] lg:min-h-[calc(100vh-6rem)] overflow-hidden">
@@ -53,7 +60,7 @@ const Hero = () => {
         {/* Left Section */}
         <motion.div
           className="w-1/3 h-full"
-          style={{ backgroundColor: "#9C4A15" }}
+          style={{ backgroundColor: '#9C4A15' }}
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
@@ -63,7 +70,7 @@ const Hero = () => {
         {/* Middle Section */}
         <motion.div
           className="w-1/3 h-full"
-          style={{ backgroundColor: "#3F2305" }}
+          style={{ backgroundColor: '#2A1803' }}
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
@@ -73,7 +80,7 @@ const Hero = () => {
         {/* Right Section */}
         <motion.div
           className="w-1/3 h-full"
-          style={{ backgroundColor: "#9C4A15" }}
+          style={{ backgroundColor: '#9C4A15' }}
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
@@ -95,11 +102,7 @@ const Hero = () => {
           variants={fadeIn}
           transition={{ delay: 0.4 }}
         >
-          <img
-            src={flourImage}
-            alt="Flour"
-            className="w-20 md:w-32 lg:w-45 opacity-90"
-          />
+          <img src={flourImage} alt="Flour" className="w-20 md:w-32 lg:w-45 opacity-90" />
         </motion.div>
 
         {/* Yeast - Top Right */}
@@ -108,11 +111,7 @@ const Hero = () => {
           variants={fadeIn}
           transition={{ delay: 0.5 }}
         >
-          <img
-            src={yeastImage}
-            alt="Yeast"
-            className="w-20 md:w-32 lg:w-45 opacity-90"
-          />
+          <img src={yeastImage} alt="Yeast" className="w-20 md:w-32 lg:w-45 opacity-90" />
         </motion.div>
 
         {/* Rolling Pin - Bottom Left */}
@@ -121,11 +120,7 @@ const Hero = () => {
           variants={fadeIn}
           transition={{ delay: 0.6 }}
         >
-          <img
-            src={rollingImage}
-            alt="Rolling Pin"
-            className="w-24 md:w-36 lg:w-49 opacity-80"
-          />
+          <img src={rollingImage} alt="Rolling Pin" className="w-24 md:w-36 lg:w-49 opacity-80" />
         </motion.div>
 
         {/* Wheat - Bottom Right */}
@@ -134,11 +129,7 @@ const Hero = () => {
           variants={fadeIn}
           transition={{ delay: 0.7 }}
         >
-          <img
-            src={wheatImage}
-            alt="Wheat"
-            className="w-16 md:w-24 lg:w-45 opacity-90"
-          />
+          <img src={wheatImage} alt="Wheat" className="w-16 md:w-24 lg:w-45 opacity-90" />
         </motion.div>
       </motion.div>
 
@@ -148,7 +139,7 @@ const Hero = () => {
           {/* Headline */}
           <motion.h1
             className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-light mb-4 md:mb-6 font-[titleFont]"
-            style={{ color: "#F5EFE7" }}
+            style={{ color: '#F5EFE7' }}
             initial="initial"
             whileInView="animate"
             viewport={{ once: true, amount: 0.2 }}
@@ -161,7 +152,7 @@ const Hero = () => {
           {/* Subheadline */}
           <motion.p
             className="text-lg md:text-xl lg:text-2xl mb-8 md:mb-10 font-[titleFont]"
-            style={{ color: "#F5EFE7" }}
+            style={{ color: '#F5EFE7' }}
             initial="initial"
             whileInView="animate"
             viewport={{ once: true, amount: 0.2 }}
@@ -173,10 +164,11 @@ const Hero = () => {
 
           {/* Order Now Button */}
           <motion.button
+            onClick={handleOrderNow}
             className="font-medium py-2 px-8 md:py-2 md:px-10 rounded-full transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 cursor-pointer text-base md:text-lg font-[titleFont]"
             style={{
-              backgroundColor: "#F5EFE7",
-              color: "#3F2305",
+              backgroundColor: '#F5EFE7',
+              color: '#3F2305',
             }}
             initial="initial"
             whileInView="animate"
@@ -202,17 +194,10 @@ const Hero = () => {
           variants={slideInLeft}
           transition={{ ...slideInLeft.transition, delay: 0.8 }}
         >
-          <h2
-            className="text-3xl lg:text-5xl font-bold leading-tight"
-            style={{ color: "#F5EFE7" }}
-          >
-            Fresh{" "}
-            <span className="text-xl lg:text-2xl font-normal block">
-              bakes,
-            </span>
+          <h2 className="text-3xl lg:text-5xl font-bold leading-tight" style={{ color: '#F5EFE7' }}>
+            Fresh <span className="text-xl lg:text-2xl font-normal block">bakes,</span>
             <span className="block text-4xl lg:text-5xl ml-6 lg:ml-8">
-              Good{" "}
-              <span className="text-2xl lg:text-3xl font-normal">vibes.</span>
+              Good <span className="text-2xl lg:text-3xl font-normal">vibes.</span>
             </span>
           </h2>
         </motion.div>
@@ -227,7 +212,7 @@ const Hero = () => {
           transition={{ ...slideInRight.transition, delay: 0.9 }}
         >
           <div className="flex items-center justify-end gap-2 mb-2">
-            <span className="text-4xl font-bold" style={{ color: "#F5EFE7" }}>
+            <span className="text-4xl font-bold" style={{ color: '#F5EFE7' }}>
               4.5
             </span>
             <motion.img
@@ -240,12 +225,9 @@ const Hero = () => {
               transition={{ delay: 1.0, duration: 0.6 }}
             />
           </div>
-          <p
-            className="text-sm lg:text-base leading-snug"
-            style={{ color: "#F5EFE7" }}
-          >
-            Savor our freshly baked pandesal and experience the warm, comforting
-            taste that will delight your senses.
+          <p className="text-sm lg:text-base leading-snug" style={{ color: '#F5EFE7' }}>
+            Savor our freshly baked pandesal and experience the warm, comforting taste that will
+            delight your senses.
           </p>
         </motion.div>
       </div>
@@ -256,7 +238,7 @@ const Hero = () => {
         initial={{ opacity: 0, y: 50 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
-        transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+        transition={{ duration: 1, delay: 0.2, ease: 'easeOut' }}
       >
         <img
           src={heroImage}
@@ -269,7 +251,7 @@ const Hero = () => {
         />
       </motion.div>
     </section>
-  );
-};
+  )
+}
 
-export default Hero;
+export default Hero
