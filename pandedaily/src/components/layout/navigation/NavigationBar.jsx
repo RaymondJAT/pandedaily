@@ -1,5 +1,5 @@
 import { useState } from "react";
-import logoImage from "../../../assets/middle-logo.png";
+import logoImage from "../../../assets/hero-images/middle-logo.png";
 
 const NavigationBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -20,7 +20,7 @@ const NavigationBar = () => {
               <a
                 key={item.id}
                 href={item.href}
-                className="font-medium transition-colors duration-200 hover:opacity-80 text-sm"
+                className="font-medium transition-colors duration-200 hover:opacity-80 text-sm font-[titleFont]"
                 style={{ color: "#F5EFE7" }}
               >
                 {item.label}
@@ -38,10 +38,10 @@ const NavigationBar = () => {
           {/* Order Now Button */}
           <div className="hidden md:block">
             <button
-              className="font-medium py-2 px-7 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-105 cursor-pointer text-sm"
+              className="font-medium py-2 px-7 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-105 cursor-pointer text-sm font-[titleFont]"
               style={{
-                backgroundColor: "#9C4A15",
-                color: "#F5EFE7",
+                backgroundColor: "#F5EFE7",
+                color: "#3F2305",
               }}
             >
               Order Now
@@ -99,8 +99,8 @@ const NavigationBar = () => {
               <button
                 className="font-medium py-4 px-8 rounded-full transition-all duration-200 mt-8 hover:scale-105 text-xl"
                 style={{
-                  backgroundColor: "#9C4A15",
-                  color: "#F5EFE7",
+                  backgroundColor: "#F5EFE7",
+                  color: "#3F2305",
                 }}
               >
                 Order Now
