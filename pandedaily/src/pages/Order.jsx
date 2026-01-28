@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import AuthChoiceModal from '../components/modal/AuthChoiceModal'
 
 const Order = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDates, setSelectedDates] = useState([])
   const [currentMonth, setCurrentMonth] = useState([])
-  const [showDeliveryInfo, setShowDeliveryInfo] = useState(false)
   const [deliverySchedule, setDeliverySchedule] = useState('morning')
   const [quantity, setQuantity] = useState(20)
   const [customQuantity, setCustomQuantity] = useState('')
   const [specialInstructions, setSpecialInstructions] = useState('')
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
   // Animation variants
   const fadeInUp = {
@@ -34,10 +35,14 @@ const Order = () => {
     },
   }
 
-  // Initialize with today as selected
+  const faqItem = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5, ease: 'easeOut' },
+  }
+
+  // Initialize calendar without selecting today
   useEffect(() => {
-    const today = new Date()
-    setSelectedDates([today.toDateString()])
     generateMonthData()
   }, [currentDate])
 
@@ -178,13 +183,13 @@ const Order = () => {
 
     if (isSelected) {
       if (isToday) {
-        return 'bg-gradient-to-br from-[#9C4A15] to-[#7a3a12] text-white shadow-lg'
+        return 'bg-gradient-to-br from-[#9C4A15] to-[#7a3a12] text-white shadow-sm'
       }
-      return 'bg-gradient-to-br from-[#F5EFE7] to-[#e8dfd2] text-[#2A1803] border-2 border-[#9C4A15]'
+      return 'bg-gradient-to-br from-[#F5EFE7] to-[#e8dfd2] text-[#2A1803] border border-[#9C4A15]'
     }
 
     if (isToday) {
-      return 'bg-[#F5EFE7] text-[#2A1803] border-2 border-[#9C4A15]'
+      return 'bg-[#F5EFE7] text-[#2A1803] border border-[#9C4A15]'
     }
 
     return 'bg-white hover:bg-[#F5EFE7] text-[#2A1803] hover:text-[#9C4A15]'
@@ -217,33 +222,48 @@ const Order = () => {
       return
     }
 
-    // Here you would typically send the order to your backend
+    // Show auth modal instead of directly submitting
+    setShowAuthModal(true)
+  }
+
+  const handleGuestContinue = () => {
+    // Submit order as guest
     const orderDetails = {
       dates: selectedDates,
       schedule: deliverySchedule,
       quantity: getFinalQuantity(),
       instructions: specialInstructions,
       totalPieces: getTotalPandesal(),
-      totalPrice: getTotalPandesal() * 10, // Assuming 10 pesos per pandesal
+      totalPrice: getTotalPandesal() * 10,
     }
 
-    console.log('Order submitted:', orderDetails)
+    console.log('Order submitted as guest:', orderDetails)
     alert('Order submitted successfully! We will contact you for confirmation.')
+    setShowAuthModal(false)
+  }
+
+  const handleLoginRegister = () => {
+    // Redirect to login/register page
+    console.log('Redirecting to login/register')
+    // You would typically do: router.push('/auth')
+    // For now, just close modal and show message
+    alert('Redirecting to login/register page...')
+    setShowAuthModal(false)
   }
 
   return (
-    <section className="min-h-screen py-8 md:py-12" style={{ backgroundColor: '#F5EFE7' }}>
+    <section className="py-12 md:py-10" style={{ backgroundColor: '#F5EFE7' }}>
       <div className="container mx-auto px-4">
         {/* Header Section */}
         <motion.div
-          className="text-center mb-8 md:mb-12"
+          className="text-center mb-10 md:mb-12"
           initial="initial"
           whileInView="animate"
           viewport={{ once: true, amount: 0.2 }}
           variants={fadeInUp}
         >
           <h1
-            className="text-3xl md:text-4xl lg:text-5xl font-light mb-4 font-[titleFont]"
+            className="text-2xl md:text-3xl lg:text-4xl font-light mb-4 font-[titleFont]"
             style={{ color: '#2A1803' }}
           >
             Your Daily Bread, Just a Click Away!
@@ -260,55 +280,43 @@ const Order = () => {
             Freshly baked, hand-kneaded, and zero preservatives. Order Now!
           </motion.p>
 
-          <div className="h-1 w-24 mx-auto mb-6" style={{ backgroundColor: '#9C4A15' }}></div>
+          <div className="h-1 w-24 mx-auto" style={{ backgroundColor: '#9C4A15' }}></div>
         </motion.div>
 
-        {/* Main Content - Two Column Layout */}
+        {/* Layout - Two columns with balanced spacing */}
         <motion.div
-          className="max-w-6xl mx-auto"
+          className="mx-auto"
           initial="initial"
           whileInView="animate"
           viewport={{ once: true, amount: 0.1 }}
           variants={staggerContainer}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Column - Calendar */}
-            <motion.div className="bg-white rounded-2xl shadow-xl p-6" variants={fadeIn}>
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2
-                    className="text-2xl md:text-3xl font-light font-[titleFont]"
-                    style={{ color: '#2A1803' }}
-                  >
-                    Select Delivery Dates
-                  </h2>
-                  <button
-                    onClick={handleToday}
-                    className="px-4 py-2 rounded-full font-[titleFont] text-sm"
-                    style={{
-                      backgroundColor: '#F5EFE7',
-                      color: '#2A1803',
-                    }}
-                  >
-                    Today
-                  </button>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+            {/* Calendar Section */}
+            <motion.div className="flex flex-col" variants={faqItem}>
+              <h2
+                className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
+                style={{ color: '#2A1803' }}
+              >
+                Select Delivery Dates
+              </h2>
 
+              <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1 flex flex-col">
                 {/* Month Navigation */}
                 <div className="flex items-center justify-between mb-6">
                   <button
                     onClick={handlePrevMonth}
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#F5EFE7] transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F5EFE7] transition-colors text-base"
                     style={{ color: '#2A1803' }}
                   >
                     ←
                   </button>
-                  <h3 className="text-xl font-medium font-[titleFont]" style={{ color: '#2A1803' }}>
+                  <h3 className="text-lg font-medium font-[titleFont]" style={{ color: '#2A1803' }}>
                     {getMonthName(currentDate.getMonth())} {currentDate.getFullYear()}
                   </h3>
                   <button
                     onClick={handleNextMonth}
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#F5EFE7] transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F5EFE7] transition-colors text-base"
                     style={{ color: '#2A1803' }}
                   >
                     →
@@ -316,7 +324,7 @@ const Order = () => {
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-2 mb-4">
+                <div className="grid grid-cols-7 gap-2 mb-6">
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
                     <div
                       key={index}
@@ -339,28 +347,21 @@ const Order = () => {
                       <button
                         key={index}
                         onClick={() => handleDateClick(date)}
-                        className={`aspect-square flex flex-col items-center justify-center rounded-lg transition-all duration-200 ${getDateStyle(
+                        className={`aspect-square flex items-center justify-center rounded-lg transition-all duration-200 ${getDateStyle(
                           date,
                           isToday,
                         )} 
                           ${isSelected ? 'transform hover:scale-105' : 'hover:scale-102'} 
                           font-[titleFont] text-sm`}
                       >
-                        <span className={`font-semibold ${isSelected ? 'text-lg' : 'text-base'}`}>
-                          {date.getDate()}
-                        </span>
-                        {isToday && !isSelected && (
-                          <span className="text-xs mt-1" style={{ color: '#9C4A15' }}>
-                            Today
-                          </span>
-                        )}
+                        <span className={`font-medium`}>{date.getDate()}</span>
                       </button>
                     )
                   })}
                 </div>
 
                 {/* Quick Actions */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3 mb-6">
                   <button
                     onClick={handleSelectAllWeekdays}
                     className="px-4 py-2 rounded-full font-[titleFont] text-sm"
@@ -370,7 +371,7 @@ const Order = () => {
                       border: '1px solid #9C4A15',
                     }}
                   >
-                    All Weekdays
+                    Weekdays
                   </button>
                   <button
                     onClick={handleSelectAllWeekends}
@@ -381,7 +382,7 @@ const Order = () => {
                       border: '1px solid #9C4A15',
                     }}
                   >
-                    All Weekends
+                    Weekends
                   </button>
                   <button
                     onClick={handleClearAll}
@@ -392,232 +393,277 @@ const Order = () => {
                       border: '1px solid #9C4A15',
                     }}
                   >
-                    Clear All
+                    Clear
+                  </button>
+                  <button
+                    onClick={handleToday}
+                    className="px-4 py-2 rounded-full font-[titleFont] text-sm"
+                    style={{
+                      backgroundColor: '#F5EFE7',
+                      color: '#2A1803',
+                      border: '1px solid #9C4A15',
+                    }}
+                  >
+                    Today
                   </button>
                 </div>
-              </div>
 
-              {/* Selected Dates Preview */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="font-bold mb-4 font-[titleFont]" style={{ color: '#2A1803' }}>
-                  Selected Dates ({selectedDates.length})
-                </h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {selectedDates.map((dateStr, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg"
-                      style={{ backgroundColor: '#F5EFE7' }}
-                    >
-                      <span className="font-medium font-[titleFont]" style={{ color: '#2A1803' }}>
-                        {formatDateDisplay(dateStr)}
-                      </span>
-                      <span className="text-sm font-[titleFont]" style={{ color: '#9C4A15' }}>
-                        {deliverySchedule === 'morning' ? '6:30-10 AM' : '3-7 PM'}
-                      </span>
-                    </div>
-                  ))}
-                  {selectedDates.length === 0 && (
-                    <p className="text-center py-4 font-[titleFont]" style={{ color: '#9C4A15' }}>
-                      No dates selected
-                    </p>
-                  )}
+                {/* Selected Dates Preview */}
+                <div className="pt-6 border-t" style={{ borderColor: '#F5EFE7' }}>
+                  <h3
+                    className="font-bold mb-4 font-[titleFont] text-base"
+                    style={{ color: '#2A1803' }}
+                  >
+                    Selected Dates ({selectedDates.length})
+                  </h3>
+                  <div className="space-y-3 h-35 overflow-y-auto pr-2">
+                    {selectedDates.map((dateStr, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 rounded-lg text-sm"
+                        style={{ backgroundColor: '#F5EFE7' }}
+                      >
+                        <span
+                          className="font-medium font-[titleFont] truncate pr-2"
+                          style={{ color: '#2A1803' }}
+                        >
+                          {formatDateDisplay(dateStr)}
+                        </span>
+                        <span
+                          className="text-sm font-[titleFont] whitespace-nowrap"
+                          style={{ color: '#9C4A15' }}
+                        >
+                          {deliverySchedule === 'morning' ? '6:30-10 AM' : '3-7 PM'}
+                        </span>
+                      </div>
+                    ))}
+                    {selectedDates.length === 0 && (
+                      <p
+                        className="text-center py-4 font-[titleFont] text-sm"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        No dates selected
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* Right Column - Order Details */}
-            <motion.div className="space-y-6" variants={fadeIn} transition={{ delay: 0.2 }}>
-              {/* Delivery Schedule */}
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h3
-                  className="text-xl font-light mb-6 font-[titleFont]"
+            {/* Order Configuration */}
+            <div className="flex flex-col space-y-8">
+              {/* Delivery Configuration */}
+              <motion.div className="flex flex-col" variants={faqItem} transition={{ delay: 0.1 }}>
+                <h2
+                  className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
                   style={{ color: '#2A1803' }}
                 >
-                  Delivery Schedule
-                </h3>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => handleScheduleChange('morning')}
-                    className={`flex-1 py-4 rounded-xl border-2 transition-all duration-200 font-[titleFont] ${
-                      deliverySchedule === 'morning'
-                        ? 'border-[#9C4A15] bg-[#F5EFE7]'
-                        : 'border-gray-200 hover:border-[#9C4A15]'
-                    }`}
-                    style={{ color: '#2A1803' }}
-                  >
-                    <div className="font-medium">Morning</div>
-                    <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
-                      6:30-10 AM
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleScheduleChange('evening')}
-                    className={`flex-1 py-4 rounded-xl border-2 transition-all duration-200 font-[titleFont] ${
-                      deliverySchedule === 'evening'
-                        ? 'border-[#9C4A15] bg-[#F5EFE7]'
-                        : 'border-gray-200 hover:border-[#9C4A15]'
-                    }`}
-                    style={{ color: '#2A1803' }}
-                  >
-                    <div className="font-medium">Evening</div>
-                    <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
-                      3-7 PM
-                    </div>
-                  </button>
-                </div>
-              </div>
+                  Delivery Configuration
+                </h2>
 
-              {/* Quantity Selection */}
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h3
-                  className="text-xl font-light mb-6 font-[titleFont]"
-                  style={{ color: '#2A1803' }}
-                >
-                  Quantity per Delivery
-                </h3>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  {[20, 40, 50].map((option) => (
+                <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1">
+                  <h3
+                    className="text-lg font-medium mb-4 font-[titleFont]"
+                    style={{ color: '#9C4A15' }}
+                  >
+                    Choose Delivery Time
+                  </h3>
+                  <div className="flex gap-4 mb-6">
                     <button
-                      key={option}
-                      onClick={() => handleQuantityChange(option)}
-                      className={`py-3 rounded-lg transition-all duration-200 font-[titleFont] ${
-                        quantity === option && quantity !== 'custom'
+                      onClick={() => handleScheduleChange('morning')}
+                      className={`flex-1 py-4 rounded-lg border-2 transition-all duration-200 font-[titleFont] text-base ${
+                        deliverySchedule === 'morning'
+                          ? 'border-[#9C4A15] bg-[#F5EFE7]'
+                          : 'border-gray-200 hover:border-[#9C4A15]'
+                      }`}
+                      style={{ color: '#2A1803' }}
+                    >
+                      <div className="font-medium">Morning</div>
+                      <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
+                        6:30-10 AM
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleScheduleChange('evening')}
+                      className={`flex-1 py-4 rounded-lg border-2 transition-all duration-200 font-[titleFont] text-base ${
+                        deliverySchedule === 'evening'
+                          ? 'border-[#9C4A15] bg-[#F5EFE7]'
+                          : 'border-gray-200 hover:border-[#9C4A15]'
+                      }`}
+                      style={{ color: '#2A1803' }}
+                    >
+                      <div className="font-medium">Evening</div>
+                      <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
+                        3-7 PM
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Quantity Selection */}
+                  <h3
+                    className="text-lg font-medium mb-4 font-[titleFont]"
+                    style={{ color: '#9C4A15' }}
+                  >
+                    Quantity per Delivery
+                  </h3>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {[20, 40, 50].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => handleQuantityChange(option)}
+                        className={`py-3 rounded-lg transition-all duration-200 font-[titleFont] text-sm ${
+                          quantity === option && quantity !== 'custom'
+                            ? 'bg-[#9C4A15] text-white'
+                            : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
+                        }`}
+                      >
+                        {option} pcs
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-3 mb-3">
+                    <button
+                      onClick={() => handleQuantityChange('custom')}
+                      className={`flex-1 py-3 rounded-lg transition-all duration-200 font-[titleFont] text-sm ${
+                        quantity === 'custom'
                           ? 'bg-[#9C4A15] text-white'
                           : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
                       }`}
                     >
-                      {option} pcs
+                      Custom
                     </button>
-                  ))}
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => handleQuantityChange('custom')}
-                    className={`flex-1 py-3 rounded-lg transition-all duration-200 font-[titleFont] ${
-                      quantity === 'custom'
-                        ? 'bg-[#9C4A15] text-white'
-                        : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
-                    }`}
-                  >
-                    Custom
-                  </button>
-                  {quantity === 'custom' && (
-                    <input
-                      type="number"
-                      value={customQuantity}
-                      onChange={(e) => setCustomQuantity(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Enter quantity"
-                      min="20"
-                      className="flex-1 px-4 py-3 rounded-lg border-2 border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] font-[titleFont]"
-                      style={{ color: '#2A1803' }}
-                    />
-                  )}
-                </div>
-                <p className="text-sm mt-3 font-[titleFont]" style={{ color: '#9C4A15' }}>
-                  Minimum: 20 pieces per delivery
-                </p>
-              </div>
+                    {quantity === 'custom' && (
+                      <input
+                        type="number"
+                        value={customQuantity}
+                        onChange={(e) => setCustomQuantity(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter quantity"
+                        min="20"
+                        className="flex-1 px-4 py-3 rounded-lg border-2 border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] font-[titleFont] text-sm"
+                        style={{ color: '#2A1803' }}
+                      />
+                    )}
+                  </div>
+                  <p className="text-sm font-[titleFont]" style={{ color: '#9C4A15' }}>
+                    Minimum: 20 pieces per delivery
+                  </p>
 
-              {/* Special Instructions */}
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h3
-                  className="text-xl font-light mb-4 font-[titleFont]"
-                  style={{ color: '#2A1803' }}
-                >
-                  Special Instructions
-                </h3>
-                <textarea
-                  value={specialInstructions}
-                  onChange={(e) => setSpecialInstructions(e.target.value)}
-                  placeholder="Any special requests or notes for delivery..."
-                  className="w-full h-32 px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] font-[titleFont] resize-none"
-                  style={{ color: '#2A1803' }}
-                />
-              </div>
+                  {/* Special Instructions */}
+                  <h3
+                    className="text-lg font-medium mb-4 mt-8 font-[titleFont]"
+                    style={{ color: '#9C4A15' }}
+                  >
+                    Special Instructions
+                  </h3>
+                  <textarea
+                    value={specialInstructions}
+                    onChange={(e) => setSpecialInstructions(e.target.value)}
+                    placeholder="Any special requests or notes for delivery..."
+                    className="w-full h-28 px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] font-[titleFont] text-sm resize-none"
+                    style={{ color: '#2A1803' }}
+                  />
+                </div>
+              </motion.div>
 
               {/* Order Summary */}
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h3
-                  className="text-xl font-light mb-6 font-[titleFont]"
+              <motion.div className="flex flex-col" variants={faqItem} transition={{ delay: 0.2 }}>
+                <h2
+                  className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
                   style={{ color: '#2A1803' }}
                 >
                   Order Summary
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-[titleFont]" style={{ color: '#2A1803' }}>
-                      Selected Days
-                    </span>
-                    <span className="font-bold font-[titleFont]" style={{ color: '#9C4A15' }}>
-                      {selectedDates.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-[titleFont]" style={{ color: '#2A1803' }}>
-                      Pieces per delivery
-                    </span>
-                    <span className="font-bold font-[titleFont]" style={{ color: '#9C4A15' }}>
-                      {getFinalQuantity()} pcs
-                    </span>
-                  </div>
-                  <div className="h-px bg-gray-200 my-2"></div>
-                  <div className="flex justify-between items-center text-lg">
-                    <span className="font-bold font-[titleFont]" style={{ color: '#2A1803' }}>
-                      Total Pandesal
-                    </span>
-                    <span className="font-bold font-[titleFont]" style={{ color: '#9C4A15' }}>
-                      {getTotalPandesal()} pcs
-                    </span>
-                  </div>
-                  {specialInstructions && (
-                    <div
-                      className="mt-4 p-3 rounded-lg font-[titleFont] text-sm"
-                      style={{ backgroundColor: '#F5EFE7', color: '#2A1803' }}
-                    >
-                      📝 With special instructions
+                </h2>
+
+                <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1 flex flex-col">
+                  <div className="space-y-4 flex-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
+                        Selected Days
+                      </span>
+                      <span
+                        className="font-bold font-[titleFont] text-lg"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        {selectedDates.length}
+                      </span>
                     </div>
-                  )}
+                    <div className="flex justify-between items-center">
+                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
+                        Pieces per delivery
+                      </span>
+                      <span
+                        className="font-bold font-[titleFont] text-lg"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        {getFinalQuantity()} pcs
+                      </span>
+                    </div>
+
+                    <div className="h-px" style={{ backgroundColor: '#F5EFE7' }}></div>
+
+                    <div className="flex justify-between items-center">
+                      <span
+                        className="font-bold font-[titleFont] text-lg"
+                        style={{ color: '#2A1803' }}
+                      >
+                        Total Pandesal
+                      </span>
+                      <span
+                        className="font-bold font-[titleFont] text-xl"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        {getTotalPandesal()} pcs
+                      </span>
+                    </div>
+
+                    {specialInstructions && (
+                      <div
+                        className="mt-4 p-3 rounded-lg font-[titleFont] text-sm"
+                        style={{ backgroundColor: '#F5EFE7', color: '#2A1803' }}
+                      >
+                        With special instructions
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6">
+                    <motion.button
+                      onClick={handleSubmitOrder}
+                      className="w-full py-4 rounded-full font-bold font-[titleFont] text-base transition-all duration-200 shadow-lg"
+                      style={{
+                        backgroundColor: '#9C4A15',
+                        color: '#F5EFE7',
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={
+                        selectedDates.length === 0 ||
+                        (quantity === 'custom' &&
+                          (!customQuantity || parseInt(customQuantity) < 20))
+                      }
+                    >
+                      {selectedDates.length === 0
+                        ? 'Select Delivery Dates'
+                        : `Place Order for ${selectedDates.length} Delivery${selectedDates.length !== 1 ? 's' : ''}`}
+                    </motion.button>
+
+                    <p
+                      className="text-center mt-3 font-[titleFont] text-sm"
+                      style={{ color: '#9C4A15' }}
+                    >
+                      Free delivery on all subscriptions
+                    </p>
+                  </div>
                 </div>
-
-                <motion.button
-                  onClick={handleSubmitOrder}
-                  className="w-full py-4 mt-6 rounded-full font-bold text-lg font-[titleFont] transition-all duration-200 shadow-lg"
-                  style={{
-                    backgroundColor: '#9C4A15',
-                    color: '#F5EFE7',
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={
-                    selectedDates.length === 0 ||
-                    (quantity === 'custom' && (!customQuantity || parseInt(customQuantity) < 20))
-                  }
-                >
-                  {selectedDates.length === 0
-                    ? 'Select Delivery Dates'
-                    : `Place Order for ${selectedDates.length} Delivery${selectedDates.length !== 1 ? 's' : ''}`}
-                </motion.button>
-
-                <p
-                  className="text-center mt-4 font-[titleFont] text-sm"
-                  style={{ color: '#9C4A15' }}
-                >
-                  Free delivery on all subscriptions
-                </p>
-              </div>
-            </motion.div>
+              </motion.div>
+            </div>
           </div>
         </motion.div>
 
         {/* Footer Note */}
-        <motion.div
-          className="text-center mt-12 pt-8 border-t"
-          style={{ borderColor: '#9C4A15' }}
-          variants={fadeIn}
-          transition={{ delay: 0.3 }}
-        >
-          <p className="font-[titleFont] mb-2" style={{ color: '#2A1803' }}>
+        <motion.div className="text-center mt-12" variants={faqItem} transition={{ delay: 0.3 }}>
+          <div className="h-1 w-32 mx-auto mb-4" style={{ backgroundColor: '#9C4A15' }}></div>
+          <p className="text-lg md:text-xl font-[titleFont]" style={{ color: '#2A1803' }}>
             Need more help? Contact us at{' '}
             <a
               href="mailto:customerservice@pandedaily.com"
@@ -627,11 +673,19 @@ const Order = () => {
               customerservice@pandedaily.com
             </a>
           </p>
-          <p className="text-sm font-[titleFont]" style={{ color: '#9C4A15' }}>
+          <p className="text-sm font-[titleFont] mt-2" style={{ color: '#9C4A15' }}>
             Free delivery on all subscriptions • Zero preservatives • Hand-kneaded daily
           </p>
         </motion.div>
       </div>
+
+      {/* Auth Choice Modal */}
+      <AuthChoiceModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onGuestContinue={handleGuestContinue}
+        onLoginRegister={handleLoginRegister}
+      />
     </section>
   )
 }

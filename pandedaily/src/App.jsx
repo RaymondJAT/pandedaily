@@ -10,8 +10,9 @@ import Footer from './components/layout/Footer'
 import About from './pages/About'
 import Faq from './pages/Faq'
 import Order from './pages/Order'
+import AuthChoiceModal from './components/modal/AuthChoiceModal'
+import Login from './pages/Login'
 
-// Component to handle hash scrolling
 const ScrollToHash = () => {
   const location = useLocation()
 
@@ -42,6 +43,34 @@ const ScrollToHash = () => {
 
 function App() {
   const [isScrolled, setIsScrolled] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+
+  // Function to trigger auth modal from any component
+  const handleOpenAuthModal = () => {
+    setShowAuthModal(true)
+  }
+
+  // Function to close auth modal
+  const handleCloseAuthModal = () => {
+    setShowAuthModal(false)
+  }
+
+  // Handle guest checkout
+  const handleGuestContinue = () => {
+    setShowAuthModal(false)
+    // You can navigate to guest checkout page or handle guest flow
+    console.log('Guest checkout initiated')
+    // Optional: navigate to guest checkout page
+    // window.location.href = '/guest-checkout'
+  }
+
+  // Handle login/register click
+  const handleLoginRegister = () => {
+    setShowAuthModal(false)
+    // Navigation will be handled by the AuthChoiceModal component
+    // or you can navigate here:
+    window.location.href = '/login'
+  }
 
   useEffect(() => {
     const handleScroll = () => {
@@ -55,8 +84,18 @@ function App() {
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
-        <NavigationBar isScrolled={isScrolled} />
+        {/* Pass handleOpenAuthModal to NavigationBar if needed for auth buttons */}
+        <NavigationBar isScrolled={isScrolled} onAuthClick={handleOpenAuthModal} />
         <ScrollToHash />
+
+        {/* Auth Choice Modal */}
+        <AuthChoiceModal
+          isOpen={showAuthModal}
+          onClose={handleCloseAuthModal}
+          onGuestContinue={handleGuestContinue}
+          onLoginRegister={handleLoginRegister}
+        />
+
         <main className="flex-1">
           <Routes>
             <Route
@@ -74,6 +113,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/faq" element={<Faq />} />
             <Route path="/order" element={<Order />} />
+            <Route path="/login" element={<Login />} />
           </Routes>
         </main>
         <Footer />

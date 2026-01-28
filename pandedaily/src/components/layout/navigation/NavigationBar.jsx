@@ -21,7 +21,6 @@ const NavigationBar = () => {
     }
 
     if (location.pathname === '/') {
-      // We're already on homepage, scroll to contact
       setTimeout(() => {
         const element = document.getElementById('contact')
         if (element) {
@@ -34,9 +33,8 @@ const NavigationBar = () => {
             behavior: 'smooth',
           })
         }
-      }, 100) // Small delay to ensure DOM is ready
+      }, 100)
     } else {
-      // Navigate to homepage with hash
       navigate('/#contact')
     }
   }
@@ -62,7 +60,7 @@ const NavigationBar = () => {
             behavior: 'smooth',
           })
         }
-      }, 500) // Delay to ensure page is loaded
+      }, 500)
     }
   }, [location])
 
