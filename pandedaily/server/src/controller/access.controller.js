@@ -1,9 +1,5 @@
 const { Master } = require('../database/model/Master')
-const { SQLQueryBuilder } = require('../utils/helper.util')
-const { Query, Insert, Update, Transaction } = require('../database/utility/queries.util')
-const dictionary = require('../utils/dictionary.util')
-
-const SQL = new SQLQueryBuilder()
+const { Query, Insert } = require('../database/utility/queries.util')
 
 // READ
 const getAccess = async (req, res) => {
@@ -44,6 +40,7 @@ const addAccess = async (req, res) => {
   }
 }
 
+// UPDATE
 const updateAccess = async (req, res) => {
   const { id } = req.params
   const { name, status } = req.body

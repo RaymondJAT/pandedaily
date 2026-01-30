@@ -1,7 +1,8 @@
 const express = require('express')
-const { validateField } = require('../middleware/validateSchema.middleware')
+const { validateField, validateSchema } = require('../middleware/validateSchema.middleware')
 const { MasterAccessSchema, MasterAccessField } = require('../schemas/master-access.schema')
 const { getAccess, addAccess, updateAccess } = require('../controller/access.controller')
+const Joi = require('joi')
 
 const accessRouter = express.Router()
 
@@ -18,11 +19,16 @@ accessRouter.post(
 // PUT
 accessRouter.put(
   '/:id',
-  validateField(MasterAccessSchema, [
-    MasterAccessField.Id,
-    MasterAccessField.Name,
-    MasterAccessField.Status,
-  ]),
+
+  validateField(MasterAccessSchema, [MasterAccessField.Id], 'params'),
+
+  validateSchema({
+    body: Joi.object({
+      name: MasterAccessSchema.extract(MasterAccessField.Name).optional(),
+      status: MasterAccessSchema.extract(MasterAccessField.Status).optional(),
+    }).min(1),
+  }),
+
   updateAccess,
 )
 

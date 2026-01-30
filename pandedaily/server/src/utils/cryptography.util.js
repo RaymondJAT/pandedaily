@@ -1,13 +1,13 @@
-require('dotenv')
+require('dotenv').config()
 const bcrypt = require('bcrypt')
-const { logger } = require('../util/logger.util')
+const { logger } = require('./logger.util')
 
 /**
  * Encryption Salt
  */
-const saltRounds = 10
-const sqlPassword = '#Ebedaf19dd0d'
-const salt = '$2b$10$nsumtNnZ5fP5s5GHybnCu.' //bcrypt.genSaltSync(saltRounds);
+// const saltRounds = 10
+// const sqlPassword = '#Ebedaf19dd0d'
+// const salt = '$2b$10$nsumtNnZ5fP5s5GHybnCu.' //bcrypt.genSaltSync(saltRounds);
 const crypto = require('crypto')
 
 /**
@@ -84,4 +84,46 @@ exports.EncryptString = (password) => {
   } catch (error) {
     throw error
   }
+}
+
+function Main() {
+  const args = process.argv.slice(2)
+
+  if (args.length < 2) {
+    console.log(`
+      Usage:
+        node src/util/cryptography.util.js encrypt "text to encrypt"
+        node src/util/cryptography.util.js decrypt "hash to decrypt"
+        
+      Example:
+        node src/util/cryptography.util.js encrypt "myPassword123"
+        node src/util/cryptography.util.js decrypt "a1b2c3d4e5f6..."
+    `)
+    return
+  }
+
+  const operation = args[0]
+  const input = args[1]
+
+  if (operation === 'encrypt') {
+    try {
+      const result = exports.EncryptString(input)
+      console.log('Encrypted:', result)
+    } catch (error) {
+      console.error('Encryption failed:', error.message)
+    }
+  } else if (operation === 'decrypt') {
+    const result = exports.DecryptString(input)
+    if (result !== null) {
+      console.log('Decrypted:', result)
+    } else {
+      console.error('Decryption failed')
+    }
+  } else {
+    console.error('Invalid operation. Use "encrypt" or "decrypt"')
+  }
+}
+
+if (require.main === module) {
+  Main()
 }
