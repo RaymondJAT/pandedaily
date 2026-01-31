@@ -4,6 +4,8 @@ const YAML = require('yaml')
 const { accessRouter } = require('../routes/access.routes')
 const { routeRouter } = require('../routes/route.routes')
 const { userRouter } = require('../routes/user.routes')
+const { authRouter } = require('../routes/auth.routes')
+const { auth } = require('../middleware/auth.middleware')
 
 const file = fs.readFileSync('./src/docs/swagger.docs.yaml', 'utf8')
 const swaggerDocs = YAML.parse(file)
@@ -14,6 +16,7 @@ const initRoutes = async (app) => {
   app.use('/access', accessRouter)
   app.use('/route', routeRouter)
   app.use('/user', userRouter)
+  app.use('/auth', authRouter)
 }
 
 module.exports = {

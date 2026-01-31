@@ -1,44 +1,42 @@
 'use strict'
 
 const jwt = require('jsonwebtoken')
+const { Query } = require('../database/utility/queries.util')
+const { SQLQueryBuilder } = require('../utils/helper.util')
+const { Master } = require('../database/model/Master')
+const { logger } = require('../utils/logger.util')
+const { EncryptString } = require('../utils/cryptography.util')
 require('dotenv').config()
-const { logger } = require('../util/logger.util')
+
+const SQL = new SQLQueryBuilder()
 
 const auth = async (req, res, next) => {
-  const token = req.session.jwt
-
-  if (!token) {
-    return res.status(401).json({ message: 'Unauthorized: No authentication token found.' })
-  }
-
-  if (!process.env._SECRET_KEY) {
-    logger.error('JWT Secret key not found in environment variables.')
-    return res.status(500).json({ message: 'Server configuration error.' })
-  }
-
   try {
-    const decoded = jwt.verify(token, process.env._SECRET_KEY)
-    req.context = {
-      usercode: decoded.usercode,
-      accesstype: decoded.accesstype,
-      branchid: decoded.branchid,
-      employeeid: decoded.employeeid,
+    let token = req.session.jwt
+
+    // console.log(req.headers)
+    if (!token && req.headers['authorization']) {
+      token = req.headers['authorization'].split(' ')[1]
     }
 
-    req.session.usercode = decoded.usercode
-    req.session.accesstype = decoded.accesstype
-    req.session.branchid = decoded.branchid
-    req.session.employeeid = decoded.employeeid
+    if (!token) {
+      return res.status(401).json({ message: 'Unauthorized: Please login.' })
+    }
+
+    console.log('here', process.env._SECRET_KEY)
+
+    const decodedUser = jwt.verify(token, process.env._SECRET_KEY)
+    // console.log(decodedUser)
+
+    req.context = {
+      ...decodedUser,
+    }
 
     return next()
   } catch (err) {
-    logger.error('JWT Verification Failed')
-    req.session.destroy(() => {})
-
-    return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.' })
+    logger.error('Auth Middleware Error', err)
+    return res.status(401).json({ message: 'Authentication failed.' })
   }
 }
 
-module.exports = {
-  auth,
-}
+module.exports = { auth }

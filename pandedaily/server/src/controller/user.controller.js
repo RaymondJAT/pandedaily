@@ -8,6 +8,8 @@ const getUser = async (req, res) => {
     const statement = `SELECT * FROM master_user`
 
     const data = await Query(statement, [], Master.master_user.prefix_)
+    console.log(data)
+
     res.status(200).json({ message: 'User data retrieved.', data })
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving user data.' })
@@ -28,7 +30,8 @@ const getUserById = async (req, res) => {
 
 // CREATE
 const addUser = async (req, res) => {
-  const { fullname, access_id, email, username, password, status = 1 } = req.body
+  const { fullname, access_id, email, username, status = 1 } = req.body
+  let { password } = req.body
 
   try {
     if (!fullname || !access_id || !email || !username || !password) {
@@ -38,7 +41,14 @@ const addUser = async (req, res) => {
     }
 
     const statement = `INSERT INTO master_user(mu_fullname, mu_access_id, mu_email, mu_username, mu_password, mu_status) VALUES(?, ?, ?, ?, ?, ?)`
-    const data = await Query(statement, [fullname, access_id, email, username, password, status])
+    const data = await Query(statement, [
+      fullname,
+      access_id,
+      email,
+      username,
+      EncryptString(password),
+      status,
+    ])
 
     res.status(201).json({
       message: 'User data added successfully.',
@@ -123,8 +133,8 @@ const updateUser = async (req, res) => {
       }
 
       if (field === 'password') {
-        value = await bcrypt.hash(value, 10)
-        updatedFields.password = '[HASHED]'
+        value = EncryptString(value)
+        updatedFields.password = '[ENCRYPTED]'
       } else {
         updatedFields[field] = value
       }
@@ -142,6 +152,12 @@ const updateUser = async (req, res) => {
     `
 
     const data = await Query(statement, params)
+
+    if (data.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'User not found or no changes made.',
+      })
+    }
 
     res.status(200).json({
       message: 'User updated successfully.',
