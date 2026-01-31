@@ -1,5 +1,5 @@
 const { Master } = require('../database/model/Master')
-const { Query, Insert, Update, Transaction } = require('../database/utility/queries.util')
+const { Query } = require('../database/utility/queries.util')
 
 // READ
 const getRoute = async (req, res) => {

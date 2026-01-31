@@ -14,26 +14,18 @@ const getAccess = async (req, res) => {
 }
 
 // CREATE
-const addAccess = async (req, res) => {
-  const { name, status = 1 } = req.body
-
+const addAccess = async (req, res_) => {
   try {
-    if (!name) {
-      return res.status(400).json({
-        message: 'Access name is required.',
-      })
-    }
-
+    const { name, status = 1 } = req.body
     const statement = `INSERT INTO master_access(ma_name, ma_status) VALUES(?, ?)`
-    const data = await Insert(statement, [name, status])
-
-    res.status(200).json({
+    const data = await Query(statement, [name, status])
+    res_.status(200).json({
       message: 'Access data added successfully.',
       data,
     })
   } catch (error) {
     console.error('Error adding access data:', error)
-    res.status(500).json({
+    res_.status(500).json({
       message: 'Error adding access data.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     })

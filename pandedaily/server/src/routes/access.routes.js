@@ -10,11 +10,7 @@ const accessRouter = express.Router()
 accessRouter.get('/', getAccess)
 
 // POST
-accessRouter.post(
-  '/',
-  validateField(MasterAccessSchema, [MasterAccessField.Name, MasterAccessField.Status]),
-  addAccess,
-)
+accessRouter.post('/', addAccess)
 
 // PUT
 accessRouter.put(

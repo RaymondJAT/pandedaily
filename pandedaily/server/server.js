@@ -24,14 +24,14 @@ const ServerStart = async () => {
     logger.info('Initializing logger middleware')
     app.use(httpLogger)
 
-    logger.info('Initializing CORS middleware')
-    app.use(cors(corsOptions))
-
     logger.info('Initializing session middleware')
     initSession(app)
 
     logger.info('Initializing routes')
     initRoutes(app)
+
+    logger.info('Initializing CORS middleware')
+    app.use(cors(corsOptions))
 
     logger.info('Checking database connection')
     await checkConnection()

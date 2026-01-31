@@ -5,10 +5,11 @@ const { EncryptString, DecryptString } = require('../utils/cryptography.util')
 // READ
 const getUser = async (req, res) => {
   try {
+    console.log(req.context)
+
     const statement = `SELECT * FROM master_user`
 
     const data = await Query(statement, [], Master.master_user.prefix_)
-    console.log(data)
 
     res.status(200).json({ message: 'User data retrieved.', data })
   } catch (error) {

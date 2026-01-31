@@ -38,7 +38,7 @@ const httpLogger = morgan(format, {
   stream: morganStream,
   skip: (req, res) => {
     if (req.method === 'OPTIONS') return true
-    if (req.methid === 'GET') return true
+    if (req.method === 'GET') return true
     if (req.url === '/health' || req.url === '/status' || req.url === '/ping') return true
     if (req.url === '/favicon.ico') return true
     if (req.url.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff|woff2)$/)) return true

@@ -23,8 +23,6 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Unauthorized: Please login.' })
     }
 
-    console.log('here', process.env._SECRET_KEY)
-
     const decodedUser = jwt.verify(token, process.env._SECRET_KEY)
     // console.log(decodedUser)
 

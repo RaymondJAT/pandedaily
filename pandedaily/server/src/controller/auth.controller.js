@@ -1,4 +1,3 @@
-const { Master } = require('../database/model/Master')
 const { Query } = require('../database/utility/queries.util')
 const { EncryptString, DecryptString } = require('../utils/cryptography.util')
 require('dotenv').config()

@@ -1,6 +1,4 @@
 const express = require('express')
-const { valieField, validateSchema } = require('../middleware/validateSchema.middleware')
-const { MasterUserSchema, MasterUserField } = require('../schemas/master-user.schema')
 const { getUser, getUserById, addUser, updateUser } = require('../controller/user.controller')
 
 const userRouter = express.Router()
