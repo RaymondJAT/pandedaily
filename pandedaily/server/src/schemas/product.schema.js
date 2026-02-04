@@ -4,7 +4,7 @@
 
 const Joi = require('joi');
 
-const MasterAccessSchema = Joi.object({
+const ProductSchema = Joi.object({
  	id: Joi.number().integer().required().messages({
         'any.required': 'id is required.',
         'number.base': 'id must be a valid integer.',
@@ -12,6 +12,18 @@ const MasterAccessSchema = Joi.object({
  	name: Joi.string().trim().required().messages({
         'any.required': 'name is required.',
         'string.empty': 'name must be a valid string.',
+      }),
+ 	categoryId: Joi.number().integer().required().messages({
+        'any.required': 'categoryId is required.',
+        'number.base': 'categoryId must be a valid integer.',
+      }),
+ 	price: Joi.string().trim().required().messages({
+        'any.required': 'price is required.',
+        'string.empty': 'price must be a valid decimal.',
+      }),
+ 	cost: Joi.string().trim().required().messages({
+        'any.required': 'cost is required.',
+        'string.empty': 'cost must be a valid decimal.',
       }),
  	status: Joi.string().trim().required().messages({
         'any.required': 'status is required.',
@@ -21,16 +33,19 @@ const MasterAccessSchema = Joi.object({
 
 
 /** Field references for clean, type-safe access */
-const MasterAccessField = {
+const ProductField = {
     Id: 'id',
     Name: 'name',
+    CategoryId: 'category_id',
+    Price: 'price',
+    Cost: 'cost',
     Status: 'status',
     Createddate: 'createddate',
-    All: ['id', 'name', 'status', 'createddate'],
+    All: ['id', 'name', 'category_id', 'price', 'cost', 'status', 'createddate'],
 };
 
 
 module.exports = {
-  MasterAccessSchema,
-  MasterAccessField, 
+  ProductSchema,
+  ProductField, 
 };

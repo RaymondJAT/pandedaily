@@ -8,6 +8,7 @@ const { authRouter } = require('../routes/auth.routes')
 const { customerRouter } = require('../routes/customer.routes')
 const { productRouter } = require('../routes/product.routes')
 const { inventoryRouter } = require('../routes/inventory.routes')
+const { orderRouter } = require('../routes/order.routes')
 const { auth } = require('../middleware/auth.middleware')
 
 const file = fs.readFileSync('./src/docs/swagger.docs.yaml', 'utf8')
@@ -25,6 +26,7 @@ const initRoutes = async (app) => {
   app.use('/customer', customerRouter)
   app.use('/product', productRouter)
   app.use('/inventory', inventoryRouter)
+  app.use('/orders', orderRouter)
 }
 
 module.exports = {

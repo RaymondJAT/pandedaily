@@ -4,7 +4,7 @@
 
 const Joi = require('joi');
 
-const MasterAccessSchema = Joi.object({
+const ProductCategorySchema = Joi.object({
  	id: Joi.number().integer().required().messages({
         'any.required': 'id is required.',
         'number.base': 'id must be a valid integer.',
@@ -21,7 +21,7 @@ const MasterAccessSchema = Joi.object({
 
 
 /** Field references for clean, type-safe access */
-const MasterAccessField = {
+const ProductCategoryField = {
     Id: 'id',
     Name: 'name',
     Status: 'status',
@@ -31,6 +31,6 @@ const MasterAccessField = {
 
 
 module.exports = {
-  MasterAccessSchema,
-  MasterAccessField, 
+  ProductCategorySchema,
+  ProductCategoryField, 
 };
