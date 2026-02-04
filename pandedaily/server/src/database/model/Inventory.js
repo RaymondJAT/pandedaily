@@ -49,7 +49,6 @@ const Inventory = {
   prefix_: "ih_",
   insertColumns: [
       "inventory_id",
-      "quantity",
       "stock_before",
       "stock_after"
     ],
@@ -57,7 +56,6 @@ const Inventory = {
       "ih_id",
       "ih_inventory_id",
       "ih_date",
-      "ih_quantity",
       "ih_stock_before",
       "ih_stock_after",
       "ih_status"
@@ -66,7 +64,6 @@ const Inventory = {
     id: "ih_id",
     inventory_id: "ih_inventory_id",
     date: "ih_date",
-    quantity: "ih_quantity",
     stock_before: "ih_stock_before",
     stock_after: "ih_stock_after",
     status: "ih_status"
@@ -75,7 +72,6 @@ const Inventory = {
     id: "id",
     inventory_id: "inventory_id",
     date: "date",
-    quantity: "quantity",
     stock_before: "stock_before",
     stock_after: "stock_after",
     status: "status"
@@ -90,7 +86,6 @@ const Inventory = {
     id: "INTEGER",
     inventory_id: "INTEGER",
     date: "DATE",
-    quantity: "INTEGER",
     stock_before: "INTEGER",
     stock_after: "INTEGER",
     status: "ENUM"

@@ -134,7 +134,7 @@ const registerCustomer = async (req, res) => {
       EncryptString(password),
     ])
 
-    res.status(201).json({
+    res.status(200).json({
       message: 'Customer data added successfully.',
       data,
       insertedId: data.insertId,

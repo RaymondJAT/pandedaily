@@ -2,18 +2,18 @@ const { Product } = require('../database/model/Product')
 const { Query } = require('../database/utility/queries.util')
 
 // GET ALL
-const getProductCategory = async (req, res_) => {
+const getProductCategory = async (req, res) => {
   try {
     const statement = `SELECT * FROM product_category`
 
     const data = await Query(statement, [], Product.product_category.prefix_)
-    res_.status(200).json({ message: 'Product category data retrieved.', data })
+    res.status(200).json({ message: 'Product category data retrieved.', data })
   } catch (error) {
-    res_.status(500).json({ message: 'Error retrieving product category data.' })
+    res.status(500).json({ message: 'Error retrieving product category data.' })
   }
 }
 
-const getProduct = async (req, res_) => {
+const getProduct = async (req, res) => {
   try {
     const statement = `SELECT p_id AS id, p_name AS name, pc_name AS category_name, p_price AS price, p_cost AS cost, p_status AS status, pi_image AS image 
     FROM product 
@@ -21,14 +21,14 @@ const getProduct = async (req, res_) => {
     LEFT JOIN product_image ON product.p_id = product_image.pi_product_id`
 
     const data = await Query(statement, [], Product.product.prefix_)
-    res_.status(200).json({ message: 'Product data retrieved.', data })
+    res.status(200).json({ message: 'Product data retrieved.', data })
   } catch (error) {
-    res_.status(500).json({ message: 'Error retrieving product data.' })
+    res.status(500).json({ message: 'Error retrieving product data.' })
   }
 }
 
 // GET BY ID
-const getProductById = async (req, res_) => {
+const getProductById = async (req, res) => {
   const { id } = req.params
 
   try {
@@ -40,20 +40,20 @@ const getProductById = async (req, res_) => {
 
     const data = await Query(statement, [id], Product.product.prefix_)
 
-    res_.status(200).json({ message: 'Product data retrieved.', data })
+    res.status(200).json({ message: 'Product data retrieved.', data })
   } catch (error) {
-    res_.status(500).json({ message: 'Error retrieving product data.' })
+    res.status(500).json({ message: 'Error retrieving product data.' })
   }
 }
 
 // CREATE
-const addProductCategory = async (req, res_) => {
+const addProductCategory = async (req, res) => {
   const { name, status = 1 } = req.body
 
   try {
     const statement = `INSERT INTO product_category(pc_name, pc_status) VALUES(?, ?)`
     const data = await Query(statement, [name, status])
-    res_.status(201).json({
+    res.status(200).json({
       message: 'Product category data added successfully.',
       data,
       insertedId: data.insertId,
@@ -64,40 +64,51 @@ const addProductCategory = async (req, res_) => {
     console.error('Error parameters:', [name, status])
 
     if (error.code === 'ER_DUP_ENTRY') {
-      return res_.status(409).json({ message: 'Product category with this name already exists.' })
+      return res.status(409).json({ message: 'Product category with this name already exists.' })
     }
 
-    res_.status(500).json({ message: 'Error adding product category data.' })
+    res.status(500).json({ message: 'Error adding product category data.' })
   }
 }
 
-const addProduct = async (req, res_) => {
+const addProduct = async (req, res) => {
   const { name, category_id, price, cost, status = 1, image } = req.body
 
   try {
-    const statement = `INSERT INTO product(p_name, p_category_id, p_price, p_cost, p_status) VALUES(?, ?, ?, ?, ?)`
-    const data = await Query(statement, [name, category_id, price, cost, status])
+    const productResult = await Query(
+      `INSERT INTO product(p_name, p_category_id, p_price, p_cost, p_status) VALUES(?, ?, ?, ?, ?)`,
+      [name, category_id, price, cost, status],
+    )
+    const productId = productResult.insertId
 
-    console.log('result', data.insertId)
+    await Query(`INSERT INTO product_image(pi_product_id, pi_image) VALUES(?, ?)`, [
+      productId,
+      image,
+    ])
 
-    const productImage = `INSERT INTO product_image(pi_product_id, pi_image) VALUES(?, ?)`
-    await Query(productImage, [data.insertId, image])
+    const inventoryResult = await Query(
+      `INSERT INTO inventory(i_product_id, i_current_stock, i_previous_stock) VALUES(?, 0, 0)`,
+      [productId],
+    )
+    const inventoryId = inventoryResult.insertId
 
-    res_.status(201).json({
-      message: 'Product data added successfully.',
-      data,
-      insertedId: data.insertId,
+    await Query(
+      `INSERT INTO inventory_history(ih_inventory_id, ih_date, ih_stock_before, ih_stock_after, ih_status)
+       VALUES(?, NOW(), 0, 0, 'new')`,
+      [inventoryId],
+    )
+
+    res.status(200).json({
+      message: 'Product added successfully with inventory and initial history.',
+      productId,
+      inventoryId,
     })
   } catch (error) {
-    console.error('Error adding product data:', error)
-    console.error('Error SQL:', error.sql)
-    console.error('Error parameters:', [name, category_id, price, cost, status])
-
+    console.error('Error adding product:', error)
     if (error.code === 'ER_DUP_ENTRY') {
-      return res_.status(409).json({ message: 'Product with this name already exists.' })
+      return res.status(409).json({ message: 'Product with this name already exists.' })
     }
-
-    res_.status(500).json({ message: 'Error adding product data.' })
+    res.status(500).json({ message: 'Error adding product data.' })
   }
 }
 

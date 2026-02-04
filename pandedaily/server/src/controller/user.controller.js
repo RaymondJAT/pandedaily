@@ -51,7 +51,7 @@ const addUser = async (req, res) => {
       status,
     ])
 
-    res.status(201).json({
+    res.status(200).json({
       message: 'User data added successfully.',
       data,
       insertedId: data.insertId,

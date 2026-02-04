@@ -38,7 +38,7 @@ const addRoute = async (req, res) => {
     `
     const data = await Query(statement, [access_id, route_name, status])
 
-    res.status(201).json({
+    res.status(200).json({
       message: 'Route data added successfully.',
       data,
       insertedId: data.insertId,
