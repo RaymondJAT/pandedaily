@@ -65,82 +65,63 @@ const addRoute = async (req, res) => {
 // UPDATE
 const updateRoute = async (req, res) => {
   const { id } = req.params
-  const { accessId, routeName, status } = req.body
+  const { access_id, route_name, status } = req.body
+
+  if (!Number.isInteger(+id)) {
+    return res.status(400).json({ message: 'Valid route ID is required.' })
+  }
+
+  if (![access_id, route_name, status].some((v) => v !== undefined)) {
+    return res.status(400).json({
+      message: 'At least one field (access_id, route_name, or status) is required.',
+    })
+  }
 
   try {
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        message: 'Valid route ID is required.',
-      })
-    }
+    const [route] = await Query(`SELECT mr_id FROM master_route WHERE mr_id = ?`, [id])
 
-    if (!accessId && !routeName && !status) {
-      return res.status(400).json({
-        message: 'At least one field (accessId, routeName, or status) is required for update.',
-      })
-    }
-
-    if (accessId && isNaN(parseInt(accessId))) {
-      return res.status(400).json({
-        message: 'accessId must be a valid number.',
-      })
-    }
-
-    if (routeName && typeof routeName !== 'string') {
-      return res.status(400).json({
-        message: 'routeName must be a string.',
-      })
-    }
-
-    if (status && typeof status !== 'string') {
-      return res.status(400).json({
-        message: 'status must be a string.',
-      })
-    }
-
-    const recordExists = await Query(`SELECT mr_id FROM master_route WHERE mr_id = ?`, [id])
-
-    if (recordExists.length === 0) {
-      return res.status(404).json({
-        message: 'Route record not found.',
-      })
-    }
-
-    if (accessId) {
-      const accessExists = await Query(`SELECT ma_id FROM master_access WHERE ma_id = ?`, [
-        accessId,
-      ])
-      if (accessExists.length === 0) {
-        return res.status(404).json({
-          message: 'Access ID not found.',
-        })
-      }
+    if (!route) {
+      return res.status(404).json({ message: 'Route record not found.' })
     }
 
     const updates = []
     const params = []
+    const updatedFields = {}
 
-    if (accessId) {
-      updates.push('mr_access_id = ?')
-      params.push(parseInt(accessId))
-    }
-
-    if (routeName) {
-      const trimmedRouteName = routeName.trim()
-      if (trimmedRouteName === '') {
-        return res.status(400).json({
-          message: 'routeName cannot be empty.',
-        })
+    if (access_id !== undefined) {
+      if (!Number.isInteger(+access_id)) {
+        return res.status(400).json({ message: 'access_id must be a valid number.' })
       }
-      updates.push('mr_route_name = ?')
-      params.push(trimmedRouteName)
+
+      const [access] = await Query(`SELECT ma_id FROM master_access WHERE ma_id = ?`, [access_id])
+
+      if (!access) {
+        return res.status(404).json({ message: 'Access ID not found.' })
+      }
+
+      updates.push('mr_access_id = ?')
+      params.push(+access_id)
+      updatedFields.access_id = +access_id
     }
 
-    if (status) {
-      const validStatuses = ['FULL', 'VIEW', 'NO-ACCESS']
-      const formattedStatus = status.trim().toUpperCase()
+    // route_name
+    if (route_name !== undefined) {
+      const name = route_name.trim()
+      if (!name) {
+        return res.status(400).json({ message: 'route_name cannot be empty.' })
+      }
 
-      if (!validStatuses.includes(formattedStatus)) {
+      updates.push('mr_route_name = ?')
+      params.push(name)
+      updatedFields.route_name = name
+    }
+
+    // status
+    if (status !== undefined) {
+      const validStatuses = ['FULL', 'VIEW', 'NO-ACCESS']
+      const value = status.trim().toUpperCase()
+
+      if (!validStatuses.includes(value)) {
         return res.status(400).json({
           message: `Status must be one of: ${validStatuses.join(', ')}`,
           validStatuses,
@@ -148,39 +129,17 @@ const updateRoute = async (req, res) => {
       }
 
       updates.push('mr_status = ?')
-      params.push(formattedStatus)
-    }
-
-    if (updates.length === 0) {
-      return res.status(400).json({
-        message: 'No valid fields to update.',
-      })
+      params.push(value)
+      updatedFields.status = value
     }
 
     params.push(id)
 
-    const statement = `
-      UPDATE master_route
-      SET ${updates.join(', ')}
-      WHERE mr_id = ?
-    `
-
-    const data = await Query(statement, params)
-
-    if (data.affectedRows === 0) {
-      return res.status(404).json({
-        message: 'Route not found or no changes made.',
-      })
-    }
+    await Query(`UPDATE master_route SET ${updates.join(', ')} WHERE mr_id = ?`, params)
 
     res.status(200).json({
       message: 'Route updated successfully.',
-      data,
-      updatedFields: {
-        ...(accessId && { accessId: parseInt(accessId) }),
-        ...(routeName && { routeName: routeName.trim() }),
-        ...(status && { status: status.trim().toUpperCase() }),
-      },
+      updatedFields,
     })
   } catch (error) {
     console.error('Error updating route:', error)
@@ -188,12 +147,6 @@ const updateRoute = async (req, res) => {
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
         message: 'Route with this name already exists for the given access.',
-      })
-    }
-
-    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
-      return res.status(404).json({
-        message: 'Referenced access ID does not exist.',
       })
     }
 

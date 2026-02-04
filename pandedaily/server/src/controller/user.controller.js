@@ -83,7 +83,7 @@ const updateUser = async (req, res) => {
     return res.status(400).json({ message: 'User ID is required.' })
   }
 
-  if (![fullname, access_id, email, username, password, status].some(Boolean)) {
+  if (![fullname, access_id, email, username, password, status].some((v) => v !== undefined)) {
     return res.status(400).json({
       message:
         'At least one field (fullname, access_id, email, username, password, or status) is required.',

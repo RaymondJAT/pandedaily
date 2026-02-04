@@ -37,66 +37,65 @@ const updateAccess = async (req, res) => {
   const { id } = req.params
   const { name, status } = req.body
 
+  if (!Number.isInteger(+id)) {
+    return res.status(400).json({ message: 'Valid access ID is required.' })
+  }
+
+  if (![name, status].some((v) => v !== undefined)) {
+    return res.status(400).json({
+      message: 'At least one field (name or status) is required.',
+    })
+  }
+
   try {
-    if (!id) {
-      return res.status(400).json({
-        message: 'Access ID is required.',
-      })
+    const [access] = await Query(`SELECT ma_id FROM master_access WHERE ma_id = ?`, [id])
+
+    if (!access) {
+      return res.status(404).json({ message: 'Access record not found.' })
     }
 
-    if (!name && !status) {
-      return res.status(400).json({
-        message: 'At least one field (name or status) is required for update.',
-      })
+    const updates = []
+    const params = []
+    const updatedFields = {}
+
+    if (name !== undefined) {
+      const trimmed = name.trim()
+      if (!trimmed) {
+        return res.status(400).json({ message: 'Name cannot be empty.' })
+      }
+
+      updates.push('ma_name = ?')
+      params.push(trimmed)
+      updatedFields.name = trimmed
     }
 
-    let formattedStatus
-    if (status) {
+    if (status !== undefined) {
       const validStatuses = ['ACTIVE', 'INACTIVE', 'DELETED']
-      if (!validStatuses.includes(status.toUpperCase())) {
+      const value = status.toUpperCase()
+
+      if (!validStatuses.includes(value)) {
         return res.status(400).json({
-          message: 'Status must be one of: ACTIVE, INACTIVE, or DELETED',
+          message: 'Status must be one of: ACTIVE, INACTIVE, DELETED',
           validStatuses,
         })
       }
-      formattedStatus = status.toUpperCase()
+
+      updates.push('ma_status = ?')
+      params.push(value)
+      updatedFields.status = value
     }
 
-    const checkStatement = `SELECT ma_id FROM master_access WHERE ma_id = ?`
-    const recordExists = await Query(checkStatement, [id])
+    params.push(id)
 
-    if (recordExists.length === 0) {
-      return res.status(404).json({
-        message: 'Access record not found.',
-      })
-    }
-
-    let statement
-    let params = []
-
-    if (name && formattedStatus) {
-      statement = `UPDATE master_access SET ma_name = ?, ma_status = ? WHERE ma_id = ?`
-      params = [name, formattedStatus, id]
-    } else if (name) {
-      statement = `UPDATE master_access SET ma_name = ? WHERE ma_id = ?`
-      params = [name, id]
-    } else if (formattedStatus) {
-      statement = `UPDATE master_access SET ma_status = ? WHERE ma_id = ?`
-      params = [formattedStatus, id]
-    }
-
-    const data = await Query(statement, params)
+    await Query(`UPDATE master_access SET ${updates.join(', ')} WHERE ma_id = ?`, params)
 
     res.status(200).json({
       message: 'Access data updated successfully.',
-      data,
-      updatedFields: {
-        ...(name && { name }),
-        ...(formattedStatus && { status: formattedStatus }),
-      },
+      updatedFields,
     })
   } catch (error) {
     console.error('Error updating access data:', error)
+
     res.status(500).json({
       message: 'Error updating access data.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
