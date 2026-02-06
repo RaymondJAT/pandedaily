@@ -1,17 +1,22 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import NavigationBar from './components/layout/navigation/NavigationBar'
-import Hero from './pages/home/Hero'
-import Why from './pages/home/Why'
-import Story from './pages/home/Story'
-import CallToAction from './pages/home/CallToAction'
-import Contact from './pages/home/Contact'
+import Hero from './pages/website/home/Hero'
+import Why from './pages/website/home/Why'
+import Story from './pages/website/home/Story'
+import CallToAction from './pages/website/home/CallToAction'
+import Contact from './pages/website/home/Contact'
 import Footer from './components/layout/Footer'
-import About from './pages/About'
-import Faq from './pages/Faq'
-import Order from './pages/Order'
+import About from './pages/website/About'
+import Faq from './pages/website/Faq'
+import Order from './pages/website/Order'
 import AuthChoiceModal from './components/modal/AuthChoiceModal'
-import Login from './pages/Login'
+import Login from './pages/website/Login'
+import Signup from './pages/website/Signup'
+
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './routes/ProtectedRoute'
+import DashboardLayout from './pages/dashboard/DashboardLayout'
 
 const ScrollToHash = () => {
   const location = useLocation()
@@ -33,7 +38,6 @@ const ScrollToHash = () => {
         }
       }, 500)
     } else {
-      // Scroll to top if no hash
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }, [location])
@@ -44,6 +48,7 @@ const ScrollToHash = () => {
 function App() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   // Function to trigger auth modal from any component
   const handleOpenAuthModal = () => {
@@ -58,17 +63,12 @@ function App() {
   // Handle guest checkout
   const handleGuestContinue = () => {
     setShowAuthModal(false)
-    // You can navigate to guest checkout page or handle guest flow
     console.log('Guest checkout initiated')
-    // Optional: navigate to guest checkout page
-    // window.location.href = '/guest-checkout'
   }
 
   // Handle login/register click
   const handleLoginRegister = () => {
     setShowAuthModal(false)
-    // Navigation will be handled by the AuthChoiceModal component
-    // or you can navigate here:
     window.location.href = '/login'
   }
 
@@ -83,41 +83,57 @@ function App() {
 
   return (
     <Router>
-      <div className="flex flex-col min-h-screen">
-        {/* Pass handleOpenAuthModal to NavigationBar if needed for auth buttons */}
-        <NavigationBar isScrolled={isScrolled} onAuthClick={handleOpenAuthModal} />
-        <ScrollToHash />
-
-        {/* Auth Choice Modal */}
-        <AuthChoiceModal
-          isOpen={showAuthModal}
-          onClose={handleCloseAuthModal}
-          onGuestContinue={handleGuestContinue}
-          onLoginRegister={handleLoginRegister}
-        />
-
-        <main className="flex-1">
+      <AuthProvider>
+        <div className="flex flex-col min-h-screen">
           <Routes>
             <Route
-              path="/"
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute allowedTypes={['admin']}>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="*"
               element={
                 <>
-                  <Hero />
-                  <Why />
-                  <Story />
-                  <CallToAction />
-                  <Contact id="contact" />
+                  <NavigationBar isScrolled={isScrolled} onAuthClick={handleOpenAuthModal} />
+                  <ScrollToHash />
+                  <AuthChoiceModal
+                    isOpen={showAuthModal}
+                    onClose={handleCloseAuthModal}
+                    onGuestContinue={handleGuestContinue}
+                    onLoginRegister={handleLoginRegister}
+                  />
+                  <main className="flex-1">
+                    <Routes>
+                      <Route
+                        path="/"
+                        element={
+                          <>
+                            <Hero />
+                            <Why />
+                            <Story />
+                            <CallToAction />
+                            <Contact id="contact" />
+                          </>
+                        }
+                      />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/faq" element={<Faq />} />
+                      <Route path="/order" element={<Order />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/signup" element={<Signup />} />
+                    </Routes>
+                  </main>
+                  <Footer />
                 </>
               }
             />
-            <Route path="/about" element={<About />} />
-            <Route path="/faq" element={<Faq />} />
-            <Route path="/order" element={<Order />} />
-            <Route path="/login" element={<Login />} />
           </Routes>
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </AuthProvider>
     </Router>
   )
 }

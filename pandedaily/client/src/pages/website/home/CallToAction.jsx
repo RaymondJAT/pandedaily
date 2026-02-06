@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import ctaBackground from '../../assets/story-images/image-sixteen.png'
+import ctaBackground from '../../../assets/story-images/image-sixteen.png'
 
 const CallToAction = () => {
   const backgroundStyle = {

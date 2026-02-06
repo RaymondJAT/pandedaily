@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import storyImage from '../../assets/story-images/image-nine.jpg'
+import storyImage from '../../../assets/story-images/image-nine.jpg'
 
 const Story = () => {
   const navigate = useNavigate()

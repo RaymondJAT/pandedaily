@@ -1,11 +1,11 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import heroImage from '../../assets/hero-images/hero-image.png'
-import flourImage from '../../assets/hero-images/flour.png'
-import wheatImage from '../../assets/hero-images/wheat.png'
-import yeastImage from '../../assets/hero-images/yeast.png'
-import rollingImage from '../../assets/hero-images/rolling.png'
-import starIcon from '../../assets/hero-images/stars.png'
+import heroImage from '../../../assets/hero-images/hero-image.png'
+import flourImage from '../../../assets/hero-images/flour.png'
+import wheatImage from '../../../assets/hero-images/wheat.png'
+import yeastImage from '../../../assets/hero-images/yeast.png'
+import rollingImage from '../../../assets/hero-images/rolling.png'
+import starIcon from '../../../assets/hero-images/stars.png'
 
 const Hero = () => {
   const navigate = useNavigate()

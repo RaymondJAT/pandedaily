@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { FiUser } from 'react-icons/fi'
 import logoImage from '../../../assets/hero-images/middle-logo.png'
+import { WebsiteRoutes } from '../../../routes/websiteRoutes'
+import { useAuth } from '../../../context/AuthContext'
 
 const NavigationBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Define navigation items
-  const navItems = [
-    { id: 1, label: 'About', href: '/about', external: true },
-    { id: 2, label: 'FAQ', href: '/faq', external: true },
-    { id: 3, label: 'Contact', href: '/#contact', external: false },
-  ]
+  const { user, logout } = useAuth()
 
   const handleContactClick = () => {
     // Close mobile menu if open
@@ -20,7 +18,7 @@ const NavigationBar = () => {
       setIsMenuOpen(false)
     }
 
-    if (location.pathname === '/') {
+    if (location.pathname === WebsiteRoutes.home) {
       setTimeout(() => {
         const element = document.getElementById('contact')
         if (element) {
@@ -35,19 +33,19 @@ const NavigationBar = () => {
         }
       }, 100)
     } else {
-      navigate('/#contact')
+      navigate(WebsiteRoutes.contact)
     }
   }
 
-  // Logo click handler - navigate to home
+  // Logo click handler
   const handleLogoClick = () => {
     if (isMenuOpen) setIsMenuOpen(false)
-    navigate('/')
+    navigate(WebsiteRoutes.home)
   }
 
-  // Scroll to contact if URL has hash on mount
+  // Scroll to contact
   useEffect(() => {
-    if (location.pathname === '/' && location.hash === '#contact') {
+    if (location.pathname === WebsiteRoutes.home && location.hash === '#contact') {
       setTimeout(() => {
         const element = document.getElementById('contact')
         if (element) {
@@ -68,10 +66,10 @@ const NavigationBar = () => {
     <nav className="sticky top-0 z-50" style={{ backgroundColor: '#2A1803' }}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-24">
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center space-x-10">
-            {navItems.map((item) =>
-              item.external ? (
+          {/* Left Side: Navigation Links */}
+          <div className="hidden md:flex items-center space-x-10 flex-1 justify-start">
+            {WebsiteRoutes.navItems.map((item) =>
+              item.type === 'external' ? (
                 <Link
                   key={item.id}
                   to={item.href}
@@ -93,8 +91,8 @@ const NavigationBar = () => {
             )}
           </div>
 
-          {/* Logo */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 md:relative md:left-0 md:transform-none">
+          {/* Logo - Always Center */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 md:absolute md:left-1/2 md:transform md:-translate-x-1/2">
             <button onClick={handleLogoClick} className="focus:outline-none cursor-pointer">
               <img
                 src={logoImage}
@@ -104,8 +102,21 @@ const NavigationBar = () => {
             </button>
           </div>
 
-          {/* Order Now Button */}
-          <div className="hidden md:block">
+          {/* Right Side: Login + Order Now */}
+          <div className="hidden md:flex items-center space-x-6 flex-1 justify-end">
+            {/* Always show Login button (users will be redirected to dashboard if admin) */}
+            <Link
+              to="/login"
+              className="font-medium transition-colors duration-200 hover:opacity-80 text-sm font-[titleFont]"
+              style={{ color: '#F5EFE7' }}
+            >
+              <div className="flex items-center space-x-2">
+                <FiUser className="text-[#F5EFE7]" size={18} />
+                <span>Login</span>
+              </div>
+            </Link>
+
+            {/* Order Now Button */}
             <Link
               to="/order"
               className="font-medium py-2 px-7 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-105 cursor-pointer text-sm font-[titleFont] inline-block"
@@ -118,8 +129,8 @@ const NavigationBar = () => {
             </Link>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          {/* Mobile menu button - On the right side */}
+          <div className="md:hidden flex items-center absolute right-4">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="focus:outline-none"
@@ -151,9 +162,8 @@ const NavigationBar = () => {
         {isMenuOpen && (
           <div className="md:hidden py-6" style={{ backgroundColor: '#2A1803' }}>
             <div className="flex flex-col space-y-8 px-6">
-              {navItems.map((item) =>
-                item.external ? (
-                  // External link (About, FAQ)
+              {WebsiteRoutes.navItems.map((item) =>
+                item.type === 'external' ? (
                   <Link
                     key={item.id}
                     to={item.href}
@@ -164,7 +174,6 @@ const NavigationBar = () => {
                     {item.label}
                   </Link>
                 ) : (
-                  // Internal scroll (Contact)
                   <button
                     key={item.id}
                     onClick={handleContactClick}
@@ -175,9 +184,24 @@ const NavigationBar = () => {
                   </button>
                 ),
               )}
+
+              {/* Mobile Login Button */}
               <Link
-                to="/order"
-                className="font-medium py-4 px-8 rounded-full transition-all duration-200 mt-8 hover:scale-105 text-xl text-center"
+                to="/login"
+                className="font-medium py-4 text-center hover:opacity-80 text-xl"
+                style={{ color: '#F5EFE7' }}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <FiUser className="text-[#F5EFE7]" />
+                  <span>Login</span>
+                </div>
+              </Link>
+
+              {/* Mobile Order Now Button */}
+              <Link
+                to={WebsiteRoutes.order}
+                className="font-medium py-4 px-8 rounded-full transition-all duration-200 mt-4 hover:scale-105 text-xl text-center"
                 style={{
                   backgroundColor: '#F5EFE7',
                   color: '#3F2305',

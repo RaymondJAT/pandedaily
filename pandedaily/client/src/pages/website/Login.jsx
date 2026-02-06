@@ -1,33 +1,32 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { FaUser, FaLock, FaArrowLeft, FaEye, FaEyeSlash } from 'react-icons/fa'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { loginUser } from '../../services/api'
 
 const Login = () => {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   })
   const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState('')
 
   // Form validation
   const validateForm = () => {
     const newErrors = {}
 
-    // Username validation
     if (!formData.username) {
       newErrors.username = 'Username is required'
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters'
     }
 
-    // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'
     }
 
     setErrors(newErrors)
@@ -41,28 +40,70 @@ const Login = () => {
       ...prev,
       [name]: value,
     }))
-    // Clear error for this field when user starts typing
+    // Clear errors when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
         [name]: '',
       }))
     }
+    if (apiError) {
+      setApiError('')
+    }
   }
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setApiError('')
+    setIsSubmitting(true)
 
-    if (validateForm()) {
-      // Handle successful form submission
-      console.log('Form submitted:', formData)
-
-      // In a real app, you would make an API call here
-      // For demo purposes, we'll simulate a successful login
-      alert('Login successful!')
-      navigate('/') // Navigate to home page
+    if (!validateForm()) {
+      setIsSubmitting(false)
+      return
     }
+
+    try {
+      const response = await loginUser(formData.username, formData.password)
+
+      // Handle response from API
+      const { token, user } = response
+
+      localStorage.setItem('token', token)
+
+      const userType = user.access_id === 1 ? 'admin' : 'customer'
+
+      // Update auth context
+      login({
+        type: userType,
+        id: user.id,
+        name: user.userName,
+        fullName: user.fullname,
+        accessId: user.access_id,
+        token: token,
+      })
+
+      localStorage.setItem('userId', user.id)
+      localStorage.setItem('userFullName', user.fullname)
+      localStorage.setItem('userAccessId', user.access_id)
+
+      // Redirect based on user type
+      if (userType === 'admin') {
+        navigate('/dashboard')
+      } else {
+        navigate('/order')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setApiError('Invalid username or password. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Go to signup page
+  const goToSignup = () => {
+    navigate('/signup')
   }
 
   // Animation variants
@@ -132,6 +173,17 @@ const Login = () => {
 
             {/* Form */}
             <div className="p-6 md:p-8">
+              {/* API Error Message */}
+              {apiError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+                >
+                  <p className="text-red-600 text-sm font-[titleFont]">{apiError}</p>
+                </motion.div>
+              )}
+
               <form onSubmit={handleSubmit}>
                 {/* Username */}
                 <div className="mb-6">
@@ -212,15 +264,40 @@ const Login = () => {
                 {/* Submit Button */}
                 <motion.button
                   type="submit"
-                  className="w-full py-3 md:py-4 rounded-lg font-medium font-[titleFont] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9C4A15] cursor-pointer"
+                  disabled={isSubmitting}
+                  className={`w-full py-3 md:py-4 rounded-lg font-medium font-[titleFont] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9C4A15] cursor-pointer ${
+                    isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
                   style={{
                     backgroundColor: '#9C4A15',
                     color: '#F5EFE7',
                   }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                  whileTap={!isSubmitting ? { scale: 0.98 } : {}}
                 >
-                  Sign In
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Signing In...
+                    </span>
+                  ) : (
+                    'Sign In'
+                  )}
                 </motion.button>
               </form>
             </div>
@@ -231,14 +308,13 @@ const Login = () => {
               style={{ borderColor: '#9C4A15', backgroundColor: '#F5EFE7' }}
             >
               <p className="text-xs font-[titleFont]" style={{ color: '#9C4A15' }}>
-                By continuing, you agree to our{' '}
-                <Link to="/terms" className="underline hover:text-[#2A1803] transition-colors">
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link to="/privacy" className="underline hover:text-[#2A1803] transition-colors">
-                  Privacy Policy
-                </Link>
+                Don't have an account?{' '}
+                <button
+                  onClick={goToSignup}
+                  className="font-medium underline hover:text-[#2A1803] transition-colors focus:outline-none focus:ring-2 focus:ring-[#9C4A15] rounded px-1 cursor-pointer"
+                >
+                  Sign Up
+                </button>
               </p>
             </div>
           </div>
@@ -246,7 +322,7 @@ const Login = () => {
           {/* Guest Option */}
           <div className="mt-6 text-center">
             <button
-              onClick={() => navigate('/guest-checkout')}
+              onClick={() => navigate('/order')}
               className="text-sm font-[titleFont] hover:underline focus:outline-none focus:ring-2 focus:ring-[#9C4A15] rounded px-1 cursor-pointer"
               style={{ color: '#9C4A15' }}
             >

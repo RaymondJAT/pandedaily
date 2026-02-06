@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import aboutImage from '../assets/story-images/about.png'
+import aboutImage from '../../assets/story-images/about.png'
 
 const About = () => {
   const navigate = useNavigate()

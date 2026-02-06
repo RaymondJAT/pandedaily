@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { features } from '../../mapping/features'
+import { features } from '../../../mapping/features'
 
 const Why = () => {
   const fadeInUp = {
