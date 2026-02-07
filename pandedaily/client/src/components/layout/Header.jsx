@@ -1,4 +1,3 @@
-// pages/dashboard/Header.jsx
 import { FiBell, FiChevronDown, FiMenu } from 'react-icons/fi'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'

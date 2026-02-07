@@ -11,7 +11,7 @@ const DashboardLayout = () => {
   const { user, logout } = useAuth()
 
   return (
-    <div className="h-screen overflow-hidden bg-[#F5EFE7]">
+    <div className="h-screen overflow-hidden bg-[#F5EFE7] font-mono">
       {/* Sidebar */}
       <Sidebar open={isSidebarOpen} setOpen={setIsSidebarOpen} />
 

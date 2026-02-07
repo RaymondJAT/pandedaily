@@ -57,7 +57,7 @@ const Users = () => {
             render: (value) => {
               const levelColors = {
                 Administrator: 'bg-purple-100 text-purple-800 border border-purple-200',
-                Manager: 'bg-blue-100 text-blue-800 border border-blue-200',
+                Rider: 'bg-blue-100 text-blue-800 border border-blue-200',
                 Supervisor: 'bg-green-100 text-green-800 border border-green-200',
                 User: 'bg-gray-100 text-gray-800 border border-gray-200',
                 Viewer: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
@@ -165,7 +165,6 @@ const Users = () => {
 
   // Handle edit user
   const handleEditUser = (user) => {
-    console.log('Editing user:', user)
     setEditingUser(user)
     setShowEditModal(true)
   }

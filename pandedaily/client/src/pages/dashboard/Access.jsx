@@ -1,141 +1,175 @@
-import { useMemo, useState } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiPlus } from 'react-icons/fi'
-
-const accessColumns = [
-  {
-    key: 'id',
-    label: 'ID',
-    sortable: true,
-    width: '8%',
-    align: 'center',
-    render: (value) => (
-      <span className="font-mono font-semibold text-blue-700">
-        {value.toString().padStart(3, '0')}
-      </span>
-    ),
-  },
-  {
-    key: 'accessName',
-    label: 'Access Name',
-    sortable: true,
-    width: '25%',
-    align: 'left',
-    render: (value) => <span className="font-medium text-gray-800">{value}</span>,
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    sortable: true,
-    width: '12%',
-    align: 'center',
-    render: (value) => {
-      const statusConfig = {
-        Active: { color: 'bg-green-100 text-green-800', border: 'border-green-200' },
-        Inactive: { color: 'bg-red-100 text-red-800', border: 'border-red-200' },
-        Pending: { color: 'bg-amber-100 text-amber-800', border: 'border-amber-200' },
-      }
-
-      const config = statusConfig[value] || statusConfig['Pending']
-
-      return (
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold border ${config.color} ${config.border}`}
-        >
-          {value}
-        </span>
-      )
-    },
-  },
-  {
-    key: 'createdAt',
-    label: 'Created At',
-    sortable: true,
-    width: '15%',
-    align: 'center',
-    render: (value) => {
-      const date = new Date(value)
-      const formattedDate = date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-      return <span className="text-gray-700">{formattedDate}</span>
-    },
-  },
-]
-
-const createAccessData = (count) => {
-  const accessNames = [
-    'Administrator',
-    'Finance Manager',
-    'Team Leader',
-    'Employee',
-    'View Only',
-    'Auditor',
-    'Supervisor',
-    'HR Manager',
-    'IT Admin',
-    'Operations Lead',
-    'Sales Manager',
-    'Customer Support',
-    'Quality Assurance',
-    'Project Manager',
-    'Data Analyst',
-  ]
-
-  const statuses = ['Active', 'Inactive', 'Pending']
-
-  const generateRandomDate = () => {
-    const start = new Date()
-    start.setFullYear(start.getFullYear() - 2)
-    const end = new Date()
-
-    const randomDate = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
-
-    // Format as YYYY-MM-DD HH:MM:SS
-    const pad = (num) => num.toString().padStart(2, '0')
-    const year = randomDate.getFullYear()
-    const month = pad(randomDate.getMonth() + 1)
-    const day = pad(randomDate.getDate())
-    const hours = pad(randomDate.getHours())
-    const minutes = pad(randomDate.getMinutes())
-    const seconds = pad(randomDate.getSeconds())
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-  }
-
-  return Array.from({ length: count }, (_, i) => {
-    const status = statuses[i % statuses.length]
-    const permissions = Math.floor(Math.random() * 20) + 5
-
-    return {
-      id: i + 1,
-      accessName: accessNames[i % accessNames.length],
-      status: status,
-      createdAt: generateRandomDate(),
-      updatedAt: generateRandomDate(),
-      permissions: permissions,
-      lastModified: generateRandomDate(),
-      createdBy: `Admin ${Math.floor(Math.random() * 5) + 1}`,
-    }
-  })
-}
+import { FiPlus, FiRefreshCw } from 'react-icons/fi'
+import { getAccess, deleteAccess } from '../../services/api'
+import AddAccess from '../../components/dashboard modal/AddAccess'
+import EditAccess from '../../components/dashboard modal/EditAccess' // Import the EditAccess modal
 
 const Access = () => {
+  const [accessData, setAccessData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [sortKey, setSortKey] = useState('id')
   const [sortDirection, setSortDirection] = useState('desc')
   const [statusFilter, setStatusFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRows, setSelectedRows] = useState([])
-  const [selectAll, setSelectAll] = useState(false)
 
-  const accessData = useMemo(() => {
-    const data = createAccessData(25)
-    return Array.isArray(data) ? data : []
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingAccess, setEditingAccess] = useState(null)
+
+  // Fetch access levels from API
+  const fetchAccessData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await getAccess()
+      const data = response.data || response
+
+      if (Array.isArray(data)) {
+        // Transform API data to match your column structure
+        const transformedData = data.map((access) => ({
+          id: access.ma_id || access.id,
+          accessName: access.ma_name || access.name || 'Unknown',
+          status: access.ma_status || access.status || 'Active',
+          createdAt: access.ma_created_at || access.created_at || new Date().toISOString(),
+          // Add other fields if needed
+          ...access,
+        }))
+
+        setAccessData(transformedData)
+      } else {
+        console.error('Invalid data format:', data)
+        setError('Invalid data format received from server. Expected an array.')
+        setAccessData([])
+      }
+    } catch (err) {
+      console.error('Error fetching access levels:', err)
+      setError(err.message || 'Failed to fetch access levels. Please try again.')
+      setAccessData([])
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  // Initial fetch
+  useEffect(() => {
+    fetchAccessData()
+  }, [fetchAccessData])
+
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchAccessData()
+  }
+
+  // Handle add access - open modal
+  const handleAddAccess = () => {
+    setShowAddModal(true)
+  }
+
+  // Handle access added successfully
+  const handleAccessAdded = () => {
+    fetchAccessData() // Refresh the list
+  }
+
+  // Handle edit access - open modal
+  const handleEditAccess = (row) => {
+    console.log('Editing access:', row)
+    setEditingAccess(row)
+    setShowEditModal(true)
+  }
+
+  // Handle access updated successfully
+  const handleAccessUpdated = () => {
+    fetchAccessData() // Refresh the list
+  }
+
+  // Handle delete access
+  const handleDeleteAccess = async (id) => {
+    if (window.confirm('Are you sure you want to delete this access level?')) {
+      try {
+        await deleteAccess(id)
+        fetchAccessData() // Refresh the list
+      } catch (error) {
+        console.error('Error deleting access:', error)
+      }
+    }
+  }
+
+  // Column definitions
+  const accessColumns = useMemo(
+    () => [
+      {
+        key: 'id',
+        label: 'ID',
+        sortable: true,
+        width: '8%',
+        align: 'center',
+        render: (value) => (
+          <span className="font-mono font-semibold text-blue-700">
+            {value.toString().padStart(3, '0')}
+          </span>
+        ),
+      },
+      {
+        key: 'accessName',
+        label: 'Access Name',
+        sortable: true,
+        width: '25%',
+        align: 'left',
+        render: (value) => <span className="font-medium text-gray-800">{value}</span>,
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        sortable: true,
+        width: '12%',
+        align: 'center',
+        render: (value) => {
+          const statusConfig = {
+            Active: { color: 'bg-green-100 text-green-800', border: 'border-green-200' },
+            Inactive: { color: 'bg-red-100 text-red-800', border: 'border-red-200' },
+            Pending: { color: 'bg-amber-100 text-amber-800', border: 'border-amber-200' },
+          }
+
+          const config = statusConfig[value] || statusConfig['Pending']
+
+          return (
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-semibold border ${config.color} ${config.border}`}
+            >
+              {value}
+            </span>
+          )
+        },
+      },
+      {
+        key: 'createdAt',
+        label: 'Created At',
+        sortable: true,
+        width: '15%',
+        align: 'center',
+        render: (value) => {
+          try {
+            const date = new Date(value)
+            const formattedDate = date.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+            return <span className="text-gray-700">{formattedDate}</span>
+          } catch (error) {
+            return <span className="text-gray-500">Invalid Date</span>
+          }
+        },
+      },
+    ],
+    [],
+  )
 
   // Get unique statuses for filter dropdown
   const uniqueStatuses = useMemo(() => {
@@ -157,26 +191,22 @@ const Access = () => {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
         (item) =>
-          item.id.toString().includes(query) ||
-          item.accessName.toLowerCase().includes(query) ||
-          item.createdBy.toLowerCase().includes(query),
+          item.id.toString().includes(query) || item.accessName.toLowerCase().includes(query),
       )
     }
 
     // Sorting
     return filtered.sort((a, b) => {
-      if (sortKey === 'createdAt' || sortKey === 'updatedAt' || sortKey === 'lastModified') {
-        const dateA = new Date(a[sortKey])
-        const dateB = new Date(b[sortKey])
-        if (dateA < dateB) return sortDirection === 'asc' ? -1 : 1
-        if (dateA > dateB) return sortDirection === 'asc' ? 1 : -1
-        return 0
-      }
-
-      if (['userCount', 'permissions'].includes(sortKey)) {
-        if (a[sortKey] < b[sortKey]) return sortDirection === 'asc' ? -1 : 1
-        if (a[sortKey] > b[sortKey]) return sortDirection === 'asc' ? 1 : -1
-        return 0
+      if (sortKey === 'createdAt') {
+        try {
+          const dateA = new Date(a[sortKey])
+          const dateB = new Date(b[sortKey])
+          if (dateA < dateB) return sortDirection === 'asc' ? -1 : 1
+          if (dateA > dateB) return sortDirection === 'asc' ? 1 : -1
+          return 0
+        } catch (error) {
+          return 0
+        }
       }
 
       if (a[sortKey] < b[sortKey]) return sortDirection === 'asc' ? -1 : 1
@@ -194,13 +224,36 @@ const Access = () => {
     setSelectedRows(selectedIds)
   }
 
-  const handleSelectAll = (isSelected, allIds) => {
-    setSelectAll(isSelected)
-    setSelectedRows(isSelected ? allIds : [])
+  // Loading state
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading access levels...</p>
+        </div>
+      </div>
+    )
   }
 
-  const handleAddAccess = () => {
-    console.log('Add Access clicked')
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-2xl mb-2">⚠️</div>
+          <p className="text-red-600 font-medium mb-2">Error loading access levels</p>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={handleRefresh}
+            className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
+          >
+            <FiRefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -258,30 +311,65 @@ const Access = () => {
               </div>
             </div>
 
-            <PlatformTable
-              columns={accessColumns}
-              data={filteredAndSortedData}
-              sortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={handleSort}
-              maxHeight="calc(100% - 60px)"
-              title={null}
-              responsive={true}
-              containerClassName="h-full"
-              showCheckboxes={true}
-              selectedRows={selectedRows}
-              onSelectionChange={handleSelectionChange}
-              selectAll={selectAll}
-              onSelectAll={handleSelectAll}
-              onEdit={(row) => console.log('Edit access:', row)}
-              actionButtonProps={{
-                editLabel: 'Edit',
-                showEdit: true,
-              }}
-            />
+            {filteredAndSortedData.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-gray-500 text-lg">No access levels found</p>
+                  {searchQuery || statusFilter ? (
+                    <p className="text-gray-400 text-sm mt-2">
+                      Try adjusting your filters or search query
+                    </p>
+                  ) : (
+                    <button
+                      onClick={handleAddAccess}
+                      className="mt-4 px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm"
+                    >
+                      Add your first access level
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <PlatformTable
+                columns={accessColumns}
+                data={filteredAndSortedData}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                maxHeight="calc(100% - 60px)"
+                title={null}
+                responsive={true}
+                containerClassName="h-full"
+                selectedRows={selectedRows}
+                onSelectionChange={handleSelectionChange}
+                onEdit={handleEditAccess} // Pass the edit handler
+                actionButtonProps={{
+                  editLabel: 'Edit',
+                  showEdit: true,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
+
+      {/* Add Access Modal */}
+      <AddAccess
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAccessAdded={handleAccessAdded}
+      />
+
+      {/* Edit Access Modal */}
+      <EditAccess
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false)
+          setEditingAccess(null)
+        }}
+        accessData={editingAccess}
+        onAccessUpdated={handleAccessUpdated}
+      />
     </div>
   )
 }

@@ -10,11 +10,11 @@ import {
   FaHistory,
 } from 'react-icons/fa'
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom' // Import useNavigate
+import { useNavigate } from 'react-router-dom'
 
-const AuthChoiceModal = ({ isOpen, onClose, onGuestContinue, onLoginRegister }) => {
+const AuthChoiceModal = ({ isOpen, onClose }) => {
   const modalRef = useRef(null)
-  const navigate = useNavigate() // Add useNavigate hook
+  const navigate = useNavigate()
 
   // Modal animation variants
   const modalBackdropVariants = {
@@ -32,28 +32,22 @@ const AuthChoiceModal = ({ isOpen, onClose, onGuestContinue, onLoginRegister }) 
     visible: { opacity: 1, y: 0 },
   }
 
-  // Handle click outside
   const handleClickOutside = (event) => {
     if (modalRef.current && !modalRef.current.contains(event.target)) {
       onClose()
     }
   }
 
-  // Handle escape key
   const handleEscapeKey = (event) => {
     if (event.key === 'Escape') {
       onClose()
     }
   }
 
-  // Add event listeners when modal is open
   useEffect(() => {
     if (isOpen) {
-      // Add click outside listener
       document.addEventListener('mousedown', handleClickOutside)
-      // Add escape key listener
       document.addEventListener('keydown', handleEscapeKey)
-      // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden'
 
       // Cleanup function
@@ -65,10 +59,14 @@ const AuthChoiceModal = ({ isOpen, onClose, onGuestContinue, onLoginRegister }) 
     }
   }, [isOpen, onClose])
 
-  // Handle login/register click - navigate to /login
+  const handleGuestContinue = () => {
+    onClose()
+    navigate('/guest-info')
+  }
+
   const handleLoginRegisterClick = () => {
     onClose()
-    navigate('/login') // Navigate to login page
+    navigate('/login')
   }
 
   if (!isOpen) return null
@@ -87,7 +85,6 @@ const AuthChoiceModal = ({ isOpen, onClose, onGuestContinue, onLoginRegister }) 
             transition={{ duration: 0.2 }}
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
           >
-            {/* Click outside area */}
             <div className="absolute inset-0" onClick={onClose} />
 
             {/* Modal Content */}
@@ -140,7 +137,7 @@ const AuthChoiceModal = ({ isOpen, onClose, onGuestContinue, onLoginRegister }) 
                 <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
                   {/* Guest Option */}
                   <motion.button
-                    onClick={onGuestContinue}
+                    onClick={handleGuestContinue}
                     className="w-full p-4 md:p-5 lg:p-6 rounded-lg md:rounded-xl border-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 cursor-pointer"
                     style={{
                       backgroundColor: 'white',
@@ -176,7 +173,7 @@ const AuthChoiceModal = ({ isOpen, onClose, onGuestContinue, onLoginRegister }) 
 
                   {/* Login/Register Option */}
                   <motion.button
-                    onClick={handleLoginRegisterClick} // Use the new handler
+                    onClick={handleLoginRegisterClick}
                     className="w-full p-4 md:p-5 lg:p-6 rounded-lg md:rounded-xl border-2 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 cursor-pointer"
                     style={{
                       backgroundColor: 'white',

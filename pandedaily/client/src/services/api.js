@@ -92,3 +92,31 @@ export const updateUserStatus = async (id, status) => {
 export const getAccessLevels = async () => {
   return fetchApi('/access')
 }
+
+export const getAccess = async () => {
+  return fetchApi('/access')
+}
+
+export const getAccessById = async (id) => {
+  return fetchApi(`/access/${id}`)
+}
+
+export const createAccess = async (accessData) => {
+  return fetchApi('/access', {
+    method: 'POST',
+    body: JSON.stringify(accessData),
+  })
+}
+
+export const updateAccess = async (id, accessData) => {
+  return fetchApi(`/access/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(accessData),
+  })
+}
+
+export const deleteAccess = async (id) => {
+  return fetchApi(`/access/${id}`, {
+    method: 'DELETE',
+  })
+}

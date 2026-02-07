@@ -14,6 +14,7 @@ import Login from '../../pages/website/Login'
 import Signup from '../../pages/website/Signup'
 import ScrollToHash from '../../components/ScrollToHash'
 import AuthChoiceModal from '../website modal/AuthChoiceModal'
+import GuestInformation from '../../pages/website/GuestInformation'
 
 const WebsiteLayout = () => {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -74,6 +75,7 @@ const WebsiteLayout = () => {
           <Route path="/about" element={<About />} />
           <Route path="/faq" element={<Faq />} />
           <Route path="/order" element={<Order />} />
+          <Route path="/guest-info" element={<GuestInformation />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 

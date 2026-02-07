@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import AuthChoiceModal from '../../components/website modal/AuthChoiceModal'
+import { useAuth } from '../../context/AuthContext'
+import { useNavigate } from 'react-router-dom' // Add navigation for redirect
 
 const Order = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -11,6 +13,13 @@ const Order = () => {
   const [customQuantity, setCustomQuantity] = useState('')
   const [specialInstructions, setSpecialInstructions] = useState('')
   const [showAuthModal, setShowAuthModal] = useState(false)
+
+  // Get user authentication status
+  const { user, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+
+  // Price configuration
+  const PANDESAL_PRICE_PER_PIECE = 15
 
   // Animation variants
   const fadeInUp = {
@@ -206,9 +215,46 @@ const Order = () => {
     return selectedDates.length * getFinalQuantity()
   }
 
+  const getTotalPrice = () => {
+    const totalPieces = getTotalPandesal()
+    return totalPieces * PANDESAL_PRICE_PER_PIECE
+  }
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  }
+
   const formatDateDisplay = (dateStr) => {
     const date = new Date(dateStr)
     return `${getDayName(date.getDay())}, ${getMonthName(date.getMonth())} ${date.getDate()}`
+  }
+
+  const submitOrder = (isGuest = false) => {
+    const orderDetails = {
+      dates: selectedDates,
+      schedule: deliverySchedule,
+      quantity: getFinalQuantity(),
+      instructions: specialInstructions,
+      totalPieces: getTotalPandesal(),
+      totalPrice: getTotalPrice(),
+      pricePerPiece: PANDESAL_PRICE_PER_PIECE,
+      customerId: isGuest ? null : user?.c_id,
+      isGuest: isGuest,
+      timestamp: new Date().toISOString(),
+    }
+
+    console.log('Order submitted:', orderDetails)
+
+    // Save order to localStorage (or send to backend)
+    localStorage.setItem('currentOrder', JSON.stringify(orderDetails))
+
+    // Navigate to checkout or confirmation page
+    navigate('/checkout')
   }
 
   const handleSubmitOrder = () => {
@@ -222,33 +268,46 @@ const Order = () => {
       return
     }
 
-    // Show auth modal instead of directly submitting
-    setShowAuthModal(true)
+    // Check if user is already logged in
+    if (isAuthenticated && user) {
+      // User is logged in, submit order directly
+      console.log('User is logged in, submitting order directly...')
+      submitOrder(false)
+    } else {
+      // User is not logged in, show auth modal
+      console.log('User is not logged in, showing auth modal...')
+      setShowAuthModal(true)
+    }
   }
 
   const handleGuestContinue = () => {
     // Submit order as guest
-    const orderDetails = {
+    submitOrder(true)
+    setShowAuthModal(false)
+  }
+
+  const handleLoginRegister = () => {
+    // Save order details temporarily before redirecting to login
+    const tempOrder = {
       dates: selectedDates,
       schedule: deliverySchedule,
       quantity: getFinalQuantity(),
       instructions: specialInstructions,
       totalPieces: getTotalPandesal(),
-      totalPrice: getTotalPandesal() * 10,
+      totalPrice: getTotalPrice(),
+      pricePerPiece: PANDESAL_PRICE_PER_PIECE,
     }
 
-    console.log('Order submitted as guest:', orderDetails)
-    alert('Order submitted successfully! We will contact you for confirmation.')
+    localStorage.setItem('pendingOrder', JSON.stringify(tempOrder))
     setShowAuthModal(false)
-  }
 
-  const handleLoginRegister = () => {
-    // Redirect to login/register page
-    console.log('Redirecting to login/register')
-    // You would typically do: router.push('/auth')
-    // For now, just close modal and show message
-    alert('Redirecting to login/register page...')
-    setShowAuthModal(false)
+    // Redirect to login page
+    navigate('/login', {
+      state: {
+        fromOrder: true,
+        message: 'Please login or register to complete your order',
+      },
+    })
   }
 
   return (
@@ -397,44 +456,101 @@ const Order = () => {
                   </button>
                 </div>
 
-                {/* Selected Dates Preview */}
-                <div className="pt-6 border-t" style={{ borderColor: '#F5EFE7' }}>
-                  <h3
-                    className="font-bold mb-4 font-[titleFont] text-base"
-                    style={{ color: '#2A1803' }}
-                  >
-                    Selected Dates ({selectedDates.length})
-                  </h3>
-                  <div className="space-y-3 h-35 overflow-y-auto pr-2">
-                    {selectedDates.map((dateStr, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 rounded-lg text-sm"
-                        style={{ backgroundColor: '#F5EFE7' }}
+                {/* Selected Dates Preview - Cleaner without redundant summary */}
+                <div className="mt-4 pt-6 border-t" style={{ borderColor: '#F5EFE7' }}>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold font-[titleFont] text-lg" style={{ color: '#2A1803' }}>
+                      Selected Delivery Dates ({selectedDates.length})
+                    </h3>
+                    {selectedDates.length > 0 && (
+                      <span
+                        className="text-sm font-[titleFont] px-3 py-1 rounded-full"
+                        style={{ backgroundColor: '#F5EFE7', color: '#9C4A15' }}
                       >
-                        <span
-                          className="font-medium font-[titleFont] truncate pr-2"
-                          style={{ color: '#2A1803' }}
-                        >
-                          {formatDateDisplay(dateStr)}
-                        </span>
-                        <span
-                          className="text-sm font-[titleFont] whitespace-nowrap"
-                          style={{ color: '#9C4A15' }}
-                        >
-                          {deliverySchedule === 'morning' ? '6:30-10 AM' : '3-7 PM'}
-                        </span>
-                      </div>
-                    ))}
-                    {selectedDates.length === 0 && (
-                      <p
-                        className="text-center py-4 font-[titleFont] text-sm"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        No dates selected
-                      </p>
+                        {deliverySchedule === 'morning' ? 'Morning Delivery' : 'Evening Delivery'}
+                      </span>
                     )}
                   </div>
+
+                  {selectedDates.length === 0 ? (
+                    <div
+                      className="flex flex-col items-center justify-center py-8 md:py-12 text-center"
+                      style={{ color: '#9C4A15' }}
+                    >
+                      <svg
+                        className="w-12 h-12 mb-4 opacity-50"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <p className="font-[titleFont] text-base">No dates selected yet</p>
+                      <p className="text-sm mt-1">
+                        Click on dates in the calendar above to add delivery dates
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      {/* Grid layout for better space utilization */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {selectedDates.map((dateStr, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-4 rounded-lg hover:shadow-sm transition-shadow"
+                            style={{
+                              backgroundColor: '#F5EFE7',
+                              border: '1px solid rgba(156, 74, 21, 0.2)',
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-10 h-10 flex items-center justify-center rounded-lg"
+                                style={{ backgroundColor: '#9C4A15', color: '#F5EFE7' }}
+                              >
+                                <span className="font-bold font-[titleFont]">
+                                  {new Date(dateStr).getDate()}
+                                </span>
+                              </div>
+                              <div>
+                                <span
+                                  className="font-medium font-[titleFont] block"
+                                  style={{ color: '#2A1803' }}
+                                >
+                                  {formatDateDisplay(dateStr)}
+                                </span>
+                                <span
+                                  className="text-xs font-[titleFont] block mt-1"
+                                  style={{ color: '#9C4A15' }}
+                                >
+                                  {getDayName(new Date(dateStr).getDay())}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span
+                                className="text-sm font-[titleFont] font-medium block"
+                                style={{ color: '#9C4A15' }}
+                              >
+                                {deliverySchedule === 'morning' ? '6:30-10 AM' : '3-7 PM'}
+                              </span>
+                              <span
+                                className="text-xs font-[titleFont] block mt-1"
+                                style={{ color: '#2A1803' }}
+                              >
+                                {getFinalQuantity()} pcs
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -534,7 +650,7 @@ const Order = () => {
                     )}
                   </div>
                   <p className="text-sm font-[titleFont]" style={{ color: '#9C4A15' }}>
-                    Minimum: 20 pieces per delivery
+                    Minimum: 20 pieces per delivery (₱{20 * PANDESAL_PRICE_PER_PIECE} minimum)
                   </p>
 
                   {/* Special Instructions */}
@@ -587,10 +703,21 @@ const Order = () => {
                         {getFinalQuantity()} pcs
                       </span>
                     </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
+                        Price per piece
+                      </span>
+                      <span
+                        className="font-bold font-[titleFont] text-lg"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        {formatCurrency(PANDESAL_PRICE_PER_PIECE)}
+                      </span>
+                    </div>
 
                     <div className="h-px" style={{ backgroundColor: '#F5EFE7' }}></div>
 
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-2">
                       <span
                         className="font-bold font-[titleFont] text-lg"
                         style={{ color: '#2A1803' }}
@@ -605,12 +732,37 @@ const Order = () => {
                       </span>
                     </div>
 
+                    {/* Total Price Section */}
+                    <div className="mt-4 pt-4 border-t" style={{ borderColor: '#F5EFE7' }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span
+                          className="font-bold font-[titleFont] text-lg"
+                          style={{ color: '#2A1803' }}
+                        >
+                          Total Amount
+                        </span>
+                        <span
+                          className="font-bold font-[titleFont] text-2xl"
+                          style={{ color: '#9C4A15' }}
+                        >
+                          {formatCurrency(getTotalPrice())}
+                        </span>
+                      </div>
+                      <p
+                        className="text-sm font-[titleFont] text-right"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        ({getTotalPandesal()} pcs × {formatCurrency(PANDESAL_PRICE_PER_PIECE)})
+                      </p>
+                    </div>
+
                     {specialInstructions && (
                       <div
                         className="mt-4 p-3 rounded-lg font-[titleFont] text-sm"
                         style={{ backgroundColor: '#F5EFE7', color: '#2A1803' }}
                       >
-                        With special instructions
+                        <span className="font-medium">Special Instructions:</span>{' '}
+                        {specialInstructions}
                       </div>
                     )}
                   </div>
@@ -633,8 +785,21 @@ const Order = () => {
                     >
                       {selectedDates.length === 0
                         ? 'Select Delivery Dates'
-                        : `Place Order for ${selectedDates.length} Delivery${selectedDates.length !== 1 ? 's' : ''}`}
+                        : `Place Order • ${formatCurrency(getTotalPrice())}`}
                     </motion.button>
+
+                    {/* Show user status message */}
+                    {isAuthenticated && user && (
+                      <p
+                        className="text-center mt-3 font-[titleFont] text-sm"
+                        style={{ color: '#2A1803' }}
+                      >
+                        Ordering as:{' '}
+                        <span style={{ color: '#9C4A15', fontWeight: '600' }}>
+                          {user.c_fullname}
+                        </span>
+                      </p>
+                    )}
 
                     <p
                       className="text-center mt-3 font-[titleFont] text-sm"
@@ -665,10 +830,13 @@ const Order = () => {
           <p className="text-sm font-[titleFont] mt-2" style={{ color: '#9C4A15' }}>
             Free delivery on all subscriptions • Zero preservatives • Hand-kneaded daily
           </p>
+          <p className="text-sm font-[titleFont] mt-1" style={{ color: '#2A1803' }}>
+            Price: {formatCurrency(PANDESAL_PRICE_PER_PIECE)} per piece
+          </p>
         </motion.div>
       </div>
 
-      {/* Auth Choice Modal */}
+      {/* Auth Choice Modal - Only shown if user is NOT logged in */}
       <AuthChoiceModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
