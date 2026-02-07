@@ -12,42 +12,99 @@ const jwt = require('jsonwebtoken')
 const Login = async (req, res) => {
   const { username, password } = req.body
 
+  if (!username || !password) {
+    return res.status(400).json({
+      message: 'Username and password are required',
+    })
+  }
+
   try {
-    const [result] = await Query(
-      `SELECT mu_id AS id, mu_fullname AS fullname, mu_access_id AS access_id, mu_username AS userName FROM master_user WHERE mu_username = ? AND  mu_password = ?`,
+    // Check in master_user table
+    const [adminUser] = await Query(
+      `SELECT 
+        mu_id AS id, 
+        mu_fullname AS fullname, 
+        mu_access_id AS access_id, 
+        mu_username AS username,
+        ma.ma_name AS role_name,
+        'admin' AS user_type
+       FROM master_user mu
+       INNER JOIN master_access ma ON mu.mu_access_id = ma.ma_id
+       WHERE mu.mu_username = ? 
+         AND mu.mu_password = ?
+         AND mu.mu_status = 'active'
+         AND ma.ma_status = 'active'`,
       [username, EncryptString(password)],
     )
 
-    if (!result) {
-      return res.status(401).json({ message: 'Invalid username or password.' })
+    if (adminUser) {
+      const jwtPayload = {
+        id: adminUser.id,
+        fullname: adminUser.fullname,
+        username: adminUser.username,
+        access_id: adminUser.access_id,
+        role_name: adminUser.role_name,
+        user_type: 'admin',
+      }
+
+      const jwtToken = jwt.sign(jwtPayload, process.env._SECRET_KEY, {
+        expiresIn: '30d',
+      })
+
+      console.log('RESULT:', jwtToken)
+
+      return res.status(200).json({
+        message: 'Login successful',
+        token: jwtToken,
+        user: jwtPayload,
+      })
     }
-    const { id, fullname, access_id, userName } = result
 
-    const jwtPayload = {
-      id,
-      fullname,
-      access_id,
-      userName,
+    // Check in customer table
+    const [customer] = await Query(
+      `SELECT 
+        c_id AS id,
+        c_fullname AS fullname,
+        c_email AS email,
+        c_username AS username,
+        c_customer_type AS customer_type,
+        'customer' AS user_type
+       FROM customer 
+       WHERE c_username = ? 
+         AND c_password = ?
+         AND c_is_registered = true`,
+      [username, EncryptString(password)],
+    )
+
+    if (customer) {
+      const jwtPayload = {
+        id: customer.id,
+        fullname: customer.fullname,
+        email: customer.email,
+        username: customer.username,
+        customer_type: customer.customer_type,
+        user_type: 'customer',
+      }
+
+      const jwtToken = jwt.sign(jwtPayload, process.env._SECRET_KEY, {
+        expiresIn: '30d',
+      })
+
+      return res.status(200).json({
+        message: 'Login successful',
+        token: jwtToken,
+        user: jwtPayload,
+      })
     }
 
-    const jwtToken = jwt.sign(jwtPayload, process.env._SECRET_KEY, {
-      expiresIn: '30d',
-    })
-
-    req.session.jwt = jwtToken
-    req.session.id = id
-    req.session.fullname = fullname
-    req.session.access_id = access_id
-    req.session.username = userName
-
-    return res.status(200).json({
-      message: 'Login successful',
-      token: jwtToken,
-      user: jwtPayload,
+    return res.status(401).json({
+      message: 'Invalid username or password',
     })
   } catch (error) {
-    console.log(error)
-    return res.status(500).json({ message: 'Server error' })
+    console.error('Login error:', error)
+    return res.status(500).json({
+      message: 'Server error. Please try again later.',
+    })
   }
 }
 
@@ -102,13 +159,23 @@ const CheckSession = async (req, res) => {
  * Method: POST
  */
 const Logout = async (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Cannot destroy session')
-    }
+  req.session.jwt = null
 
-    res.sendStatus(204)
-  })
+  try {
+    res.clearCookie('token')
+
+    return res.status(200).json({
+      success: true,
+      message: 'Logout successful',
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Logout error:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Logout failed. Please try again.',
+    })
+  }
 }
 
 // CUSTOMER

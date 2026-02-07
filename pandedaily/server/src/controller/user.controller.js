@@ -5,9 +5,9 @@ const { EncryptString, DecryptString } = require('../utils/cryptography.util')
 // READ
 const getUser = async (req, res) => {
   try {
-    console.log(req.context)
-
-    const statement = `SELECT * FROM master_user`
+    const statement = `SELECT mu_id, mu_fullname, ma.ma_name AS access_name, mu_email, mu_username, mu_password, mu_status FROM master_user 
+    INNER JOIN master_access ma ON mu_access_id = ma.ma_id
+   `
 
     const data = await Query(statement, [], Master.master_user.prefix_)
 
