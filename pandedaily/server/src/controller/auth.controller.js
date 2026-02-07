@@ -67,7 +67,7 @@ const Login = async (req, res) => {
         c_fullname AS fullname,
         c_email AS email,
         c_username AS username,
-        c_customer_type AS customer_type,
+        c_is_registered AS is_registered,
         'customer' AS user_type
        FROM customer 
        WHERE c_username = ? 
@@ -82,7 +82,7 @@ const Login = async (req, res) => {
         fullname: customer.fullname,
         email: customer.email,
         username: customer.username,
-        customer_type: customer.customer_type,
+        is_registered: customer.is_registered,
         user_type: 'customer',
       }
 
@@ -180,53 +180,144 @@ const Logout = async (req, res) => {
 
 // CUSTOMER
 const registerCustomer = async (req, res) => {
-  const { fullname, email, customer_type, address, latitude, longitude, password } = req.body
+  const { fullname, contact, email, address, latitude, longitude, username, password } = req.body
 
   try {
-    if (!fullname || !email || !customer_type || !address || !latitude || !longitude || !password) {
+    // Validate required fields
+    if (
+      !fullname ||
+      !contact ||
+      !email ||
+      !address ||
+      !latitude ||
+      !longitude ||
+      !username ||
+      !password
+    ) {
       return res.status(400).json({
         message:
-          'Fullname, email, customer_type, address, latitude, longitude, and password are required.',
+          'Fullname, contact, email, address, latitude, longitude, username and password are required.',
       })
     }
 
-    const statement = `INSERT INTO customer(c_fullname, c_email, c_customer_type, c_address, c_latitude, c_longitude, c_password) VALUES(?, ?, ?, ?, ?, ?, ?)`
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: 'Invalid email format.',
+      })
+    }
+
+    // Validate phone format
+    const phoneRegex = /^(09|\+639)\d{9}$/
+    const cleanedContact = contact.replace(/\s/g, '')
+    if (!phoneRegex.test(cleanedContact)) {
+      return res.status(400).json({
+        message: 'Invalid phone number format. Use 09XXXXXXXXX or +639XXXXXXXXX',
+      })
+    }
+
+    // Validate numeric values
+    const lat = parseFloat(latitude)
+    const lng = parseFloat(longitude)
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({
+        message: 'Latitude and longitude must be valid numbers.',
+      })
+    }
+
+    // Validate password strength (minimum 8 characters)
+    if (password.length < 5) {
+      return res.status(400).json({
+        message: 'Password must be at least 8 characters long.',
+      })
+    }
+
+    // Validate username (alphanumeric, underscore, hyphen)
+    const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        message:
+          'Username must be 3-30 characters and contain only letters, numbers, underscore, or hyphen.',
+      })
+    }
+
+    // Check if username already exists
+    const checkUsernameQuery = `SELECT c_id FROM customer WHERE c_username = ?`
+    const existingUsername = await Query(checkUsernameQuery, [username])
+    if (existingUsername.length > 0) {
+      return res.status(409).json({
+        message: 'Username already taken.',
+      })
+    }
+
+    // Check if email already exists
+    const checkEmailQuery = `SELECT c_id FROM customer WHERE c_email = ?`
+    const existingEmail = await Query(checkEmailQuery, [email])
+    if (existingEmail.length > 0) {
+      return res.status(409).json({
+        message: 'Email already registered.',
+      })
+    }
+
+    // Check if contact already exists
+    const checkContactQuery = `SELECT c_id FROM customer WHERE c_contact = ?`
+    const existingContact = await Query(checkContactQuery, [cleanedContact])
+    if (existingContact.length > 0) {
+      return res.status(409).json({
+        message: 'Contact number already registered.',
+      })
+    }
+
+    // Insert customer with is_registered = 1 (true)
+    const statement = `INSERT INTO customer(c_fullname, c_contact, c_email, c_address, c_latitude, c_longitude, c_username, c_password, c_is_registered) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`
     const data = await Query(statement, [
-      fullname,
-      email,
-      customer_type,
-      address,
-      latitude,
-      longitude,
+      fullname.trim(),
+      cleanedContact,
+      email.toLowerCase().trim(),
+      address.trim(),
+      lat,
+      lng,
+      username.trim(),
       EncryptString(password),
+      1, // Always registered for signup
     ])
 
-    res.status(200).json({
-      message: 'Customer data added successfully.',
-      data,
-      insertedId: data.insertId,
+    // Create a clean response without sensitive data
+    const customerData = {
+      id: data.insertId,
+      fullname: fullname.trim(),
+      contact: cleanedContact,
+      email: email.toLowerCase().trim(),
+      address: address.trim(),
+      username: username.trim(),
+      is_registered: true,
+      created_at: new Date().toISOString(),
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Customer registered successfully.',
+      customer: customerData,
     })
   } catch (error) {
-    console.error('Error adding customer data:', error)
-    console.error('Error SQL:', error.sql)
-    console.error('Error parameters:', [
-      fullname,
-      email,
-      customer_type,
-      address,
-      latitude,
-      longitude,
-      password,
-    ])
+    console.error('Error registering customer:', error)
 
+    // Don't log sensitive data
+    console.error('Error SQL:', error.sql)
+
+    // Handle specific database errors
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Customer with this email already exists.',
+        success: false,
+        message:
+          'Registration failed. One of the fields (email, username, or contact) already exists.',
       })
     }
 
     res.status(500).json({
-      message: 'Error adding customer data.',
+      success: false,
+      message: 'An error occurred during registration. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     })
   }
@@ -235,20 +326,20 @@ const registerCustomer = async (req, res) => {
 // UPDATE CUSTOMER
 const editRegisteredCustomer = async (req, res) => {
   const { id } = req.params
-  const { fullname, email, customer_type, address, latitude, longitude, password } = req.body
+  const { fullname, email, is_registered, address, latitude, longitude, password } = req.body
 
   if (!Number.isInteger(+id)) {
     return res.status(400).json({ message: 'Valid customer ID is required.' })
   }
 
   if (
-    ![fullname, email, customer_type, address, latitude, longitude, password].some(
+    ![fullname, email, is_registered, address, latitude, longitude, password].some(
       (v) => v !== undefined,
     )
   ) {
     return res.status(400).json({
       message:
-        'At least one field (fullname, email, customer_type, address, latitude, longitude, or password) is required.',
+        'At least one field (fullname, email, is_registered, address, latitude, longitude, or password) is required.',
     })
   }
 
@@ -266,7 +357,7 @@ const editRegisteredCustomer = async (req, res) => {
     const fieldMap = {
       fullname: 'c_fullname',
       email: 'c_email',
-      customer_type: 'c_customer_type',
+      is_registered: 'c_is_registered',
       address: 'c_address',
       latitude: 'c_latitude',
       longitude: 'c_longitude',
@@ -277,7 +368,7 @@ const editRegisteredCustomer = async (req, res) => {
 
       let value = req.body[field]
 
-      if (field === 'customer_type') {
+      if (field === 'is_registered') {
         const validCustomerTypes = ['REGISTERED', 'GUEST']
         value = value.toUpperCase()
 
