@@ -5,16 +5,21 @@ import { BiPieChartAlt2 } from 'react-icons/bi'
 import { TbMoneybag } from 'react-icons/tb'
 
 export const sidebarOptions = [
-  { type: 'single', title: 'Dashboard', Icon: LuLayoutDashboard, path: '/' },
-  //   {
-  //     type: 'dropdown',
-  //     title: 'User Management',
-  //     Icon: FiUsers,
-  //     items: [
-  //       { label: 'Users', path: '/users' },
-  //       { label: 'Access', path: '/access' },
-  //     ],
-  //   },
+  {
+    type: 'single',
+    title: 'Dashboard',
+    Icon: LuLayoutDashboard,
+    path: '/dashboard',
+  },
+  {
+    type: 'dropdown',
+    title: 'User Management',
+    Icon: FiUsers,
+    items: [
+      { label: 'Users', path: '/dashboard/users' },
+      { label: 'Access', path: '/dashboard/access' },
+    ],
+  },
   //   {
   //     type: 'dropdown',
   //     title: 'Configuration',

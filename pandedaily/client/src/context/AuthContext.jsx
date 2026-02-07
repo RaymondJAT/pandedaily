@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { logoutUser as apiLogout } from '../services/api'
 
 const AuthContext = createContext()
 
@@ -8,56 +9,66 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check localStorage on initial load
-    const token = localStorage.getItem('token')
-    const userId = localStorage.getItem('userId')
-    const userFullName = localStorage.getItem('userFullName')
-    const userName = localStorage.getItem('userName')
-    const userAccessId = localStorage.getItem('userAccessId')
+    const storedUser = localStorage.getItem('user')
 
-    if (token && userId) {
-      const userType = userAccessId === '1' ? 'admin' : 'customer'
-
-      setUser({
-        type: userType,
-        id: userId,
-        name: userName || 'User',
-        fullName: userFullName || userName || 'User',
-        accessId: userAccessId,
-        token: token,
-      })
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser)
+        setUser(parsedUser)
+      } catch (error) {
+        console.error('Error parsing stored user:', error)
+        clearAuthData()
+      }
     }
     setLoading(false)
   }, [])
 
   const login = (userData) => {
-    const { type, id, name, fullName, accessId, token } = userData
-
-    // Store in localStorage
-    localStorage.setItem('token', token)
-    localStorage.setItem('userId', id)
-    localStorage.setItem('userName', name || 'User')
-    localStorage.setItem('userFullName', fullName || name || 'User')
-    localStorage.setItem('userAccessId', accessId)
+    // Store user in localStorage
+    localStorage.setItem('user', JSON.stringify(userData))
+    localStorage.setItem('token', userData.token)
 
     setUser(userData)
   }
 
-  const logout = () => {
+  const clearAuthData = () => {
     // Clear all auth-related localStorage items
+    localStorage.removeItem('user')
     localStorage.removeItem('token')
+    // Clear any other auth-related items
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
     localStorage.removeItem('userFullName')
     localStorage.removeItem('userAccessId')
     localStorage.removeItem('userEmail')
-    localStorage.removeItem('userPhone')
-    localStorage.removeItem('userAddress')
 
     setUser(null)
   }
 
+  const logout = async () => {
+    try {
+      await apiLogout()
+    } catch (error) {
+      console.error('Logout API error:', error)
+    } finally {
+      clearAuthData()
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        loading,
+        isAuthenticated: !!user,
+        isAdmin: user?.user_type === 'admin',
+        isCustomer: user?.user_type === 'customer',
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
   )
 }
 

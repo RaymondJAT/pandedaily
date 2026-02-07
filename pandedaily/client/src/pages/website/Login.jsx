@@ -1,7 +1,7 @@
-import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
-import { FaUser, FaLock, FaArrowLeft, FaEye, FaEyeSlash } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { FaArrowLeft, FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
 import { useAuth } from '../../context/AuthContext'
 import { loginUser } from '../../services/api'
 
@@ -9,123 +9,73 @@ const Login = () => {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-  })
+  const [formData, setFormData] = useState({ username: '', password: '' })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
 
-  // Form validation
+  // Validate form before sending
   const validateForm = () => {
     const newErrors = {}
-
-    if (!formData.username) {
-      newErrors.username = 'Username is required'
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required'
-    }
-
+    if (!formData.username.trim()) newErrors.username = 'Username is required'
+    if (!formData.password) newErrors.password = 'Password is required'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  // Handle input changes
+  // Input change handler
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-    // Clear errors when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }))
-    }
-    if (apiError) {
-      setApiError('')
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }))
+    if (apiError) setApiError('')
   }
 
-  // Handle form submission
+  // Form submit handler
   const handleSubmit = async (e) => {
     e.preventDefault()
     setApiError('')
+
+    if (!validateForm()) return
+
     setIsSubmitting(true)
-
-    if (!validateForm()) {
-      setIsSubmitting(false)
-      return
-    }
-
     try {
       const response = await loginUser(formData.username, formData.password)
 
-      // Handle response from API
-      const { token, user } = response
-
-      localStorage.setItem('token', token)
-
-      const userType = user.access_id === 1 ? 'admin' : 'customer'
-
       // Update auth context
       login({
-        type: userType,
-        id: user.id,
-        name: user.userName,
-        fullName: user.fullname,
-        accessId: user.access_id,
-        token: token,
+        ...response.user,
+        token: response.token,
+
+        type: response.user.user_type,
       })
 
-      localStorage.setItem('userId', user.id)
-      localStorage.setItem('userFullName', user.fullname)
-      localStorage.setItem('userAccessId', user.access_id)
-
-      // Redirect based on user type
-      if (userType === 'admin') {
+      if (response.user.user_type === 'admin') {
         navigate('/dashboard')
-      } else {
+      } else if (response.user.user_type === 'customer') {
         navigate('/order')
+      } else {
+        navigate('/')
       }
-    } catch (error) {
-      console.error('Login error:', error)
-      setApiError('Invalid username or password. Please try again.')
+    } catch (err) {
+      setApiError(err.message || 'Login failed. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Go to signup page
-  const goToSignup = () => {
-    navigate('/signup')
-  }
+  // Go to signup
+  const goToSignup = () => navigate('/signup')
 
   // Animation variants
   const pageVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { duration: 0.3 },
-    },
-    exit: {
-      opacity: 0,
-      transition: { duration: 0.2 },
-    },
+    visible: { opacity: 1, transition: { duration: 0.3 } },
+    exit: { opacity: 0, transition: { duration: 0.2 } },
   }
-
   const formVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4, ease: 'easeOut' },
-    },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
   }
 
   return (
@@ -148,9 +98,8 @@ const Login = () => {
           <span className="text-sm md:text-base font-[titleFont]">Back</span>
         </button>
 
-        {/* Main Container */}
+        {/* Form Container */}
         <motion.div className="w-full max-w-md mx-auto" variants={formVariants}>
-          {/* Card */}
           <div
             className="rounded-xl md:rounded-2xl shadow-xl md:shadow-2xl overflow-hidden"
             style={{ backgroundColor: 'white' }}
@@ -173,7 +122,6 @@ const Login = () => {
 
             {/* Form */}
             <div className="p-6 md:p-8">
-              {/* API Error Message */}
               {apiError && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -209,13 +157,7 @@ const Login = () => {
                     />
                   </div>
                   {errors.username && (
-                    <motion.p
-                      className="text-red-500 text-xs mt-1 font-[titleFont]"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                    >
-                      {errors.username}
-                    </motion.p>
+                    <p className="text-red-500 text-xs mt-1 font-[titleFont]">{errors.username}</p>
                   )}
                 </div>
 
@@ -251,54 +193,21 @@ const Login = () => {
                     </button>
                   </div>
                   {errors.password && (
-                    <motion.p
-                      className="text-red-500 text-xs mt-1 font-[titleFont]"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                    >
-                      {errors.password}
-                    </motion.p>
+                    <p className="text-red-500 text-xs mt-1 font-[titleFont]">{errors.password}</p>
                   )}
                 </div>
 
                 {/* Submit Button */}
-                <motion.button
+                <button
                   type="submit"
                   disabled={isSubmitting}
                   className={`w-full py-3 md:py-4 rounded-lg font-medium font-[titleFont] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9C4A15] cursor-pointer ${
                     isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
-                  style={{
-                    backgroundColor: '#9C4A15',
-                    color: '#F5EFE7',
-                  }}
-                  whileHover={!isSubmitting ? { scale: 1.02 } : {}}
-                  whileTap={!isSubmitting ? { scale: 0.98 } : {}}
+                  style={{ backgroundColor: '#9C4A15', color: '#F5EFE7' }}
                 >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center">
-                      <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Signing In...
-                    </span>
-                  ) : (
-                    'Sign In'
-                  )}
-                </motion.button>
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
+                </button>
               </form>
             </div>
 
@@ -309,10 +218,7 @@ const Login = () => {
             >
               <p className="text-xs font-[titleFont]" style={{ color: '#9C4A15' }}>
                 Don't have an account?{' '}
-                <button
-                  onClick={goToSignup}
-                  className="font-medium underline hover:text-[#2A1803] transition-colors focus:outline-none focus:ring-2 focus:ring-[#9C4A15] rounded px-1 cursor-pointer"
-                >
+                <button onClick={goToSignup} className="font-medium underline hover:text-[#2A1803]">
                   Sign Up
                 </button>
               </p>
@@ -323,7 +229,7 @@ const Login = () => {
           <div className="mt-6 text-center">
             <button
               onClick={() => navigate('/order')}
-              className="text-sm font-[titleFont] hover:underline focus:outline-none focus:ring-2 focus:ring-[#9C4A15] rounded px-1 cursor-pointer"
+              className="text-sm font-[titleFont] hover:underline"
               style={{ color: '#9C4A15' }}
             >
               Continue as guest without creating an account

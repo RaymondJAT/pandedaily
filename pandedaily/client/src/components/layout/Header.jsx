@@ -1,12 +1,17 @@
-import { FiBell, FiChevronDown } from 'react-icons/fi'
+// pages/dashboard/Header.jsx
+import { FiBell, FiChevronDown, FiMenu } from 'react-icons/fi'
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '../../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
-const Header = () => {
+const Header = ({ sidebarOpen, onToggleSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const notificationsRef = useRef(null)
   const userMenuRef = useRef(null)
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -31,21 +36,37 @@ const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const handleLogout = async () => {
+    setShowUserMenu(false)
+    try {
+      await logout()
+      // Redirect to login page
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Still navigate to login even if there's an error
+      navigate('/login')
+    }
+  }
+
   return (
-    <header className="sticky top-0 z-30 bg-[#3F2305] border-b border-[#2A1803] h-18">
-      {' '}
-      {/* Reduced height */}
+    <header className="bg-[#3F2305] border-b border-[#2A1803] h-16">
       <div className="flex items-center justify-between px-6 h-full">
-        {' '}
-        {/* Added h-full */}
-        {/* Breadcrumb or Title */}
-        <div className="flex-1">
-          <h1 className="text-lg font-semibold text-[#F5EFE7]">Dashboard</h1>{' '}
-          {/* Reduced text size */}
+        {/* Left side with menu button and title */}
+        <div className="flex items-center space-x-4">
+          {/* Menu Toggle Button */}
+          {/* <button
+            onClick={onToggleSidebar}
+            className="p-2 hover:bg-[#523010] rounded-lg transition-colors cursor-pointer"
+            aria-label="Toggle sidebar"
+          >
+            <FiMenu size={20} className="text-[#F5EFE7]" />
+          </button> */}
+
+          {/* Breadcrumb or Title */}
         </div>
+
         <div className="flex items-center space-x-3">
-          {' '}
-          {/* Reduced space between items */}
           {/* Notifications */}
           <div className="relative">
             <button
@@ -53,13 +74,12 @@ const Header = () => {
                 setShowNotifications(!showNotifications)
                 setShowUserMenu(false)
               }}
-              className="relative p-1.5 hover:bg-[#523010] rounded-lg transition-colors cursor-pointer" // Reduced padding
+              className="relative p-2 hover:bg-[#523010] rounded-lg transition-colors cursor-pointer"
               aria-label="Notifications"
             >
-              <FiBell size={18} className="text-[#F5EFE7]" /> {/* Reduced icon size */}
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#9C4A15] text-[#F5EFE7] text-[10px] rounded-full flex items-center justify-center font-semibold">
-                {' '}
-                {/* Reduced badge size */}3
+              <FiBell size={18} className="text-[#F5EFE7]" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#9C4A15] text-[#F5EFE7] text-[10px] rounded-full flex items-center justify-center font-semibold">
+                3
               </span>
             </button>
 
@@ -73,21 +93,16 @@ const Header = () => {
                   className="absolute right-0 mt-2 w-80 bg-[#3F2305] rounded-lg shadow-xl border border-[#2A1803] z-50"
                   style={{
                     position: 'fixed',
-                    top: '60px', // Adjusted for smaller header
+                    top: '60px',
                     right: '20px',
                     maxHeight: 'calc(100vh - 100px)',
                     overflowY: 'auto',
                   }}
                 >
                   <div className="p-3 border-b border-[#2A1803]">
-                    {' '}
-                    {/* Reduced padding */}
                     <h3 className="font-semibold text-[#F5EFE7]">Notifications</h3>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
-                    {' '}
-                    {/* Reduced max height */}
-                    {/* Add your notification items here */}
                     <div className="p-3 border-b border-[#2A1803] hover:bg-[#523010] cursor-pointer transition-colors">
                       <p className="text-sm text-[#F5EFE7]">New order received</p>
                       <p className="text-xs text-[#D9D2C9] mt-1">2 minutes ago</p>
@@ -105,6 +120,7 @@ const Header = () => {
               )}
             </AnimatePresence>
           </div>
+
           {/* User Profile */}
           <div className="relative">
             <button
@@ -112,18 +128,23 @@ const Header = () => {
                 setShowUserMenu(!showUserMenu)
                 setShowNotifications(false)
               }}
-              className="flex items-center space-x-2 p-1.5 hover:bg-[#523010] rounded-lg transition-colors cursor-pointer" // Reduced padding and spacing
+              className="flex items-center space-x-2 p-2 hover:bg-[#523010] rounded-lg transition-colors cursor-pointer"
               aria-label="User menu"
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#F5EFE7] to-[#D9D2C9] flex items-center justify-center">
-                <span className="text-[#3F2305] font-bold text-xs">JD</span>{' '}
-                {/* Reduced text size */}
+              <div className="w-8 h-8 rounded-full bg-linear-to-r from-[#F5EFE7] to-[#D9D2C9] flex items-center justify-center">
+                <span className="text-[#3F2305] font-bold text-xs">
+                  {user?.fullname?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                </span>
               </div>
               <div className="text-left">
-                <p className="text-sm font-semibold text-[#F5EFE7]">John Doe</p>
-                <p className="text-xs text-[#D9D2C9]">Admin</p>
+                <p className="text-sm font-semibold text-[#F5EFE7]">
+                  {user?.fullname || user?.username || 'User'}
+                </p>
+                <p className="text-xs text-[#D9D2C9]">
+                  {user?.role_name || user?.user_type || 'User'}
+                </p>
               </div>
-              <FiChevronDown className="text-[#F5EFE7]" size={16} /> {/* Reduced icon size */}
+              <FiChevronDown className="text-[#F5EFE7]" size={16} />
             </button>
 
             <AnimatePresence>
@@ -136,25 +157,24 @@ const Header = () => {
                   className="absolute right-0 mt-2 w-48 bg-[#3F2305] rounded-lg shadow-xl border border-[#2A1803] z-50"
                   style={{
                     position: 'fixed',
-                    top: '60px', // Adjusted for smaller header
+                    top: '60px',
                     right: '20px',
                   }}
                 >
-                  <div className="p-3 border-b border-[#2A1803]">
-                    {' '}
-                    {/* Reduced padding */}
-                    <p className="font-semibold text-[#F5EFE7]">John Doe</p>
-                    <p className="text-xs text-[#D9D2C9]">Admin</p>
+                  <div className="p-3">
+                    <p className="font-semibold text-[#F5EFE7]">
+                      {user?.fullname || user?.username || 'User'}
+                    </p>
+                    <p className="text-xs text-[#D9D2C9]">
+                      {user?.role_name || user?.user_type || 'User'}
+                    </p>
                   </div>
                   <div className="p-2">
-                    <button className="w-full text-left px-3 py-2 text-sm text-[#F5EFE7] hover:bg-[#523010] rounded transition-colors cursor-pointer">
-                      Profile Settings
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm text-[#F5EFE7] hover:bg-[#523010] rounded transition-colors cursor-pointer">
-                      Account Settings
-                    </button>
                     <div className="border-t border-[#2A1803] my-1"></div>
-                    <button className="w-full text-left px-3 py-2 text-sm text-[#F5EFE7] hover:bg-[#523010] rounded transition-colors cursor-pointer">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 text-sm text-[#F5EFE7] hover:bg-[#523010] rounded transition-colors cursor-pointer"
+                    >
                       Logout
                     </button>
                   </div>

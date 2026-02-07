@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import AuthChoiceModal from '../../components/modal/AuthChoiceModal'
+import AuthChoiceModal from '../../components/website modal/AuthChoiceModal'
 
 const Order = () => {
   const [currentDate, setCurrentDate] = useState(new Date())

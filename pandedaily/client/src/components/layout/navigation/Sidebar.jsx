@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { FiChevronsRight, FiChevronRight } from 'react-icons/fi'
 import { sidebarOptions } from '../../../routes/DashboardRoutes'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoImage from '../../../assets/pandesal.png'
 
 const Sidebar = ({ open, setOpen }) => {
-  const [selected, setSelected] = useState('Dashboard')
   const [expandedItems, setExpandedItems] = useState([])
   const [popoutMenu, setPopoutMenu] = useState(null)
   const [popoutPosition, setPopoutPosition] = useState({ x: 0, y: 0 })
   const sidebarRef = useRef(null)
+  const location = useLocation()
 
   const toggleExpand = (title, event) => {
     // If sidebar is closed, show popout instead of expanding
@@ -42,9 +42,18 @@ const Sidebar = ({ open, setOpen }) => {
     setPopoutMenu(null) // Close any open popout when expanding normally
   }
 
-  // Function to check if a path is active
-  const isPathActive = (path) => {
-    return window.location.pathname === path
+  // Function to check if a path is active (used for dropdown parents)
+  const isParentActive = (items) => {
+    return items.some((item) => {
+      if (item.path === location.pathname) {
+        return true
+      }
+      // Handle nested routes
+      if (location.pathname.startsWith(item.path + '/')) {
+        return true
+      }
+      return false
+    })
   }
 
   // Close popout when clicking outside
@@ -69,6 +78,18 @@ const Sidebar = ({ open, setOpen }) => {
       setPopoutMenu(null)
     }
   }, [open])
+
+  // Auto-expand dropdown when on a child page
+  useEffect(() => {
+    sidebarOptions.forEach((option) => {
+      if (option.type === 'dropdown' && option.items) {
+        const isActive = isParentActive(option.items)
+        if (isActive && !expandedItems.includes(option.title)) {
+          setExpandedItems((prev) => [...prev, option.title])
+        }
+      }
+    })
+  }, [location.pathname]) // Re-run when location changes
 
   return (
     <>
@@ -126,12 +147,12 @@ const Sidebar = ({ open, setOpen }) => {
                 <NavLink
                   key={option.title}
                   to={option.path}
+                  end // This makes it only active on exact match
                   className={({ isActive }) =>
                     `relative flex h-10 w-full items-center rounded-md transition-colors sidebar-item ${
                       isActive ? 'bg-[#2A1803] text-[#F5EFE7]' : 'hover:bg-[#523010] text-[#F5EFE7]'
                     }`
                   }
-                  onClick={() => setSelected(option.title)}
                 >
                   <div className="grid h-full w-10 place-content-center text-lg shrink-0">
                     <option.Icon className="text-[#F5EFE7]" />
@@ -156,9 +177,7 @@ const Sidebar = ({ open, setOpen }) => {
                 <button
                   onClick={(e) => toggleExpand(option.title, e)}
                   className={`relative flex h-10 w-full items-center rounded-md transition-colors cursor-pointer text-[#F5EFE7] hover:bg-[#523010] ${
-                    isPathActive(option.items.some((item) => isPathActive(item.path)))
-                      ? 'bg-[#2A1803] text-[#F5EFE7]'
-                      : ''
+                    isParentActive(option.items) ? 'bg-[#2A1803] text-[#F5EFE7]' : ''
                   }`}
                 >
                   <div className="relative flex items-center w-full">
@@ -211,6 +230,7 @@ const Sidebar = ({ open, setOpen }) => {
                           <NavLink
                             key={item.label}
                             to={item.path}
+                            end={false} // Allow child routes to be considered active
                             className={({ isActive }) =>
                               `relative flex h-8 w-full items-center rounded-md transition-colors text-xs ${
                                 isActive
@@ -218,7 +238,6 @@ const Sidebar = ({ open, setOpen }) => {
                                   : 'hover:bg-[#523010] text-[#D9D2C9]'
                               }`
                             }
-                            onClick={() => setSelected(item.label)}
                           >
                             <span className="pl-8 flex-1 text-left whitespace-nowrap">
                               {item.label}
@@ -306,13 +325,13 @@ const Sidebar = ({ open, setOpen }) => {
                   <NavLink
                     key={item.label}
                     to={item.path}
+                    end={false}
                     className={({ isActive }) =>
                       `flex items-center justify-between px-4 py-2.5 text-sm transition-colors text-[#F5EFE7] ${
                         isActive ? 'bg-[#2A1803] text-[#F5EFE7] font-medium' : 'hover:bg-[#523010]'
                       }`
                     }
                     onClick={() => {
-                      setSelected(item.label)
                       setPopoutMenu(null)
                     }}
                   >

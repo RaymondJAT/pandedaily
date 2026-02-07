@@ -1,66 +1,94 @@
 const API_URL = 'http://localhost:3080'
 
-// Login API call
-export const loginUser = async (username, password) => {
+// Helper function for API calls
+const fetchApi = async (endpoint, options = {}) => {
   try {
-    console.log(`Attempting to fetch: ${API_URL}/auth/login`)
+    const token = localStorage.getItem('token')
 
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-      credentials: 'include',
-    })
-
-    console.log('Response status:', response.status)
-    console.log('Response headers:', [...response.headers.entries()])
-
-    if (!response.ok) {
-      let errorMessage = `HTTP error! status: ${response.status}`
-      try {
-        const errorData = await response.json()
-        errorMessage = errorData.message || errorMessage
-      } catch (jsonError) {
-        console.log('Could not parse error JSON')
-      }
-      throw new Error(errorMessage)
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
     }
 
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    })
+
     const data = await response.json()
-    console.log('Response data:', data)
+
+    if (!response.ok) {
+      throw new Error(data.message || `API error: ${response.status}`)
+    }
+
     return data
   } catch (error) {
-    console.error('Login error details:', {
-      message: error.message,
-      type: error.constructor.name,
-      url: `${API_URL}/auth/login`,
-    })
-    throw new Error(`Cannot connect to server: ${error.message}`)
+    console.error(`API call failed for ${endpoint}:`, error)
+    throw error
   }
 }
 
-// Signup API call
+// Auth API calls
+export const loginUser = async (username, password) => {
+  return fetchApi('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  })
+}
+
+export const logoutUser = async () => {
+  return fetchApi('/auth/logout', {
+    method: 'POST',
+  })
+}
+
 export const signupUser = async (userData) => {
-  try {
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-      credentials: 'include',
-    })
+  return fetchApi('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  })
+}
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || 'Signup failed')
-    }
+// User Management API calls
+export const getUsers = async () => {
+  return fetchApi('/user')
+}
 
-    return await response.json()
-  } catch (error) {
-    console.error('Signup error:', error.message)
-    throw error
-  }
+export const getUserById = async (id) => {
+  return fetchApi(`/user/${id}`)
+}
+
+export const createUser = async (userData) => {
+  return fetchApi('/user', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  })
+}
+
+export const updateUser = async (id, userData) => {
+  return fetchApi(`/user/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  })
+}
+
+export const deleteUser = async (id) => {
+  return fetchApi(`/user/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export const updateUserStatus = async (id, status) => {
+  return fetchApi(`/user/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
+// Access Management API calls
+export const getAccessLevels = async () => {
+  return fetchApi('/access')
 }
