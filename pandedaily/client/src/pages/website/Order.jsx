@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import AuthChoiceModal from '../../components/website modal/AuthChoiceModal'
 import { useAuth } from '../../context/AuthContext'
-import { useNavigate } from 'react-router-dom' // Add navigation for redirect
+import { useNavigate } from 'react-router-dom'
 
 const Order = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -17,6 +17,13 @@ const Order = () => {
   // Get user authentication status
   const { user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    console.log('Order page - User object:', user)
+    if (user) {
+      console.log('User properties in Order page:', Object.keys(user))
+    }
+  }, [user])
 
   // Price configuration
   const PANDESAL_PRICE_PER_PIECE = 15
@@ -250,10 +257,8 @@ const Order = () => {
 
     console.log('Order submitted:', orderDetails)
 
-    // Save order to localStorage (or send to backend)
     localStorage.setItem('currentOrder', JSON.stringify(orderDetails))
 
-    // Navigate to checkout or confirmation page
     navigate('/checkout')
   }
 
@@ -342,7 +347,6 @@ const Order = () => {
           <div className="h-1 w-24 mx-auto" style={{ backgroundColor: '#9C4A15' }}></div>
         </motion.div>
 
-        {/* Layout - Two columns with balanced spacing */}
         <motion.div
           className="mx-auto"
           initial="initial"
@@ -456,7 +460,7 @@ const Order = () => {
                   </button>
                 </div>
 
-                {/* Selected Dates Preview - Cleaner without redundant summary */}
+                {/* Selected Dates Preview */}
                 <div className="mt-4 pt-6 border-t" style={{ borderColor: '#F5EFE7' }}>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold font-[titleFont] text-lg" style={{ color: '#2A1803' }}>
@@ -497,7 +501,6 @@ const Order = () => {
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                      {/* Grid layout for better space utilization */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {selectedDates.map((dateStr, index) => (
                           <div
@@ -830,13 +833,10 @@ const Order = () => {
           <p className="text-sm font-[titleFont] mt-2" style={{ color: '#9C4A15' }}>
             Free delivery on all subscriptions • Zero preservatives • Hand-kneaded daily
           </p>
-          <p className="text-sm font-[titleFont] mt-1" style={{ color: '#2A1803' }}>
-            Price: {formatCurrency(PANDESAL_PRICE_PER_PIECE)} per piece
-          </p>
         </motion.div>
       </div>
 
-      {/* Auth Choice Modal - Only shown if user is NOT logged in */}
+      {/* shown if user is NOT logged in */}
       <AuthChoiceModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}

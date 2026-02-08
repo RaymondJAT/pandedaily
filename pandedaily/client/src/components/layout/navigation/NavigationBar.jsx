@@ -207,13 +207,6 @@ const NavigationBar = () => {
                     </div>
 
                     {/* Menu Items */}
-                    <button
-                      onClick={handleDashboard}
-                      className="flex items-center w-full px-4 py-3 text-left hover:bg-[#F5EFE7] transition-colors cursor-pointer"
-                    >
-                      <FiUserIcon className="mr-3 text-[#9C4A15]" />
-                      <span className="text-[#2A1803]">Dashboard</span>
-                    </button>
 
                     <button
                       onClick={handleOrders}

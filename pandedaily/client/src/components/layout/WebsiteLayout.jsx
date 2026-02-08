@@ -15,6 +15,9 @@ import Signup from '../../pages/website/Signup'
 import ScrollToHash from '../../components/ScrollToHash'
 import AuthChoiceModal from '../website modal/AuthChoiceModal'
 import GuestInformation from '../../pages/website/GuestInformation'
+import Checkout from '../../pages/website/Checkout'
+import OrderConfirmation from '../../pages/website/OrderConfirmation'
+import ProtectedRoute from '../../routes/ProtectedRoute'
 
 const WebsiteLayout = () => {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -60,6 +63,7 @@ const WebsiteLayout = () => {
 
       <main className="flex-1">
         <Routes>
+          {/* Public Routes */}
           <Route
             path="/"
             element={
@@ -79,15 +83,40 @@ const WebsiteLayout = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
+          {/* Protected Routes for registered customers */}
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute allowedTypes={['customer']}>
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/order/confirmation"
+            element={
+              <ProtectedRoute allowedTypes={['customer']}>
+                <OrderConfirmation />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Add a 404 page for better UX */}
           <Route
             path="*"
             element={
-              <div className="min-h-screen flex items-center justify-center">
+              <div
+                className="min-h-screen flex items-center justify-center"
+                style={{ backgroundColor: '#F5EFE7' }}
+              >
                 <div className="text-center">
-                  <h1 className="text-4xl font-bold mb-4">404</h1>
-                  <p className="text-lg mb-6">Page not found</p>
-                  <a href="/" className="text-blue-500 hover:underline">
+                  <h1 className="text-4xl font-bold mb-4" style={{ color: '#2A1803' }}>
+                    404
+                  </h1>
+                  <p className="text-lg mb-6" style={{ color: '#9C4A15' }}>
+                    Page not found
+                  </p>
+                  <a href="/" className="text-[#9C4A15] hover:underline font-medium">
                     Return to Home
                   </a>
                 </div>
