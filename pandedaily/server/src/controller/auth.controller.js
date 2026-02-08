@@ -65,7 +65,9 @@ const Login = async (req, res) => {
       `SELECT 
         c_id AS id,
         c_fullname AS fullname,
+        c_contact AS contact,
         c_email AS email,
+        c_address AS address,
         c_username AS username,
         c_is_registered AS is_registered,
         'customer' AS user_type
@@ -80,7 +82,9 @@ const Login = async (req, res) => {
       const jwtPayload = {
         id: customer.id,
         fullname: customer.fullname,
+        contact: customer.contact,
         email: customer.email,
+        address: customer.address,
         username: customer.username,
         is_registered: customer.is_registered,
         user_type: 'customer',

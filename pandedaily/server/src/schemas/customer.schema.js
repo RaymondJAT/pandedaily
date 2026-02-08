@@ -13,13 +13,13 @@ const CustomerSchema = Joi.object({
         'any.required': 'fullname is required.',
         'string.empty': 'fullname must be a valid string.',
       }),
+ 	contact: Joi.string().trim().required().messages({
+        'any.required': 'contact is required.',
+        'string.empty': 'contact must be a valid string.',
+      }),
  	email: Joi.string().trim().required().messages({
         'any.required': 'email is required.',
         'string.empty': 'email must be a valid string.',
-      }),
- 	customerType: Joi.string().trim().required().messages({
-        'any.required': 'customerType is required.',
-        'string.empty': 'customerType must be a valid enum.',
       }),
  	address: Joi.string().trim().required().messages({
         'any.required': 'address is required.',
@@ -33,9 +33,17 @@ const CustomerSchema = Joi.object({
         'any.required': 'longitude is required.',
         'string.empty': 'longitude must be a valid decimal.',
       }),
+ 	username: Joi.string().trim().required().messages({
+        'any.required': 'username is required.',
+        'string.empty': 'username must be a valid string.',
+      }),
  	password: Joi.string().trim().required().messages({
         'any.required': 'password is required.',
         'string.empty': 'password must be a valid text.',
+      }),
+ 	isRegistered: Joi.boolean().required().messages({
+        'any.required': 'isRegistered is required.',
+        'boolean.base': 'isRegistered must be a valid boolean.',
       })
 });
 
@@ -44,14 +52,16 @@ const CustomerSchema = Joi.object({
 const CustomerField = {
     Id: 'id',
     Fullname: 'fullname',
+    Contact: 'contact',
     Email: 'email',
-    CustomerType: 'customer_type',
     Address: 'address',
     Latitude: 'latitude',
     Longitude: 'longitude',
+    Username: 'username',
     Password: 'password',
+    IsRegistered: 'is_registered',
     Createddate: 'createddate',
-    All: ['id', 'fullname', 'email', 'customer_type', 'address', 'latitude', 'longitude', 'password', 'createddate'],
+    All: ['id', 'fullname', 'contact', 'email', 'address', 'latitude', 'longitude', 'username', 'password', 'is_registered', 'createddate'],
 };
 
 
