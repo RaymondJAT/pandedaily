@@ -230,14 +230,14 @@ const registerCustomer = async (req, res) => {
       })
     }
 
-    // Validate password strength (minimum 8 characters)
+    // Validate password strength
     if (password.length < 5) {
       return res.status(400).json({
         message: 'Password must be at least 8 characters long.',
       })
     }
 
-    // Validate username (alphanumeric, underscore, hyphen)
+    // Validate username
     const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/
     if (!usernameRegex.test(username)) {
       return res.status(400).json({
@@ -273,7 +273,7 @@ const registerCustomer = async (req, res) => {
       })
     }
 
-    // Insert customer with is_registered = 1 (true)
+    // Insert customer with is_registered = 1
     const statement = `INSERT INTO customer(c_fullname, c_contact, c_email, c_address, c_latitude, c_longitude, c_username, c_password, c_is_registered) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`
     const data = await Query(statement, [
       fullname.trim(),
@@ -284,7 +284,7 @@ const registerCustomer = async (req, res) => {
       lng,
       username.trim(),
       EncryptString(password),
-      1, // Always registered for signup
+      1,
     ])
 
     // Create a clean response without sensitive data

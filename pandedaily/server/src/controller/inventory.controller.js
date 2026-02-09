@@ -4,7 +4,9 @@ const { Query } = require('../database/utility/queries.util')
 // GET ALL
 const getInventory = async (req, res) => {
   try {
-    const statement = `SELECT * FROM inventory`
+    const statement = `SELECT i_id, p.p_name AS product_name, i_current_stock, i_previous_stock FROM inventory i
+    INNER JOIN product p ON i.i_product_id = p.p_id
+    `
 
     const data = await Query(statement, [], Inventory.inventory.prefix_)
     res.status(200).json({ message: 'Inventory data retrieved.', data })
