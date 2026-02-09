@@ -1,38 +1,31 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiPlus, FiRefreshCw, FiUser } from 'react-icons/fi'
-import { getUsers } from '../../services/api'
-import { userColumns } from '../../mapping/userColumns'
-import AddUser from '../../components/dashboard modal/AddUser'
-import EditUser from '../../components/dashboard modal/EditUser'
+import { FiUser, FiMail, FiPhone, FiMapPin, FiCalendar } from 'react-icons/fi'
+import { customerColumns } from '../../mapping/customerColumns'
+import { getCustomers } from '../../services/api'
 
-const Users = () => {
-  const [users, setUsers] = useState([])
+const Customer = () => {
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [sortKey, setSortKey] = useState('mu_id')
+  const [sortKey, setSortKey] = useState('id')
   const [sortDirection, setSortDirection] = useState('desc')
   const [statusFilter, setStatusFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRows, setSelectedRows] = useState([])
   const [selectAll, setSelectAll] = useState(false)
 
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingUser, setEditingUser] = useState(null)
-
   const columnsWithRender = useMemo(() => {
-    return userColumns.map((col) => {
-      // Add centered alignment like Customer table
+    return customerColumns.map((col) => {
+      // Base column with centered alignment
       const baseColumn = {
         ...col,
-        align: 'center',
         headerClassName: 'text-center',
         cellClassName: 'text-center align-middle',
       }
 
       switch (col.key) {
-        case 'mu_id':
+        case 'id':
           return {
             ...baseColumn,
             render: (value) => {
@@ -49,7 +42,7 @@ const Users = () => {
             },
           }
 
-        case 'mu_fullname':
+        case 'fullname':
           return {
             ...baseColumn,
             render: (value) => (
@@ -62,95 +55,73 @@ const Users = () => {
             ),
           }
 
-        case 'mu_username':
+        case 'username':
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-2">
+              <div className="flex justify-center">
                 <span className="text-gray-700">{value || 'N/A'}</span>
               </div>
             ),
           }
 
-        case 'mu_email':
+        case 'email':
           return {
-            ...col,
+            ...baseColumn,
             render: (value) => (
               <div className="flex justify-center items-center gap-2">
+                <FiMail className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-700 truncate">{value || 'N/A'}</span>
               </div>
             ),
           }
 
-        case 'access_name':
+        case 'contact':
+          return {
+            ...baseColumn,
+            render: (value) => (
+              <div className="flex justify-center items-center gap-2">
+                <FiPhone className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-700">{value || 'N/A'}</span>
+              </div>
+            ),
+          }
+
+        case 'address':
+          return {
+            ...baseColumn,
+            render: (value) => (
+              <div className="flex justify-center items-center gap-2">
+                <FiMapPin className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-700 truncate" title={value}>
+                  {value || 'N/A'}
+                </span>
+              </div>
+            ),
+          }
+
+        case 'is_registered':
           return {
             ...baseColumn,
             render: (value) => {
-              const levelColors = {
-                Administrator: 'bg-purple-100 text-purple-800 border border-purple-200',
-                Rider: 'bg-blue-100 text-blue-800 border border-blue-200',
-                Supervisor: 'bg-green-100 text-green-800 border border-green-200',
-                User: 'bg-gray-100 text-gray-800 border border-gray-200',
-                Viewer: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-              }
+              const isRegistered = value === 1 || value === true || value === '1'
               return (
-                <div className="flex justify-center items-center gap-2">
+                <div className="flex justify-center">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      levelColors[value] || 'bg-gray-100 text-gray-800 border border-gray-200'
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                      isRegistered
+                        ? 'bg-green-100 text-green-800 border-green-200'
+                        : 'bg-amber-100 text-amber-800 border-amber-200'
                     }`}
                   >
-                    {value || 'N/A'}
+                    {isRegistered ? 'Registered' : 'Unregistered'}
                   </span>
                 </div>
               )
             },
           }
 
-        case 'mu_status':
-          return {
-            ...baseColumn,
-            render: (value) => {
-              const statusConfig = {
-                active: {
-                  color: 'bg-green-100 text-green-800',
-                  border: 'border-green-200',
-                  label: 'Active',
-                },
-                inactive: {
-                  color: 'bg-red-100 text-red-800',
-                  border: 'border-red-200',
-                  label: 'Inactive',
-                },
-                delete: {
-                  color: 'bg-gray-100 text-gray-800',
-                  border: 'border-gray-200',
-                  label: 'Deleted',
-                },
-              }
-
-              const config = statusConfig[value] || {
-                color: 'bg-amber-100 text-amber-800',
-                border: 'border-amber-200',
-                label: value || 'Pending',
-              }
-
-              return (
-                <div className="flex justify-center items-center gap-2">
-                  <span className="text-sm">{config.icon}</span>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${config.color} ${config.border}`}
-                  >
-                    {config.label}
-                  </span>
-                </div>
-              )
-            },
-          }
-
-        // Add created date column if not already in userColumns
-        case 'created_at':
-        case 'created_date':
+        case 'createddate':
           return {
             ...baseColumn,
             render: (value) => {
@@ -197,39 +168,41 @@ const Users = () => {
     })
   }, [])
 
-  // Fetch users from API
-  const fetchUsers = useCallback(async () => {
+  // Fetch customers from API
+  const fetchCustomers = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await getUsers()
+      const response = await getCustomers()
 
       const data = response.data || response
 
       if (Array.isArray(data)) {
-        const transformedData = data.map((user, index) => ({
-          mu_id: user.mu_id || user.id || index + 1,
-          mu_fullname: user.mu_fullname || user.fullname || 'Unknown',
-          mu_username: user.mu_username || user.username || 'N/A',
-          mu_email: user.mu_email || user.email || '',
-          mu_status: (user.mu_status || user.status || 'pending').toLowerCase(),
-          access_name: user.access_name || user.access_level || 'User',
-          // Add created date if available
-          created_at: user.created_at || user.created_date || user.createddate || '',
-          created_date: user.created_at || user.created_date || user.createddate || '',
-          ...user,
+        const transformedData = data.map((customer) => ({
+          id: customer.id || 0,
+          fullname: customer.fullname || 'Unknown',
+          username: customer.username || 'N/A',
+          email: customer.email || '',
+          contact: customer.contact || customer.phone || 'N/A',
+          address: customer.address || 'N/A',
+          latitude: customer.latitude || '',
+          longitude: customer.longitude || '',
+          password: customer.password || '',
+          is_registered: customer.is_registered || 0,
+          createddate: customer.createddate || customer.created_date || customer.createdDate || '',
+          ...customer,
         }))
 
-        setUsers(transformedData)
+        setCustomers(transformedData)
       } else {
         console.error('Invalid data format:', data)
         setError('Invalid data format received from server. Expected an array.')
-        setUsers([])
+        setCustomers([])
       }
     } catch (err) {
-      console.error('Error fetching users:', err)
-      setError(err.message || 'Failed to fetch users. Please try again.')
-      setUsers([])
+      console.error('Error fetching customers:', err)
+      setError(err.message || 'Failed to fetch customers. Please try again.')
+      setCustomers([])
     } finally {
       setLoading(false)
     }
@@ -237,62 +210,61 @@ const Users = () => {
 
   // Initial fetch
   useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
-
-  // Handle user added/updated successfully
-  const handleUserUpdated = () => {
-    fetchUsers()
-  }
-
-  // Handle edit user
-  const handleEditUser = (user) => {
-    setEditingUser(user)
-    setShowEditModal(true)
-  }
+    fetchCustomers()
+  }, [fetchCustomers])
 
   // Get unique values for filter dropdowns
   const uniqueStatuses = useMemo(() => {
-    if (!Array.isArray(users)) return []
-    return Array.from(new Set(users.map((item) => item.mu_status))).filter(Boolean)
-  }, [users])
+    if (!Array.isArray(customers)) return []
+    return Array.from(new Set(customers.map((item) => item.is_registered))).filter(
+      (status) => status !== undefined,
+    )
+  }, [customers])
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
-    if (!Array.isArray(users)) return []
+    if (!Array.isArray(customers)) return []
 
-    let filtered = [...users]
+    let filtered = [...customers]
 
-    // status filter
-    if (statusFilter) {
-      filtered = filtered.filter((item) => item.mu_status === statusFilter.toLowerCase())
+    // Status filter
+    if (statusFilter !== '') {
+      const filterValue = statusFilter === '1'
+      filtered = filtered.filter((item) => Boolean(item.is_registered) === filterValue)
     }
 
-    // search filter
+    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
         (item) =>
-          (item.mu_id && item.mu_id.toString().includes(query)) ||
-          (item.mu_fullname && item.mu_fullname.toLowerCase().includes(query)) ||
-          (item.mu_username && item.mu_username.toLowerCase().includes(query)) ||
-          (item.mu_email && item.mu_email.toLowerCase().includes(query)) ||
-          (item.access_name && item.access_name.toLowerCase().includes(query)),
+          (item.id && item.id.toString().includes(query)) ||
+          (item.fullname && item.fullname.toLowerCase().includes(query)) ||
+          (item.username && item.username.toLowerCase().includes(query)) ||
+          (item.email && item.email.toLowerCase().includes(query)) ||
+          (item.contact && item.contact.toLowerCase().includes(query)) ||
+          (item.address && item.address.toLowerCase().includes(query)),
       )
     }
 
     // Sorting with null-safe comparison
     return filtered.sort((a, b) => {
-      if (sortKey === 'mu_id') {
+      if (sortKey === 'id') {
         const aId = a[sortKey] || 0
         const bId = b[sortKey] || 0
         return sortDirection === 'asc' ? aId - bId : bId - aId
       }
 
-      if (sortKey === 'created_at' || sortKey === 'created_date') {
+      if (sortKey === 'createddate') {
         const aDate = a[sortKey] ? new Date(a[sortKey]).getTime() : 0
         const bDate = b[sortKey] ? new Date(b[sortKey]).getTime() : 0
         return sortDirection === 'asc' ? aDate - bDate : bDate - aDate
+      }
+
+      if (sortKey === 'is_registered') {
+        const aValue = Boolean(a[sortKey]) ? 1 : 0
+        const bValue = Boolean(b[sortKey]) ? 1 : 0
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
       }
 
       const aValue = a[sortKey] || ''
@@ -302,7 +274,7 @@ const Users = () => {
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
       return 0
     })
-  }, [users, sortKey, sortDirection, statusFilter, searchQuery])
+  }, [customers, sortKey, sortDirection, statusFilter, searchQuery])
 
   const handleSort = (key) => {
     setSortDirection((prev) => (sortKey === key && prev === 'asc' ? 'desc' : 'asc'))
@@ -318,31 +290,33 @@ const Users = () => {
     setSelectedRows(isSelected ? allIds : [])
   }
 
-  const handleAddUser = () => {
-    setShowAddModal(true)
-  }
-
-  const handleRefresh = () => {
-    fetchUsers()
-  }
-
   const formatStatusForDisplay = (status) => {
     const statusMap = {
-      active: 'Active',
-      inactive: 'Inactive',
-      delete: 'Deleted',
+      1: 'Registered',
+      0: 'Unregistered',
+      true: 'Registered',
+      false: 'Unregistered',
     }
-    return (
-      statusMap[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown')
-    )
+    return statusMap[status] || 'Unknown'
   }
+
+  // Calculate statistics
+  const statistics = useMemo(() => {
+    if (!Array.isArray(customers)) return { total: 0, registered: 0, unregistered: 0 }
+
+    const total = customers.length
+    const registered = customers.filter((c) => Boolean(c.is_registered)).length
+    const unregistered = total - registered
+
+    return { total, registered, unregistered }
+  }, [customers])
 
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading users...</p>
+          <p className="mt-4 text-gray-600">Loading customers...</p>
         </div>
       </div>
     )
@@ -353,15 +327,8 @@ const Users = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-2xl mb-2">⚠️</div>
-          <p className="text-red-600 font-medium mb-2">Error loading users</p>
+          <p className="text-red-600 font-medium mb-2">Error loading customers</p>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={fetchUsers}
-            className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
-          >
-            <FiRefreshCw className="w-4 h-4" />
-            Retry
-          </button>
         </div>
       </div>
     )
@@ -375,8 +342,8 @@ const Users = () => {
           <div className="px-4 py-1">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-                <p className="text-gray-600">Manage system users and their access levels</p>
+                <h1 className="text-2xl font-bold text-gray-800">Customer Management</h1>
+                <p className="text-gray-600">View all customer accounts and their information</p>
               </div>
             </div>
           </div>
@@ -390,18 +357,15 @@ const Users = () => {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="">All Status</option>
-                {uniqueStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {formatStatusForDisplay(status)}
-                  </option>
-                ))}
+                <option value="1">Registered</option>
+                <option value="0">Unregistered</option>
               </select>
             </div>
 
             <div className="flex items-center">
               <input
                 type="text"
-                placeholder="Search by name, username, email, or access level..."
+                placeholder="Search by name, username, email, contact, or address..."
                 className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-full md:w-64"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -413,40 +377,15 @@ const Users = () => {
         {/* Table container */}
         <div className="h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={handleAddUser}
-                  className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <FiPlus className="w-4 h-4" />
-                  <span>Add User</span>
-                </button>
-              </div>
-
-              {selectedRows.length > 0 && (
-                <div className="text-sm text-gray-600">
-                  {selectedRows.length} user{selectedRows.length !== 1 ? 's' : ''} selected
-                </div>
-              )}
-            </div>
-
             {filteredAndSortedData.length === 0 ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <p className="text-gray-500 text-lg">No users found</p>
-                  {searchQuery || statusFilter ? (
-                    <p className="text-gray-400 text-sm mt-2">
-                      Try adjusting your filters or search query
-                    </p>
-                  ) : (
-                    <button
-                      onClick={handleAddUser}
-                      className="mt-4 px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm"
-                    >
-                      Add your first user
-                    </button>
-                  )}
+                  <p className="text-gray-500 text-lg">No customers found</p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    {searchQuery || statusFilter
+                      ? 'Try adjusting your filters or search query'
+                      : 'No customer data available'}
+                  </p>
                 </div>
               </div>
             ) : (
@@ -464,36 +403,18 @@ const Users = () => {
                 onSelectionChange={handleSelectionChange}
                 selectAll={selectAll}
                 onSelectAll={handleSelectAll}
-                onEdit={handleEditUser}
+                showActions={false}
                 actionButtonProps={{
-                  editLabel: 'Edit',
-                  showEdit: true,
+                  showEdit: false,
+                  showDelete: false,
                 }}
               />
             )}
           </div>
         </div>
       </div>
-
-      {/* Add User Modal */}
-      <AddUser
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onUserAdded={handleUserUpdated}
-      />
-
-      {/* Edit User Modal */}
-      <EditUser
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false)
-          setEditingUser(null)
-        }}
-        userData={editingUser}
-        onUserUpdated={handleUserUpdated}
-      />
     </div>
   )
 }
 
-export default Users
+export default Customer

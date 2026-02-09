@@ -75,19 +75,6 @@ export const updateUser = async (id, userData) => {
   })
 }
 
-export const deleteUser = async (id) => {
-  return fetchApi(`/user/${id}`, {
-    method: 'DELETE',
-  })
-}
-
-export const updateUserStatus = async (id, status) => {
-  return fetchApi(`/user/${id}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  })
-}
-
 // Access Management API calls
 export const getAccessLevels = async () => {
   return fetchApi('/access')
@@ -115,8 +102,79 @@ export const updateAccess = async (id, accessData) => {
   })
 }
 
-export const deleteAccess = async (id) => {
-  return fetchApi(`/access/${id}`, {
-    method: 'DELETE',
+// Customer API calls
+export const getCustomers = async () => {
+  return fetchApi('/customer')
+}
+
+export const getCustomerById = async (id) => {
+  return fetchApi(`/customer/${id}`)
+}
+
+// Product API calls
+export const getProducts = async () => {
+  return fetchApi('/product')
+}
+
+export const getProductCategories = async () => {
+  return fetchApi('/product/category')
+}
+
+export const getProductById = async (id) => {
+  return fetchApi(`/product/${id}`)
+}
+
+export const createProduct = async (productData) => {
+  return fetchApi('/product', {
+    method: 'POST',
+    body: JSON.stringify(productData),
+  })
+}
+
+export const updateProduct = async (id, productData) => {
+  return fetchApi(`/product/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(productData),
+  })
+}
+
+export const createProductCategory = async (categoryData) => {
+  return fetchApi('/product/category', {
+    method: 'POST',
+    body: JSON.stringify(categoryData),
+  })
+}
+
+export const updateProductCategory = async (id, categoryData) => {
+  return fetchApi(`/product/category/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(categoryData),
+  })
+}
+
+// Inventory API calls
+export const getInventory = async () => {
+  return fetchApi('/inventory')
+}
+
+export const getInventoryHistory = async () => {
+  return fetchApi('/inventory/history')
+}
+
+export const getInventoryHistoryById = async (id) => {
+  return fetchApi(`/inventory/history/${id}`)
+}
+
+export const addInventory = async (inventoryData) => {
+  return fetchApi('/inventory', {
+    method: 'POST',
+    body: JSON.stringify(inventoryData),
+  })
+}
+
+export const updateInventory = async (id, inventoryData) => {
+  return fetchApi(`/inventory/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(inventoryData),
   })
 }

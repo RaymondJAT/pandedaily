@@ -1,8 +1,6 @@
-import { FiUsers, FiSettings, FiFileText } from 'react-icons/fi'
-import { LuLayoutDashboard, LuPhilippinePeso } from 'react-icons/lu'
-import { MdOutlineRateReview } from 'react-icons/md'
-import { BiPieChartAlt2 } from 'react-icons/bi'
-import { TbMoneybag } from 'react-icons/tb'
+import { FiUsers, FiPackage, FiTruck, FiShoppingBag } from 'react-icons/fi'
+import { LuLayoutDashboard } from 'react-icons/lu'
+import { PiUsersThreeLight } from 'react-icons/pi'
 
 export const sidebarOptions = [
   {
@@ -20,75 +18,31 @@ export const sidebarOptions = [
       { label: 'Access', path: '/dashboard/access' },
     ],
   },
-  //   {
-  //     type: 'dropdown',
-  //     title: 'Configuration',
-  //     Icon: FiSettings,
-  //     items: [
-  //       { label: 'Stores', path: 'stores' },
-  //       { label: 'Store Routes', path: '/store-routes' },
-  //       { label: 'Flag Analysis', path: '/flag-analysis' },
-  //       { label: 'Transport', path: '/transport' },
-  //       { label: 'Particulars', path: '/particulars' },
-  //     ],
-  //   },
-  //   {
-  //     type: 'dropdown',
-  //     title: 'Fund Management',
-  //     Icon: LuPhilippinePeso,
-  //     items: [
-  //       { label: 'Budget Allocation', path: '/budget-allocation' },
-  //       { label: 'Revolving Fund', path: '/revolving-fund' },
-  //       { label: 'Cash Disbursement', path: '/cash-disbursement' },
-  //     ],
-  //   },
-  //   {
-  //     type: 'dropdown',
-  //     title: 'Finance Review',
-  //     Icon: MdOutlineRateReview,
-  //     items: [
-  //       { label: 'Pending Final Approval', path: '/finance-approval' },
-  //       { label: 'Completed Liquidations', path: '/finance-complete' },
-  //       { label: 'Rejected Liquidations', path: '/finance-reject' },
-  //       { label: 'All Requests', path: '/all-request' },
-  //     ],
-  //   },
-  //   {
-  //     type: 'dropdown',
-  //     title: 'Cash Requests',
-  //     Icon: TbMoneybag,
-  //     items: [
-  //       // requester
-  //       { label: 'My Requests', path: '/my-request' },
-  //       { label: 'For Liquidation', path: '/for-liquidation' },
-  //       // team leader
-  //       { label: 'Pending Approvals', path: '/pending-approvals' },
-  //       { label: 'Approved Requests', path: '/approved-request' },
-  //       { label: 'Rejected Requests', path: '/rejected-request' },
-  //       // custodian
-  //       { label: 'For Processing', path: '/for-processing' },
-  //       { label: 'Released Requests', path: '/released' },
-  //       { label: 'Rejected Requests', path: '/rejected' },
-  //     ],
-  //   },
-  //   {
-  //     type: 'dropdown',
-  //     title: 'Liquidations',
-  //     Icon: FiFileText,
-  //     items: [
-  //       // requester
-  //       { label: 'My Liquidations', path: '/my-liquidations' },
-  //       { label: 'Completed Liquidations', path: '/completed-liquidations' },
-  //       { label: 'Verified Liquidations', path: '/verified-liquidations' },
-  //       // team leader
-  //       { label: 'For Review', path: '/review-liquidations' },
-  //       { label: 'Reviewed Liquidations', path: '/reviewed-liquidations' },
-  //       { label: 'Rejected Liquidations', path: '/rejected-liquidations' },
-  //       // custodian
-  //       { label: 'Verify Liquidations', path: '/verify-liquidations' },
-  //       { label: 'Verified Liquidations', path: '/verified' },
-  //       { label: 'Rejected Liquidations', path: '/reject-liquidations' },
-  //     ],
-  //   },
-  //   { type: 'single', title: 'Reporting', Icon: BiPieChartAlt2, path: '/calendar' },
+  {
+    type: 'single',
+    title: 'Customer',
+    Icon: PiUsersThreeLight,
+    path: '/dashboard/customer',
+  },
+  {
+    type: 'dropdown',
+    title: 'Product & Inventory',
+    Icon: FiPackage,
+    items: [
+      { label: 'Product', path: '/dashboard/product' },
+      { label: 'Inventory', path: '/dashboard/inventory' },
+    ],
+  },
+  {
+    type: 'single',
+    title: 'Orders',
+    Icon: FiShoppingBag,
+    path: '/dashboard/orders',
+  },
+  {
+    type: 'single',
+    title: 'Delivery',
+    Icon: FiTruck,
+    path: '/dashboard/delivery',
+  },
 ]

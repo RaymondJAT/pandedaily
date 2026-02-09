@@ -5,13 +5,16 @@ import WebsiteLayout from './components/layout/WebsiteLayout'
 import DashboardLayout from './components/layout/DashboardLayout'
 import Users from './pages/dashboard/Users'
 import Access from './pages/dashboard/Access'
+import Customer from './pages/dashboard/Customer'
+import Product from './pages/dashboard/Product'
+import Inventory from './pages/dashboard/Inventory'
 
 function App() {
   return (
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Dashboard Routes - Protected Admin Access */}
+          {/* Dashboard Routes */}
           <Route
             path="/dashboard/*"
             element={
@@ -20,10 +23,11 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* Nested dashboard routes */}
             <Route path="users" element={<Users />} />
             <Route path="access" element={<Access />} />
-            {/* Add more dashboard routes here as needed */}
+            <Route path="customer" element={<Customer />} />
+            <Route path="product" element={<Product />} />
+            <Route path="inventory" element={<Inventory />} />
           </Route>
 
           {/* Public Website Routes */}

@@ -1,0 +1,58 @@
+export const customerColumns = [
+  {
+    key: 'id',
+    label: 'ID',
+    sortable: true,
+    width: '80px',
+    align: 'center',
+  },
+  {
+    key: 'fullname',
+    label: 'Full Name',
+    sortable: true,
+    width: '200px',
+    align: 'center',
+  },
+  {
+    key: 'username',
+    label: 'Username',
+    sortable: true,
+    width: '150px',
+    align: 'center',
+  },
+  {
+    key: 'email',
+    label: 'Email',
+    sortable: true,
+    width: '200px',
+    align: 'center',
+  },
+  {
+    key: 'contact',
+    label: 'Contact',
+    sortable: true,
+    width: '140px',
+    align: 'center',
+  },
+  {
+    key: 'address',
+    label: 'Address',
+    sortable: true,
+    width: '250px',
+    align: 'center',
+  },
+  {
+    key: 'is_registered',
+    label: 'Status',
+    sortable: true,
+    width: '120px',
+    align: 'center',
+  },
+  {
+    key: 'createddate',
+    label: 'Created Date',
+    sortable: true,
+    width: '160px',
+    align: 'center',
+  },
+]
