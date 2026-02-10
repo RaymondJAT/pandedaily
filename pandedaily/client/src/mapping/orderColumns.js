@@ -1,0 +1,51 @@
+export const orderColumns = [
+  {
+    key: 'or_id',
+    label: 'Order ID',
+    sortable: true,
+    width: '100px',
+    align: 'center',
+  },
+  {
+    key: 'or_date',
+    label: 'Order Date',
+    sortable: true,
+    width: '150px',
+    align: 'center',
+  },
+  {
+    key: 'customer_name',
+    label: 'Customer',
+    sortable: true,
+    width: '200px',
+    align: 'center',
+  },
+  {
+    key: 'or_total',
+    label: 'Total Amount',
+    sortable: true,
+    width: '120px',
+    align: 'center',
+  },
+  {
+    key: 'or_status',
+    label: 'Status',
+    sortable: true,
+    width: '120px',
+    align: 'center',
+  },
+  {
+    key: 'or_payment_type',
+    label: 'Payment Type',
+    sortable: true,
+    width: '130px',
+    align: 'center',
+  },
+  {
+    key: 'or_payment_reference',
+    label: 'Payment Ref',
+    sortable: true,
+    width: '150px',
+    align: 'center',
+  },
+]

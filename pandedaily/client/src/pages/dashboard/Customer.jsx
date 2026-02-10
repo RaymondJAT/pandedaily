@@ -213,14 +213,6 @@ const Customer = () => {
     fetchCustomers()
   }, [fetchCustomers])
 
-  // Get unique values for filter dropdowns
-  const uniqueStatuses = useMemo(() => {
-    if (!Array.isArray(customers)) return []
-    return Array.from(new Set(customers.map((item) => item.is_registered))).filter(
-      (status) => status !== undefined,
-    )
-  }, [customers])
-
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
     if (!Array.isArray(customers)) return []
@@ -289,27 +281,6 @@ const Customer = () => {
     setSelectAll(isSelected)
     setSelectedRows(isSelected ? allIds : [])
   }
-
-  const formatStatusForDisplay = (status) => {
-    const statusMap = {
-      1: 'Registered',
-      0: 'Unregistered',
-      true: 'Registered',
-      false: 'Unregistered',
-    }
-    return statusMap[status] || 'Unknown'
-  }
-
-  // Calculate statistics
-  const statistics = useMemo(() => {
-    if (!Array.isArray(customers)) return { total: 0, registered: 0, unregistered: 0 }
-
-    const total = customers.length
-    const registered = customers.filter((c) => Boolean(c.is_registered)).length
-    const unregistered = total - registered
-
-    return { total, registered, unregistered }
-  }, [customers])
 
   if (loading) {
     return (

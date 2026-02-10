@@ -8,6 +8,7 @@ import Access from './pages/dashboard/Access'
 import Customer from './pages/dashboard/Customer'
 import Product from './pages/dashboard/Product'
 import Inventory from './pages/dashboard/Inventory'
+import Orders from './pages/dashboard/Orders'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="customer" element={<Customer />} />
             <Route path="product" element={<Product />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="orders" element={<Orders />} />
           </Route>
 
           {/* Public Website Routes */}

@@ -178,3 +178,36 @@ export const updateInventory = async (id, inventoryData) => {
     body: JSON.stringify(inventoryData),
   })
 }
+
+// Order API calls
+export const getOrders = async () => {
+  return fetchApi('/orders')
+}
+
+export const getOrderById = async (id) => {
+  return fetchApi(`/orders/${id}`)
+}
+
+export const getOrderItems = async (orderId) => {
+  return fetchApi(`/orders/${orderId}/items`)
+}
+
+export const createOrder = async (orderData) => {
+  return fetchApi('/orders', {
+    method: 'POST',
+    body: JSON.stringify(orderData),
+  })
+}
+
+// export const updateOrder = async (id, orderData) => {
+//   return fetchApi(`/orders/${id}`, {
+//     method: 'PUT',
+//     body: JSON.stringify(orderData),
+//   })
+// }
+
+// export const deleteOrder = async (id) => {
+//   return fetchApi(`/orders/${id}`, {
+//     method: 'DELETE',
+//   })
+// }
