@@ -36,9 +36,17 @@ const EditInventory = ({ isOpen, onClose, inventoryData, onInventoryUpdated }) =
       const newStock = parseInt(values.current_stock)
       const oldStock = inventoryData.current_stock || 0
 
-      await updateInventory(inventoryData.id, {
+      console.log('Updating inventory:', {
+        inventoryId: inventoryData.id,
+        oldStock,
+        newStock,
+      })
+
+      const response = await updateInventory(inventoryData.id, {
         current_stock: newStock,
       })
+
+      console.log('Update response:', response)
 
       message.success('Stock updated successfully!')
 
@@ -54,7 +62,12 @@ const EditInventory = ({ isOpen, onClose, inventoryData, onInventoryUpdated }) =
       onClose()
     } catch (error) {
       console.error('Error updating inventory:', error)
-      message.error(error.message || 'Failed to update stock. Please try again.')
+      console.error('Error details:', error.response?.data || error.message)
+      message.error(
+        error.response?.data?.message ||
+          error.message ||
+          'Failed to update stock. Please try again.',
+      )
     } finally {
       setIsSubmitting(false)
     }

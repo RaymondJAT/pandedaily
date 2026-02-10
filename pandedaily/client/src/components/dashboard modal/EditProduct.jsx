@@ -14,86 +14,123 @@ import {
   Spin,
 } from 'antd'
 import { PlusOutlined, LoadingOutlined } from '@ant-design/icons'
-import { updateProduct, getProductCategories } from '../../services/api'
+import { updateProduct } from '../../services/api'
 
 const { Option } = Select
 
-const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
+const EditProduct = ({ isOpen, onClose, productData, onProductUpdated, categories = [] }) => {
   const [form] = Form.useForm()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [initialValues, setInitialValues] = useState(null)
-  const [categories, setCategories] = useState([])
   const [imageFile, setImageFile] = useState(null)
   const [existingImage, setExistingImage] = useState('')
-  const [loadingCategories, setLoadingCategories] = useState(false)
-  const [categoryError, setCategoryError] = useState('')
+  const [imageBase64, setImageBase64] = useState(undefined)
+  const [formInitialized, setFormInitialized] = useState(false)
 
   // Extract product info from productData prop
   const productInfo = useMemo(() => {
     if (!productData) return null
 
+    console.log('EditProduct - productData:', {
+      id: productData.id,
+      name: productData.name,
+      category_id: productData.category_id,
+      category_name: productData.category_name,
+    })
+
     return {
-      id: productData.id || productData.product_id,
-      name: productData.name || productData.product_name || '',
-      price: productData.price || 0,
-      stockQuantity: productData.stock_quantity || productData.quantity || 0,
-      category: productData.category_id || productData.category?.id || undefined,
-      categoryName: productData.category_name || productData.category?.name,
-      imageUrl: productData.image_url || productData.image || '',
-      status: productData.status || 'ACTIVE',
+      id: productData.id || 0,
+      name: productData.name || '',
+      price:
+        typeof productData.price === 'string'
+          ? parseFloat(productData.price)
+          : productData.price || 0,
+      cost:
+        typeof productData.cost === 'string' ? parseFloat(productData.cost) : productData.cost || 0,
+      category_id: productData.category_id || undefined,
+      category_name: productData.category_name || '',
+      image: productData.image || '',
+      status: (productData.status || 'AVAILABLE').toLowerCase(),
     }
   }, [productData])
 
-  // Fetch categories when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchCategories()
-    }
-  }, [isOpen])
+  // Filter active categories
+  const activeCategories = useMemo(() => {
+    return (categories || [])
+      .filter((cat) => cat.status !== 'DELETED' && cat.pc_status !== 'DELETED')
+      .sort((a, b) => (a.name || a.pc_name || '').localeCompare(b.name || b.pc_name || ''))
+  }, [categories])
 
-  // Fetch categories from API
-  const fetchCategories = async () => {
-    setLoadingCategories(true)
-    setCategoryError('')
-    try {
-      const response = await getProductCategories()
-      if (response.data && Array.isArray(response.data)) {
-        // Filter out deleted categories and sort alphabetically
-        const activeCategories = response.data
-          .filter((cat) => cat.status !== 'DELETED')
-          .sort((a, b) => a.name.localeCompare(b.name))
-
-        setCategories(activeCategories)
-      } else {
-        setCategories([])
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-      setCategoryError('Failed to load categories. Please try again.')
-      message.error('Failed to load categories')
-    } finally {
-      setLoadingCategories(false)
-    }
+  // Find category by ID
+  const findCategoryById = (categoryId) => {
+    if (!categoryId || !activeCategories.length) return null
+    return activeCategories.find((cat) => (cat.id || cat.pc_id) == categoryId)
   }
 
   // Initialize form when modal opens
   useEffect(() => {
-    if (isOpen && productData && categories.length > 0) {
-      const values = {
-        name: productInfo?.name || '',
-        price: productInfo?.price || 0,
-        stockQuantity: productInfo?.stockQuantity || 0,
-        category: productInfo?.category || undefined,
+    if (isOpen && productInfo && !formInitialized) {
+      console.log('Initializing form with productInfo:', productInfo)
+
+      let categoryId = productInfo.category_id
+      let selectedCategory = null
+
+      // Try to find category by ID
+      if (categoryId) {
+        selectedCategory = findCategoryById(categoryId)
       }
 
-      setInitialValues(values)
-      setExistingImage(productInfo?.imageUrl || '')
-      form.setFieldsValue(values)
+      // If not found by ID, try by name (fallback)
+      if (!selectedCategory && productInfo.category_name) {
+        const matchedCategory = activeCategories.find(
+          (cat) =>
+            (cat.name || cat.pc_name || '').toLowerCase() ===
+            productInfo.category_name.toLowerCase(),
+        )
+        if (matchedCategory) {
+          categoryId = matchedCategory.id || matchedCategory.pc_id
+          selectedCategory = matchedCategory
+        }
+      }
+
+      const initialFormValues = {
+        name: productInfo.name,
+        price: productInfo.price,
+        cost: productInfo.cost,
+        status: productInfo.status,
+        category: categoryId,
+      }
+
+      console.log('Setting form values:', initialFormValues)
+
+      setInitialValues(initialFormValues)
+      setExistingImage(productInfo.image || '')
+      setFormInitialized(true)
+
+      setTimeout(() => {
+        if (form && isOpen) {
+          form.setFieldsValue(initialFormValues)
+        }
+      }, 50)
+
       setHasUnsavedChanges(false)
       setImageFile(null)
+      setImageBase64(undefined)
     }
-  }, [isOpen, productData, categories])
+  }, [isOpen, productInfo, activeCategories, form, formInitialized])
+
+  // Reset when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFormInitialized(false)
+      setInitialValues(null)
+      setImageFile(null)
+      setImageBase64(undefined)
+      setExistingImage('')
+      setHasUnsavedChanges(false)
+    }
+  }, [isOpen])
 
   // Handle form submission
   const handleSubmit = async (values) => {
@@ -102,30 +139,42 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
       return
     }
 
+    console.log('Submitting form with values:', values)
+
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData()
-      formData.append('name', values.name.trim())
-      formData.append('price', values.price)
-      formData.append('stock_quantity', values.stockQuantity)
-      formData.append('category_id', values.category)
-
-      if (imageFile) {
-        formData.append('image', imageFile)
+      const productUpdateData = {
+        name: values.name.trim(),
+        category_id: values.category ? Number(values.category) : null,
+        price: parseFloat(values.price),
+        cost: parseFloat(values.cost),
+        status: values.status === 'available' ? 'AVAILABLE' : 'UNAVAILABLE',
       }
 
-      const response = await updateProduct(productInfo.id, formData)
+      if (imageBase64 !== undefined) {
+        productUpdateData.image = imageBase64 || ''
+      }
+
+      console.log('Sending update to backend:', productUpdateData)
+
+      const response = await updateProduct(productInfo.id, productUpdateData)
+      console.log('Update response:', response)
+
       message.success('Product updated successfully!')
 
       if (onProductUpdated) {
-        onProductUpdated(response.data)
+        onProductUpdated()
       }
 
       onClose()
     } catch (error) {
       console.error('Error updating product:', error)
-      message.error(error.message || 'Failed to update product. Please try again.')
+      message.error(
+        error.response?.data?.message ||
+          error.message ||
+          'Failed to update product. Please try again.',
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -134,8 +183,6 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
   // Handle modal cancel
   const handleCancel = () => {
     if (!isSubmitting) {
-      form.resetFields()
-      setImageFile(null)
       onClose()
     }
   }
@@ -146,26 +193,38 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
 
     const hasChanges = Object.keys(allValues).some((key) => {
       const currentValue = allValues[key]
-      const originalValue = initialValues[key] || ''
+      const originalValue = initialValues[key]
 
-      // Handle number comparisons properly
+      if (currentValue == null && originalValue == null) return false
+      if (currentValue == null || originalValue == null) return true
+
       if (typeof currentValue === 'number' && typeof originalValue === 'number') {
         return currentValue !== originalValue
       }
 
-      // Handle undefined/empty string comparisons
-      const current =
-        currentValue === undefined || currentValue === null ? '' : String(currentValue)
-      const original =
-        originalValue === undefined || originalValue === null ? '' : String(originalValue)
-      return current !== original
+      if (key === 'category') {
+        return String(currentValue) !== String(originalValue)
+      }
+
+      return String(currentValue) !== String(originalValue)
     })
 
-    setHasUnsavedChanges(hasChanges || !!imageFile)
+    const imageChanged = imageBase64 !== undefined
+    setHasUnsavedChanges(hasChanges || imageChanged)
+  }
+
+  // Convert image file to base64
+  const convertImageToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = (error) => reject(error)
+    })
   }
 
   // Handle image upload
-  const handleImageUpload = (file) => {
+  const handleImageUpload = async (file) => {
     const isImage = file.type.startsWith('image/')
     if (!isImage) {
       message.error('You can only upload image files!')
@@ -178,42 +237,30 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
       return false
     }
 
-    // Check image dimensions (optional)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        if (img.width < 100 || img.height < 100) {
-          message.error('Image should be at least 100x100 pixels')
-          setImageFile(null)
-          return false
-        }
-      }
-      img.src = e.target.result
+    try {
+      const base64 = await convertImageToBase64(file)
+      setImageFile(file)
+      setImageBase64(base64)
+      setHasUnsavedChanges(true)
+    } catch (error) {
+      console.error('Error converting image:', error)
+      message.error('Failed to process image. Please try again.')
     }
-    reader.readAsDataURL(file)
 
-    setImageFile(file)
-    setHasUnsavedChanges(true)
     return false
   }
 
-  // Handle ESC key press
-  useEffect(() => {
-    const handleEscKey = (event) => {
-      if (event.key === 'Escape' && isOpen && !isSubmitting) {
-        handleCancel()
-      }
+  // Handle image removal
+  const handleRemoveImage = () => {
+    if (imageFile) {
+      setImageFile(null)
+      setImageBase64('')
+    } else {
+      setExistingImage('')
+      setImageBase64('')
     }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscKey)
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscKey)
-    }
-  }, [isOpen, isSubmitting])
+    setHasUnsavedChanges(true)
+  }
 
   // Format peso currency
   const pesoFormatter = (value) => {
@@ -225,6 +272,15 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
     return value.replace(/₱\s?|(,*)/g, '')
   }
 
+  // Get current category name for display
+  const currentCategoryName = useMemo(() => {
+    if (!productInfo) return ''
+    const categoryById = findCategoryById(productInfo.category_id)
+    return categoryById
+      ? categoryById.name || categoryById.pc_name || ''
+      : productInfo.category_name || ''
+  }, [productInfo, activeCategories])
+
   if (!isOpen || !productData) return null
 
   return (
@@ -235,298 +291,258 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated }) => {
       footer={null}
       width={800}
       centered
-      maskClosable={true}
-      keyboard={true}
+      maskClosable={!isSubmitting}
+      keyboard={!isSubmitting}
       className="edit-product-modal"
       closable={!isSubmitting}
-      styles={{
-        body: {
-          padding: '24px',
-        },
-      }}
+      destroyOnHidden={true}
       afterClose={() => {
         form.resetFields()
-        setHasUnsavedChanges(false)
-        setInitialValues(null)
-        setImageFile(null)
-        setExistingImage('')
-        setCategoryError('')
       }}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleSubmit}
-        onValuesChange={handleValuesChange}
-        disabled={isSubmitting}
-        size="large"
-        autoComplete="off"
-      >
-        <Row gutter={[16, 16]}>
-          <Col span={12}>
-            <Form.Item
-              label="Product Name"
-              name="name"
-              rules={[
-                { required: true, message: 'Please input product name!' },
-                { min: 2, message: 'Product name must be at least 2 characters!' },
-                { max: 100, message: 'Product name cannot exceed 100 characters!' },
-                {
-                  validator: (_, value) => {
-                    if (value && value.trim().length < 2) {
-                      return Promise.reject(new Error('Product name must be at least 2 characters'))
-                    }
-                    return Promise.resolve()
-                  },
-                },
-              ]}
-            >
-              <Input placeholder="Enter product name" disabled={isSubmitting} allowClear />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item
-              label="Category"
-              name="category"
-              rules={[{ required: true, message: 'Please select category!' }]}
-              help={categoryError}
-              validateStatus={categoryError ? 'error' : ''}
-            >
-              <Select
-                placeholder={
-                  loadingCategories ? (
-                    <span>
-                      <Spin indicator={<LoadingOutlined style={{ fontSize: 14 }} spin />} /> Loading
-                      categories...
-                    </span>
-                  ) : (
-                    productInfo?.categoryName || 'Select category'
-                  )
-                }
-                disabled={isSubmitting || loadingCategories}
-                allowClear
-                showSearch
-                filterOption={(input, option) =>
-                  option.children.toLowerCase().includes(input.toLowerCase())
-                }
-                notFoundContent={
-                  loadingCategories ? (
-                    <div className="py-2 text-center">
-                      <Spin size="small" />
-                    </div>
-                  ) : (
-                    <div className="py-2 text-center text-gray-500">No categories found</div>
-                  )
-                }
-                dropdownRender={(menu) => (
-                  <>
-                    {menu}
-                    {categories.length === 0 && !loadingCategories && (
-                      <div className="p-2 text-center text-gray-500">No categories available.</div>
-                    )}
-                  </>
-                )}
+      {!formInitialized ? (
+        <div className="text-center py-8">
+          <Spin size="large" />
+          <p className="mt-4 text-gray-600">Loading product data...</p>
+        </div>
+      ) : (
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          onValuesChange={handleValuesChange}
+          disabled={isSubmitting}
+          size="large"
+          autoComplete="off"
+        >
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <Form.Item
+                label="Product Name"
+                name="name"
+                rules={[
+                  { required: true, message: 'Please input product name!' },
+                  { min: 2, message: 'Product name must be at least 2 characters!' },
+                  { max: 100, message: 'Product name cannot exceed 100 characters!' },
+                ]}
               >
-                {categories.map((category) => (
-                  <Option
-                    key={category.id || category.category_id}
-                    value={category.id || category.category_id}
-                  >
-                    {category.name || category.category_name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
+                <Input placeholder="Enter product name" disabled={isSubmitting} />
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label="Price"
-              name="price"
-              rules={[
-                { required: true, message: 'Please input price!' },
-                {
-                  type: 'number',
-                  min: 0.01,
-                  message: 'Price must be greater than ₱0.00!',
-                },
-                {
-                  validator: (_, value) => {
-                    if (value && value > 99999999.99) {
-                      return Promise.reject(new Error('Price cannot exceed ₱99,999,999.99'))
-                    }
-                    return Promise.resolve()
+            <Col span={12}>
+              <Form.Item
+                label="Category"
+                name="category"
+                rules={[{ required: true, message: 'Please select category!' }]}
+                extra={
+                  currentCategoryName && (
+                    <span className="text-xs text-gray-500">
+                      Current category: {currentCategoryName}
+                    </span>
+                  )
+                }
+              >
+                <Select
+                  placeholder={`Select category (current: ${currentCategoryName || 'none'})`}
+                  disabled={isSubmitting}
+                  allowClear
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.children || '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  loading={!categories}
+                  optionFilterProp="children"
+                >
+                  {activeCategories.map((category) => {
+                    const categoryId = category.id || category.pc_id
+                    const categoryName = category.name || category.pc_name
+                    return (
+                      <Option key={categoryId} value={categoryId}>
+                        {categoryName}
+                      </Option>
+                    )
+                  })}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item
+                label="Selling Price"
+                name="price"
+                rules={[
+                  { required: true, message: 'Please input price!' },
+                  {
+                    type: 'number',
+                    min: 0.01,
+                    message: 'Price must be greater than ₱0.00!',
                   },
-                },
-              ]}
-            >
-              <InputNumber
-                placeholder="0.00"
-                min={0}
-                step={0.01}
-                style={{ width: '100%' }}
-                disabled={isSubmitting}
-                formatter={pesoFormatter}
-                parser={pesoParser}
-                precision={2}
-              />
-            </Form.Item>
-          </Col>
+                ]}
+              >
+                <InputNumber
+                  placeholder="0.00"
+                  min={0.01}
+                  step={0.01}
+                  style={{ width: '100%' }}
+                  disabled={isSubmitting}
+                  formatter={pesoFormatter}
+                  parser={pesoParser}
+                  precision={2}
+                />
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label="Stock Quantity"
-              name="stockQuantity"
-              rules={[
-                { required: true, message: 'Please input stock quantity!' },
-                { type: 'number', min: 0, message: 'Quantity cannot be negative!' },
-                {
-                  validator: (_, value) => {
-                    if (value && value > 999999) {
-                      return Promise.reject(new Error('Quantity cannot exceed 999,999'))
-                    }
-                    return Promise.resolve()
+            <Col span={12}>
+              <Form.Item
+                label="Cost Price"
+                name="cost"
+                rules={[
+                  { required: true, message: 'Please input cost price!' },
+                  {
+                    type: 'number',
+                    min: 0.01,
+                    message: 'Cost must be greater than ₱0.00!',
                   },
-                },
-              ]}
-            >
-              <InputNumber
-                placeholder="0"
-                min={0}
-                style={{ width: '100%' }}
-                disabled={isSubmitting}
-                precision={0}
-              />
-            </Form.Item>
-          </Col>
+                ]}
+                help="Production cost of the product"
+              >
+                <InputNumber
+                  placeholder="0.00"
+                  min={0.01}
+                  step={0.01}
+                  style={{ width: '100%' }}
+                  disabled={isSubmitting}
+                  formatter={pesoFormatter}
+                  parser={pesoParser}
+                  precision={2}
+                />
+              </Form.Item>
+            </Col>
 
-          <Col span={24}>
-            <Form.Item
-              label="Product Image"
-              help="Supported formats: JPG, PNG, GIF. Max size: 2MB. Recommended: 500x500px"
-            >
-              <div className="space-y-4">
-                <div className="flex items-start gap-4 flex-wrap">
-                  {existingImage && !imageFile && (
-                    <div className="relative group">
-                      <div className="relative w-32 h-32 overflow-hidden rounded border border-gray-300">
-                        <Image
-                          src={existingImage}
-                          alt="current product"
-                          width={128}
-                          height={128}
-                          className="object-cover w-full h-full"
-                          preview={{
-                            mask: 'Preview',
-                          }}
-                        />
+            <Col span={12}>
+              <Form.Item
+                label="Status"
+                name="status"
+                rules={[{ required: true, message: 'Please select status!' }]}
+              >
+                <Select disabled={isSubmitting}>
+                  <Option value="available">Available</Option>
+                  <Option value="unavailable">Unavailable</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Form.Item
+                label="Product Image"
+                help="Supported formats: JPG, PNG, GIF. Max size: 2MB. Recommended: 500x500px"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4 flex-wrap">
+                    {existingImage && (
+                      <div className="relative group">
+                        <div className="relative w-32 h-32 overflow-hidden rounded border border-gray-300">
+                          <Image
+                            src={existingImage}
+                            alt="current product"
+                            width={128}
+                            height={128}
+                            className="object-cover w-full h-full"
+                            preview={{ mask: 'Preview' }}
+                          />
+                        </div>
+                        <div className="mt-2 text-xs text-gray-600 text-center">Current Image</div>
                       </div>
-                      <div className="mt-2 text-xs text-gray-600 text-center">Current Image</div>
+                    )}
+
+                    <div className="relative">
+                      <Upload
+                        name="image"
+                        listType="picture-card"
+                        showUploadList={false}
+                        beforeUpload={handleImageUpload}
+                        accept="image/*"
+                        disabled={isSubmitting}
+                      >
+                        {imageFile ? (
+                          <div className="relative w-full h-full">
+                            <img
+                              src={URL.createObjectURL(imageFile)}
+                              alt="new product"
+                              className="w-full h-full object-cover rounded"
+                            />
+                          </div>
+                        ) : (
+                          <div className="text-center">
+                            <PlusOutlined />
+                            <div style={{ marginTop: 8 }}>
+                              {existingImage ? 'Replace Image' : 'Upload Image'}
+                            </div>
+                          </div>
+                        )}
+                      </Upload>
+                    </div>
+                  </div>
+
+                  {(imageFile || existingImage) && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">
+                        {imageFile
+                          ? `${imageFile.name} • ${(imageFile.size / 1024).toFixed(2)} KB`
+                          : 'Current image will be kept unless replaced'}
+                      </span>
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        onClick={handleRemoveImage}
+                        disabled={isSubmitting}
+                        className="ml-2"
+                      >
+                        {imageFile ? 'Remove New Image' : 'Remove Current Image'}
+                      </Button>
                     </div>
                   )}
-
-                  <div className="relative">
-                    <Upload
-                      name="image"
-                      listType="picture-card"
-                      showUploadList={false}
-                      beforeUpload={handleImageUpload}
-                      accept="image/*"
-                      disabled={isSubmitting}
-                    >
-                      {imageFile ? (
-                        <div className="relative w-full h-full">
-                          <img
-                            src={URL.createObjectURL(imageFile)}
-                            alt="new product"
-                            className="w-full h-full object-cover rounded"
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-white text-sm">Change Image</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center">
-                          <PlusOutlined />
-                          <div style={{ marginTop: 8 }}>
-                            {existingImage ? 'Replace Image' : 'Upload Image'}
-                          </div>
-                        </div>
-                      )}
-                    </Upload>
-                    {imageFile && (
-                      <div className="absolute -bottom-8 left-0 right-0 text-center">
-                        <span className="text-xs text-gray-600">New image selected</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
+              </Form.Item>
+            </Col>
+          </Row>
 
-                {(imageFile || existingImage) && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">
-                      {imageFile
-                        ? `${imageFile.name} • ${(imageFile.size / 1024).toFixed(2)} KB`
-                        : existingImage && 'Current image will be kept'}
-                    </span>
-                    <Button
-                      type="text"
-                      danger
-                      size="small"
-                      onClick={() => {
-                        if (imageFile) {
-                          setImageFile(null)
-                        } else {
-                          setExistingImage('')
-                        }
-                        setHasUnsavedChanges(true)
-                      }}
-                      disabled={isSubmitting}
-                      className="ml-2"
-                    >
-                      {imageFile ? 'Remove New Image' : 'Remove Current Image'}
-                    </Button>
-                  </div>
+          {/* Form Actions */}
+          <Form.Item className="mb-0 mt-6">
+            <div className="flex justify-between items-center pt-6 border-t border-slate-200">
+              <div className="text-sm text-gray-500">
+                {hasUnsavedChanges ? (
+                  <span className="text-amber-600">You have unsaved changes</span>
+                ) : (
+                  'No changes made'
                 )}
               </div>
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Form Actions */}
-        <Form.Item className="mb-0 mt-6">
-          <div className="flex justify-between items-center pt-6 border-t border-slate-200">
-            <div className="text-sm text-gray-500">
-              {hasUnsavedChanges ? (
-                <span className="text-amber-600">You have unsaved changes</span>
-              ) : (
-                'No changes made'
-              )}
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleCancel}
+                  disabled={isSubmitting}
+                  size="large"
+                  className="min-w-25"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSubmitting}
+                  disabled={isSubmitting || !hasUnsavedChanges}
+                  size="large"
+                  className="min-w-25 bg-[#9C4A15] hover:bg-[#8a3f12] border-[#9C4A15]"
+                >
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <Button
-                onClick={handleCancel}
-                disabled={isSubmitting}
-                size="large"
-                className="min-w-25"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isSubmitting}
-                disabled={isSubmitting || !hasUnsavedChanges || loadingCategories}
-                size="large"
-                className="min-w-25 bg-[#9C4A15] hover:bg-[#8a3f12] border-[#9C4A15]"
-              >
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </div>
-          </div>
-        </Form.Item>
-      </Form>
+          </Form.Item>
+        </Form>
+      )}
     </Modal>
   )
 }

@@ -25,6 +25,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
   const [imageFile, setImageFile] = useState(null)
   const [loadingCategories, setLoadingCategories] = useState(false)
   const [categoryError, setCategoryError] = useState('')
+  const [imageBase64, setImageBase64] = useState('')
 
   // Fetch categories when modal opens
   useEffect(() => {
@@ -57,22 +58,40 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
     }
   }
 
+  // Convert image file to base64
+  const convertImageToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = (error) => reject(error)
+    })
+  }
+
   // Handle form submission
   const handleSubmit = async (values) => {
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData()
-      formData.append('name', values.name.trim())
-      formData.append('price', values.price)
-      formData.append('stock_quantity', values.stockQuantity)
-      formData.append('category_id', values.category)
-
-      if (imageFile) {
-        formData.append('image', imageFile)
+      // Prepare product data according to backend API expectations
+      const productData = {
+        name: values.name.trim(),
+        category_id: values.category,
+        price: parseFloat(values.price),
+        cost: parseFloat(values.cost || values.price * 0.6), // Default cost if not provided
+        status: 'available',
+        initial_stock: parseInt(values.initial_stock || 0),
       }
 
-      const response = await createProduct(formData)
+      // Add image if available
+      if (imageBase64) {
+        productData.image = imageBase64
+      }
+
+      console.log('Sending product data:', productData)
+
+      const response = await createProduct(productData)
+
       message.success('Product added successfully!')
 
       if (onProductAdded) {
@@ -93,6 +112,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
     if (!isSubmitting) {
       form.resetFields()
       setImageFile(null)
+      setImageBase64('')
       onClose()
     }
   }
@@ -106,7 +126,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
   }
 
   // Handle image upload
-  const handleImageUpload = (file) => {
+  const handleImageUpload = async (file) => {
     const isImage = file.type.startsWith('image/')
     if (!isImage) {
       message.error('You can only upload image files!')
@@ -119,23 +139,17 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
       return false
     }
 
-    // Check image dimensions (optional)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        if (img.width < 100 || img.height < 100) {
-          message.error('Image should be at least 100x100 pixels')
-          setImageFile(null)
-          return false
-        }
-      }
-      img.src = e.target.result
+    try {
+      // Convert image to base64
+      const base64 = await convertImageToBase64(file)
+      setImageFile(file)
+      setImageBase64(base64)
+      setHasUnsavedChanges(true)
+    } catch (error) {
+      console.error('Error converting image:', error)
+      message.error('Failed to process image. Please try again.')
     }
-    reader.readAsDataURL(file)
 
-    setImageFile(file)
-    setHasUnsavedChanges(true)
     return false // Prevent automatic upload
   }
 
@@ -166,6 +180,15 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
     return value.replace(/₱\s?|(,*)/g, '')
   }
 
+  // Calculate default cost based on price (60% of price)
+  const handlePriceChange = (price) => {
+    if (price && !form.getFieldValue('cost')) {
+      const defaultCost = price * 0.6
+      form.setFieldsValue({ cost: parseFloat(defaultCost.toFixed(2)) })
+      setHasUnsavedChanges(true)
+    }
+  }
+
   if (!isOpen) return null
 
   return (
@@ -189,6 +212,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
         form.resetFields()
         setHasUnsavedChanges(false)
         setImageFile(null)
+        setImageBase64('')
         setCategoryError('')
       }}
     >
@@ -270,11 +294,8 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
                 )}
               >
                 {categories.map((category) => (
-                  <Option
-                    key={category.id || category.category_id}
-                    value={category.id || category.category_id}
-                  >
-                    {category.name || category.category_name}
+                  <Option key={category.id || category.pc_id} value={category.id || category.pc_id}>
+                    {category.name || category.pc_name}
                   </Option>
                 ))}
               </Select>
@@ -283,7 +304,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
 
           <Col span={12}>
             <Form.Item
-              label="Price"
+              label="Selling Price"
               name="price"
               rules={[
                 { required: true, message: 'Please input price!' },
@@ -304,7 +325,43 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
             >
               <InputNumber
                 placeholder="0.00"
-                min={0}
+                min={0.01}
+                step={0.01}
+                style={{ width: '100%' }}
+                disabled={isSubmitting}
+                formatter={pesoFormatter}
+                parser={pesoParser}
+                precision={2}
+                onChange={handlePriceChange}
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={12}>
+            <Form.Item
+              label="Cost Price"
+              name="cost"
+              rules={[
+                { required: true, message: 'Please input cost price!' },
+                {
+                  type: 'number',
+                  min: 0.01,
+                  message: 'Cost must be greater than ₱0.00!',
+                },
+                {
+                  validator: (_, value) => {
+                    if (value && value > 99999999.99) {
+                      return Promise.reject(new Error('Cost cannot exceed ₱99,999,999.99'))
+                    }
+                    return Promise.resolve()
+                  },
+                },
+              ]}
+              help="Production cost of the product"
+            >
+              <InputNumber
+                placeholder="0.00"
+                min={0.01}
                 step={0.01}
                 style={{ width: '100%' }}
                 disabled={isSubmitting}
@@ -317,10 +374,10 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
 
           <Col span={12}>
             <Form.Item
-              label="Stock Quantity"
-              name="stockQuantity"
+              label="Initial Stock"
+              name="initial_stock"
               rules={[
-                { required: true, message: 'Please input stock quantity!' },
+                { required: true, message: 'Please input initial stock!' },
                 { type: 'number', min: 0, message: 'Quantity cannot be negative!' },
                 {
                   validator: (_, value) => {
@@ -331,6 +388,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
                   },
                 },
               ]}
+              help="Initial quantity when adding product"
             >
               <InputNumber
                 placeholder="0"
@@ -339,6 +397,15 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
                 disabled={isSubmitting}
                 precision={0}
               />
+            </Form.Item>
+          </Col>
+
+          <Col span={12}>
+            <Form.Item label="Status" name="status" initialValue="available">
+              <Select disabled={isSubmitting}>
+                <Option value="available">Available</Option>
+                <Option value="unavailable">Unavailable</Option>
+              </Select>
             </Form.Item>
           </Col>
 
@@ -386,6 +453,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
                       size="small"
                       onClick={() => {
                         setImageFile(null)
+                        setImageBase64('')
                         setHasUnsavedChanges(true)
                       }}
                       disabled={isSubmitting}

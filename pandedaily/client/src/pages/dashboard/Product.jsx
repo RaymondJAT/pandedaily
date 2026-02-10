@@ -217,7 +217,6 @@ const Product = () => {
     setLoading(true)
     setError(null)
     try {
-      // Fetch products and categories in parallel
       const [productsResponse, categoriesResponse] = await Promise.all([
         getProducts(),
         getProductCategories(),
@@ -227,17 +226,19 @@ const Product = () => {
       const categoriesData = categoriesResponse.data || categoriesResponse
 
       if (Array.isArray(productsData)) {
-        const transformedProducts = productsData.map((product) => ({
-          id: product.id || product.p_id || 0,
-          name: product.name || product.p_name || 'Unknown',
-          category_name: product.category_name || product.pc_name || 'Uncategorized',
-          price: parseFloat(product.price || product.p_price || 0),
-          cost: parseFloat(product.cost || product.p_cost || 0),
-          status: product.status || product.p_status || 'AVAILABLE',
-          image: product.image || product.pi_image || '',
-          category_id: product.category_id || product.p_category_id || 0,
-          ...product,
-        }))
+        const transformedProducts = productsData.map((product) => {
+          return {
+            id: product.id || product.p_id || 0,
+            name: product.name || product.p_name || 'Unknown',
+            category_name: product.category_name || product.pc_name || 'Uncategorized',
+            price: parseFloat(product.price || product.p_price || 0),
+            cost: parseFloat(product.cost || product.p_cost || 0),
+            status: product.status || product.p_status || 'AVAILABLE',
+            image: product.image || product.pi_image || '',
+            category_id: product.category_id || product.p_category_id || 0,
+            ...product,
+          }
+        })
 
         setProducts(transformedProducts)
       } else {
@@ -278,14 +279,21 @@ const Product = () => {
 
   // Handle edit product
   const handleEditProduct = (product) => {
-    setEditingProduct(product)
-    setShowEditModal(true)
-  }
+    console.log('=== EDIT PRODUCT DATA ===')
+    console.log('Full product object:', product)
 
-  // Handle edit category
-  const handleEditCategory = (category) => {
-    setEditingCategory(category)
-    setShowEditCategoryModal(true)
+    // Convert string prices to numbers for the form
+    const processedProduct = {
+      ...product,
+      price: parseFloat(product.price) || 0,
+      cost: parseFloat(product.cost) || 0,
+    }
+
+    console.log('Processed product:', processedProduct)
+    console.log('=== END DATA ===')
+
+    setEditingProduct(processedProduct)
+    setShowEditModal(true)
   }
 
   // Get unique values for filter dropdowns
@@ -373,10 +381,6 @@ const Product = () => {
     setShowAddCategoryModal(true)
   }
 
-  const handleRefresh = () => {
-    fetchData()
-  }
-
   const formatStatusForDisplay = (status) => {
     const statusMap = {
       AVAILABLE: 'Available',
@@ -387,29 +391,6 @@ const Product = () => {
       statusMap[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown')
     )
   }
-
-  // Calculate statistics
-  const statistics = useMemo(() => {
-    if (!Array.isArray(products))
-      return {
-        total: 0,
-        available: 0,
-        unavailable: 0,
-        categories: 0,
-        totalValue: 0,
-      }
-
-    const total = products.length
-    const available = products.filter((p) => p.status === 'AVAILABLE').length
-    const unavailable = total - available
-    const categories = uniqueCategories.length
-
-    const totalValue = products.reduce((sum, product) => {
-      return sum + (parseFloat(product.price) || 0)
-    }, 0)
-
-    return { total, available, unavailable, categories, totalValue }
-  }, [products, uniqueCategories])
 
   if (loading) {
     return (
