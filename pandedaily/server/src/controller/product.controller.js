@@ -87,7 +87,7 @@ const addProduct = async (req, res) => {
   const { name, category_id, price, cost, status = 1, image, initial_stock = 0 } = req.body
 
   try {
-    const productStatus = status === 1 || status === 'available' ? 'available' : 'unavailable'
+    const productStatus = status === 1 || status === 'AVAILABLE' ? 'AVAILABLE' : 'UNAVAILABLE'
 
     const productResult = await Query(
       `INSERT INTO product(p_name, p_category_id, p_price, p_cost, p_status) VALUES(?, ?, ?, ?, ?)`,
@@ -255,19 +255,19 @@ const updateProduct = async (req, res) => {
       let value = req.body[field]
 
       if (field === 'status') {
-        if (value === 1 || value === '1' || value === 'available') {
-          value = 'available'
-        } else if (value === 0 || value === '0' || value === 'unavailable') {
-          value = 'unavailable'
+        if (value === 1 || value === '1' || value === 'AVAILABLE') {
+          value = 'AVAILABLE'
+        } else if (value === 0 || value === '0' || value === 'UNAVAILABLE') {
+          value = 'UNAVAILABLE'
         } else {
           value = value.toLowerCase()
         }
 
         // Validate status
-        const validStatuses = ['available', 'unavailable']
+        const validStatuses = ['AVAILABLE', 'UNAVAILABLE']
         if (!validStatuses.includes(value)) {
           return res.status(400).json({
-            message: 'Invalid status. Must be "available" or "unavailable".',
+            message: 'Invalid status. Must be "AVAILABLE" or "UNAVAILABLE".',
             validStatuses,
           })
         }

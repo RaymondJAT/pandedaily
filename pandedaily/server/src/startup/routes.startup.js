@@ -21,7 +21,7 @@ const initRoutes = async (app) => {
 
   app.use('/auth', authRouter)
 
-  // app.use(auth)
+  app.use(auth)
   app.use('/access', accessRouter)
   app.use('/route', routeRouter)
   app.use('/user', userRouter)
