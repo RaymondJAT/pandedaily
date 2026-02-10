@@ -1,6 +1,5 @@
 const { Order } = require('../database/model/Order')
-const { Query } = require('../database/utility/queries.util')
-const { Transaction } = require('../database/utility/queries.util')
+const { Query, Transaction } = require('../database/utility/queries.util')
 
 // GET ALL
 const getOrders = async (req, res) => {

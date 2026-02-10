@@ -1,7 +1,7 @@
 const express = require('express')
 const {
   getInventory,
-  addInventory,
+  // addInventory,
   getAllInventoryHistory,
   getInventoryHistory,
   updateInventory,
@@ -16,7 +16,7 @@ inventoryRouter.get('/history', getAllInventoryHistory)
 inventoryRouter.get('/history/:id', getInventoryHistory)
 
 // CREATE
-inventoryRouter.post('/', addInventory)
+// inventoryRouter.post('/', addInventory)
 
 // UPDATE
 inventoryRouter.put('/:id', updateInventory)

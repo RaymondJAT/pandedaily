@@ -15,15 +15,27 @@ const getProductCategory = async (req, res) => {
 
 const getProduct = async (req, res) => {
   try {
-    const statement = `SELECT p_id AS id, p_name AS name, pc_name AS category_name, p_price AS price, p_cost AS cost, p_status AS status, pi_image AS image 
-    FROM product 
-    INNER JOIN product_category ON product.p_category_id = product_category.pc_id
-    LEFT JOIN product_image ON product.p_id = product_image.pi_product_id`
+    const statement = `SELECT 
+      p.p_id AS id, 
+      p.p_name AS name, 
+      p.p_category_id AS category_id,  
+      pc.pc_name AS category_name, 
+      p.p_price AS price, 
+      p.p_cost AS cost, 
+      p.p_status AS status, 
+      pi.pi_image AS image 
+    FROM product p
+    INNER JOIN product_category pc ON p.p_category_id = pc.pc_id
+    LEFT JOIN product_image pi ON p.p_id = pi.pi_product_id`
 
     const data = await Query(statement, [], Product.product.prefix_)
     res.status(200).json({ message: 'Product data retrieved.', data })
   } catch (error) {
-    res.status(500).json({ message: 'Error retrieving product data.' })
+    console.error('Error retrieving product data:', error)
+    res.status(500).json({
+      message: 'Error retrieving product data.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    })
   }
 }
 
@@ -72,43 +84,60 @@ const addProductCategory = async (req, res) => {
 }
 
 const addProduct = async (req, res) => {
-  const { name, category_id, price, cost, status = 1, image } = req.body
+  const { name, category_id, price, cost, status = 1, image, initial_stock = 0 } = req.body
 
   try {
+    const productStatus = status === 1 || status === 'available' ? 'available' : 'unavailable'
+
     const productResult = await Query(
       `INSERT INTO product(p_name, p_category_id, p_price, p_cost, p_status) VALUES(?, ?, ?, ?, ?)`,
-      [name, category_id, price, cost, status],
+      [name, category_id, price, cost, productStatus],
     )
     const productId = productResult.insertId
 
-    await Query(`INSERT INTO product_image(pi_product_id, pi_image) VALUES(?, ?)`, [
-      productId,
-      image,
-    ])
+    if (image && image.trim() !== '') {
+      await Query(`INSERT INTO product_image(pi_product_id, pi_image) VALUES(?, ?)`, [
+        productId,
+        image,
+      ])
+    }
+
+    const parsedStock = parseInt(initial_stock) || 0
 
     const inventoryResult = await Query(
-      `INSERT INTO inventory(i_product_id, i_current_stock, i_previous_stock) VALUES(?, 0, 0)`,
-      [productId],
+      `INSERT INTO inventory(i_product_id, i_current_stock, i_previous_stock) VALUES(?, ?, 0)`,
+      [productId, parsedStock],
     )
     const inventoryId = inventoryResult.insertId
 
     await Query(
       `INSERT INTO inventory_history(ih_inventory_id, ih_date, ih_stock_before, ih_stock_after, ih_status)
-       VALUES(?, NOW(), 0, 0, 'new')`,
-      [inventoryId],
+       VALUES(?, NOW(), 0, ?, 'new')`,
+      [inventoryId, parsedStock],
     )
 
     res.status(200).json({
       message: 'Product added successfully with inventory and initial history.',
       productId,
       inventoryId,
+      initial_stock: parsedStock,
     })
   } catch (error) {
     console.error('Error adding product:', error)
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Product with this name already exists.' })
     }
-    res.status(500).json({ message: 'Error adding product data.' })
+
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({
+        message: 'Invalid category ID. Category does not exist.',
+      })
+    }
+
+    res.status(500).json({
+      message: 'Error adding product data.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    })
   }
 }
 
@@ -192,7 +221,10 @@ const updateProduct = async (req, res) => {
     return res.status(400).json({ message: 'Product ID is required.' })
   }
 
-  if (![name, category_id, price, cost, status, image].some((v) => v !== undefined)) {
+  const hasProductUpdate = [name, category_id, price, cost, status].some((v) => v !== undefined)
+  const hasImageUpdate = image !== undefined
+
+  if (!hasProductUpdate && !hasImageUpdate) {
     return res.status(400).json({
       message: 'At least one field is required.',
     })
@@ -223,12 +255,19 @@ const updateProduct = async (req, res) => {
       let value = req.body[field]
 
       if (field === 'status') {
-        const validStatuses = ['AVAILABLE', 'UNAVAILABLE', 'DELETED']
-        value = value.toUpperCase()
+        if (value === 1 || value === '1' || value === 'available') {
+          value = 'available'
+        } else if (value === 0 || value === '0' || value === 'unavailable') {
+          value = 'unavailable'
+        } else {
+          value = value.toLowerCase()
+        }
 
+        // Validate status
+        const validStatuses = ['available', 'unavailable']
         if (!validStatuses.includes(value)) {
           return res.status(400).json({
-            message: 'Invalid status',
+            message: 'Invalid status. Must be "available" or "unavailable".',
             validStatuses,
           })
         }
@@ -245,7 +284,12 @@ const updateProduct = async (req, res) => {
 
       if (field === 'price' || field === 'cost') {
         value = parseFloat(value)
-        updatedFields[field] = '[DECIMAL]'
+        if (isNaN(value) || value < 0) {
+          return res.status(400).json({
+            message: `${field} must be a valid positive number.`,
+          })
+        }
+        updatedFields[field] = value
       } else {
         updatedFields[field] = value
       }
@@ -259,26 +303,48 @@ const updateProduct = async (req, res) => {
       await Query(`UPDATE product SET ${updates.join(', ')} WHERE p_id = ?`, params)
     }
 
+    // Handle image
     if (image !== undefined) {
-      let result = await Query(`SELECT * FROM product_image WHERE pi_product_id = ?`, [id])
-
-      if (result.length) {
-        await Query(
-          `UPDATE product_image
-           SET pi_image = ?
-           WHERE pi_product_id = ?`,
-          [image, id],
-        )
+      if (!image || image.trim() === '') {
+        await Query(`DELETE FROM product_image WHERE pi_product_id = ?`, [id])
+        updatedFields.image = null
       } else {
-        await Query(`INSERT INTO product_image(pi_product_id, pi_image) VALUES(?, ?)`, [id, image])
-      }
+        const existingImage = await Query(
+          `SELECT pi_id FROM product_image WHERE pi_product_id = ?`,
+          [id],
+        )
 
-      updatedFields.image = '[LONGTEXT]'
+        if (existingImage.length) {
+          await Query(`UPDATE product_image SET pi_image = ? WHERE pi_product_id = ?`, [image, id])
+        } else {
+          await Query(`INSERT INTO product_image(pi_product_id, pi_image) VALUES(?, ?)`, [
+            id,
+            image,
+          ])
+        }
+        updatedFields.image = '[LONGTEXT]'
+      }
     }
+
+    const [updatedProduct] = await Query(
+      `SELECT 
+        p.p_id as id,
+        p.p_name as name,
+        p.p_category_id as category_id,
+        p.p_price as price,
+        p.p_cost as cost,
+        p.p_status as status,
+        pc.pc_name as category_name
+       FROM product p
+       LEFT JOIN product_category pc ON p.p_category_id = pc.pc_id
+       WHERE p.p_id = ?`,
+      [id],
+    )
 
     res.status(200).json({
       message: 'Product updated successfully.',
       updatedFields,
+      product: updatedProduct,
     })
   } catch (error) {
     console.error('Error updating product:', error)
