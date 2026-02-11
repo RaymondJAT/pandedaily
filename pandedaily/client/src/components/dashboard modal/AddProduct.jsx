@@ -282,7 +282,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
                     <div className="py-2 text-center text-gray-500">No categories found</div>
                   )
                 }
-                dropdownRender={(menu) => (
+                popupRender={(menu) => (
                   <>
                     {menu}
                     {categories.length === 0 && !loadingCategories && (

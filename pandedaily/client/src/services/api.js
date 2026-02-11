@@ -188,8 +188,9 @@ export const getOrderById = async (id) => {
   return fetchApi(`/orders/${id}`)
 }
 
-export const getOrderItems = async (orderId) => {
-  return fetchApi(`/orders/${orderId}/items`)
+export const getOrderItem = async (orderId) => {
+  const id = typeof orderId === 'object' ? orderId?.or_id || orderId?.id || orderId : orderId
+  return fetchApi(`/orders/${id}/item`)
 }
 
 export const createOrder = async (orderData) => {

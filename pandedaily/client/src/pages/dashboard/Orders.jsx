@@ -3,6 +3,7 @@ import PlatformTable from '../../components/PlatformTable'
 import { FiUser, FiCheckCircle, FiClock, FiTruck, FiCreditCard } from 'react-icons/fi'
 import { orderColumns } from '../../mapping/orderColumns'
 import { getOrders } from '../../services/api'
+import ViewOrder from '../../components/dashboard modal/ViewOrder'
 
 const Orders = () => {
   const [orders, setOrders] = useState([])
@@ -15,6 +16,9 @@ const Orders = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRows, setSelectedRows] = useState([])
   const [selectAll, setSelectAll] = useState(false)
+
+  const [viewingOrderId, setViewingOrderId] = useState(null)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
 
   const columnsWithRender = useMemo(() => {
     return orderColumns.map((col) => {
@@ -118,23 +122,22 @@ const Orders = () => {
           return {
             ...baseColumn,
             render: (value) => {
-              // UPDATED: Made "paid" status green
               const statusConfig = {
-                paid: {
+                PAID: {
                   icon: FiCheckCircle,
-                  bg: 'bg-green-100', // Changed from blue-100 to green-100
-                  text: 'text-green-800', // Changed from blue-800 to green-800
-                  border: 'border-green-200', // Changed from blue-200 to green-200
+                  bg: 'bg-green-100',
+                  text: 'text-green-800',
+                  border: 'border-green-200',
                   label: 'Paid',
                 },
-                'on-delivery': {
+                'ON-DELIVERY': {
                   icon: FiTruck,
                   bg: 'bg-amber-100',
                   text: 'text-amber-800',
                   border: 'border-amber-200',
                   label: 'On Delivery',
                 },
-                complete: {
+                COMPLETE: {
                   icon: FiCheckCircle,
                   bg: 'bg-green-100',
                   text: 'text-green-800',
@@ -443,18 +446,29 @@ const Orders = () => {
                 onSelectAll={handleSelectAll}
                 showActions={true}
                 actionButtonProps={{
-                  showView: false,
-                  showEdit: true,
-                  showDelete: true,
-                  onView: (id) => console.log('View order:', id),
-                  onEdit: (id) => console.log('Edit order:', id),
-                  onDelete: (id) => console.log('Delete order:', id),
+                  showView: true,
+                  onView: (id) => {
+                    setViewingOrderId(id)
+                    setIsViewModalOpen(true)
+                  },
                 }}
               />
             )}
           </div>
         </div>
       </div>
+
+      {isViewModalOpen && (
+        <ViewOrder
+          orderId={viewingOrderId}
+          isOpen={isViewModalOpen}
+          onClose={() => {
+            setIsViewModalOpen(false)
+            setViewingOrderId(null)
+          }}
+          onRefresh={fetchOrders}
+        />
+      )}
     </div>
   )
 }
