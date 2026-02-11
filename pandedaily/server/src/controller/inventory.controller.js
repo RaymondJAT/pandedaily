@@ -109,32 +109,6 @@ const getInventoryHistory = async (req, res) => {
   }
 }
 
-// CREATE
-// const addInventory = async (req, res) => {
-//   const { product_id, current_stock, previous_stock } = req.body
-
-//   try {
-//     const statement = `INSERT INTO inventory(i_product_id, i_current_stock, i_previous_stock) VALUES(?, ?, ?)`
-//     const data = await Query(statement, [product_id, current_stock, previous_stock])
-
-//     res.status(200).json({
-//       message: 'Inventory data added successfully.',
-//       data,
-//       insertedId: data.insertId,
-//     })
-//   } catch (error) {
-//     console.error('Error adding inventory data:', error)
-//     console.error('Error SQL:', error.sql)
-//     console.error('Error parameters:', [product_id, current_stock, previous_stock])
-
-//     if (error.code === 'ER_DUP_ENTRY') {
-//       return res.status(409).json({ message: 'Inventory with this product_id already exists.' })
-//     }
-
-//     res.status(500).json({ message: 'Error adding inventory data.' })
-//   }
-// }
-
 // UPDATE
 const updateInventory = async (req, res) => {
   const { id } = req.params
@@ -253,6 +227,5 @@ module.exports = {
   getInventory,
   getAllInventoryHistory,
   getInventoryHistory,
-  // addInventory,
   updateInventory,
 }
