@@ -71,9 +71,10 @@ const Faq = () => {
           variants={staggerContainer}
         >
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12">
-            <div className="space-y-10">
+            {/* Left Column - Delivery Schedule & Cancellation Policy */}
+            <div className="space-y-10 flex flex-col h-full">
               {/* Delivery Schedule */}
-              <motion.div variants={faqItem}>
+              <motion.div variants={faqItem} className="flex-1 flex flex-col">
                 <h2
                   className="text-2xl md:text-3xl font-light mb-6 font-[titleFont]"
                   style={{ color: '#2A1803' }}
@@ -81,8 +82,8 @@ const Faq = () => {
                   Delivery Schedule
                 </h2>
 
-                <div className="bg-white rounded-xl shadow-lg p-6 md:p-8">
-                  <div className="space-y-8">
+                <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 flex-1 flex flex-col">
+                  <div className="space-y-8 flex-1">
                     <div>
                       <h3
                         className="text-lg md:text-xl font-medium mb-3 font-[titleFont]"
@@ -149,7 +150,11 @@ const Faq = () => {
               </motion.div>
 
               {/* Cancellation & Refund Policy */}
-              <motion.div variants={faqItem} transition={{ delay: 0.1 }}>
+              <motion.div
+                variants={faqItem}
+                transition={{ delay: 0.1 }}
+                className="flex-1 flex flex-col"
+              >
                 <h2
                   className="text-2xl md:text-3xl font-light mb-6 font-[titleFont]"
                   style={{ color: '#2A1803' }}
@@ -157,8 +162,8 @@ const Faq = () => {
                   Cancellation & Refund Policy
                 </h2>
 
-                <div className="bg-white rounded-xl shadow-lg p-6 md:p-8">
-                  <ul className="space-y-4">
+                <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 flex-1 flex flex-col">
+                  <ul className="space-y-4 flex-1">
                     <li className="flex items-start">
                       <span className="inline-block mr-3 mt-1 text-lg" style={{ color: '#9C4A15' }}>
                         •
@@ -200,9 +205,13 @@ const Faq = () => {
               </motion.div>
             </div>
 
-            {/* Promos & Discounts */}
-            <div>
-              <motion.div variants={faqItem} transition={{ delay: 0.2 }}>
+            {/* Right Column - Promos & Discounts */}
+            <div className="flex flex-col h-full">
+              <motion.div
+                variants={faqItem}
+                transition={{ delay: 0.2 }}
+                className="flex-1 flex flex-col"
+              >
                 <h2
                   className="text-2xl md:text-3xl font-light mb-6 font-[titleFont]"
                   style={{ color: '#2A1803' }}
@@ -210,8 +219,8 @@ const Faq = () => {
                   Promos & Discounts
                 </h2>
 
-                <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 h-full">
-                  <div className="space-y-4 h-full">
+                <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 flex-1 flex flex-col">
+                  <div className="space-y-6 flex-1 overflow-y-auto">
                     {/* Discount Eligibility */}
                     <div>
                       <h3
