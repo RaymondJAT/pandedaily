@@ -12,49 +12,49 @@ const Order = {
     ],
   selectColumns: [
       "or_id",
-      "or_date",
       "or_customer_id",
       "or_total",
       "or_payment_type",
       "or_payment_reference",
       "or_details",
-      "or_status"
+      "or_status",
+      "or_createddate"
     ],
   selectOptionColumns: {
     id: "or_id",
-    date: "or_date",
     customer_id: "or_customer_id",
     total: "or_total",
     payment_type: "or_payment_type",
     payment_reference: "or_payment_reference",
     details: "or_details",
-    status: "or_status"
+    status: "or_status",
+    createddate: "or_createddate"
   },
   updateOptionColumns: {
     id: "id",
-    date: "date",
     customer_id: "customer_id",
     total: "total",
     payment_type: "payment_type",
     payment_reference: "payment_reference",
     details: "details",
-    status: "status"
+    status: "status",
+    createddate: "createddate"
   },
   selectDateFormatColumns: {
-    date: "REPLACE(REPLACE(or_date, 'T', ' '), 'Z', '') AS or_date"
+    createddate: "REPLACE(REPLACE(or_createddate, 'T', ' '), 'Z', '') AS or_createddate"
   },
   selectMiscColumns: {
 
   },
   columnDataTypes: {
     id: "INTEGER",
-    date: "DATE",
     customer_id: "INTEGER",
     total: "DECIMAL",
     payment_type: "STRING",
     payment_reference: "TEXT",
     details: "TEXT",
-    status: "ENUM"
+    status: "ENUM",
+    createddate: "DATE"
   }
 },
  	order_item: {

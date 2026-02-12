@@ -5,12 +5,14 @@ const Rider = {
   prefix_: "r_",
   insertColumns: [
       "fullname",
+      "contact",
       "username",
       "password"
     ],
   selectColumns: [
       "r_id",
       "r_fullname",
+      "r_contact",
       "r_username",
       "r_password",
       "r_status"
@@ -18,6 +20,7 @@ const Rider = {
   selectOptionColumns: {
     id: "r_id",
     fullname: "r_fullname",
+    contact: "r_contact",
     username: "r_username",
     password: "r_password",
     status: "r_status"
@@ -25,6 +28,7 @@ const Rider = {
   updateOptionColumns: {
     id: "id",
     fullname: "fullname",
+    contact: "contact",
     username: "username",
     password: "password",
     status: "status"
@@ -38,6 +42,7 @@ const Rider = {
   columnDataTypes: {
     id: "INTEGER",
     fullname: "STRING",
+    contact: "STRING",
     username: "STRING",
     password: "TEXT",
     status: "ENUM"

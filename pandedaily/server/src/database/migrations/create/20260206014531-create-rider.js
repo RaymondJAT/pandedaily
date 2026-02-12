@@ -14,6 +14,11 @@ module.exports = {
         type: Sequelize.STRING(300),
         allowNull: false,
       },
+      r_contact: {
+        type: Sequelize.STRING(15),
+        allowNull: false,
+        unique: true,
+      },
       r_username: {
         type: Sequelize.STRING(300),
         allowNull: false,

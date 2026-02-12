@@ -44,12 +44,22 @@ const getOrders = async (req, res) => {
 const getOrderItem = async (req, res) => {
   const { id } = req.params
   const customerId = req.context.id
+  const accessId = req.context.access_id
 
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ message: 'Valid order ID is required.' })
   }
 
   try {
+    // Build WHERE clause based on access
+    let whereClause = 'o.or_id = ?'
+    const params = [id]
+
+    if (accessId !== 1) {
+      whereClause += ' AND o.or_customer_id = ?'
+      params.push(customerId)
+    }
+
     // Get order with customer information
     const order = await Query(
       `
@@ -61,19 +71,36 @@ const getOrderItem = async (req, res) => {
         o.or_payment_type,
         o.or_payment_reference,
         o.or_details,
+        o.or_delivery_address,
         c.c_id,
         c.c_fullname as customer_name,
         c.c_email as customer_email
       FROM orders o
       LEFT JOIN customer c ON o.or_customer_id = c.c_id
-      WHERE o.or_id = ? AND o.or_customer_id = ?
+      WHERE ${whereClause}
     `,
-      [id, customerId],
+      params,
     )
 
     if (!order.length) {
       return res.status(403).json({ message: 'You are not allowed to access this order.' })
     }
+
+    // Get delivery information for this order
+    const deliveries = await Query(
+      `
+      SELECT 
+        d.*,
+        r.r_fullname as rider_name,
+        r.r_contact as rider_contact
+      FROM delivery d
+      LEFT JOIN rider r ON d.d_rider_id = r.r_id
+      WHERE d.d_order_id = ?
+      ORDER BY d.d_date DESC
+    `,
+      [id],
+      Delivery?.delivery?.prefix_,
+    )
 
     // ORDER ITEMS with product information
     const items = await Query(
@@ -94,6 +121,10 @@ const getOrderItem = async (req, res) => {
     res.status(200).json({
       message: 'Order details retrieved successfully.',
       order: order[0],
+      deliveries: {
+        count: deliveries?.length || 0,
+        data: deliveries || [],
+      },
       items: {
         count: items.length,
         data: items,
@@ -107,13 +138,50 @@ const getOrderItem = async (req, res) => {
 
 // CREATE
 const addOrder = async (req, res) => {
-  const { customer_id, payment_type, payment_reference, details, status = 'PAID', items } = req.body
+  const {
+    customer_id,
+    payment_type,
+    payment_reference,
+    details,
+    status = 'PAID',
+    delivery_address,
+    delivery_schedules,
+    items,
+  } = req.body
 
   const validStatuses = ['PAID', 'ON-DELIVERY', 'COMPLETE']
+  const validTimeSlots = ['MORNING', 'EVENING']
+
+  // basic validation
+  if (!customer_id) {
+    return res.status(400).json({ message: 'Customer ID is required.' })
+  }
+
   if (!validStatuses.includes(status)) {
     return res.status(400).json({
       message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
     })
+  }
+
+  if (!delivery_address) {
+    return res.status(400).json({
+      message: 'Delivery address is required.',
+    })
+  }
+
+  if (!Array.isArray(delivery_schedules) || delivery_schedules.length === 0) {
+    return res.status(400).json({
+      message: 'At least one delivery schedule is required.',
+    })
+  }
+
+  for (const schedule of delivery_schedules) {
+    if (!schedule.date || !validTimeSlots.includes(schedule.time_slot)) {
+      return res.status(400).json({
+        message:
+          'Each delivery schedule must have a valid date and time_slot (MORNING or EVENING).',
+      })
+    }
   }
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -123,7 +191,7 @@ const addOrder = async (req, res) => {
   }
 
   for (const item of items) {
-    if (!item.product_id || !item.quantity || !item.price || item.quantity <= 0) {
+    if (!item.product_id || !item.quantity || !item.price || Number(item.quantity) <= 0) {
       return res.status(400).json({
         message: 'Each item must have product_id, quantity > 0, and price.',
       })
@@ -133,7 +201,7 @@ const addOrder = async (req, res) => {
   const total = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.price), 0)
 
   try {
-    // PRE-CHECK INVENTORY
+    //  check inventory
     const inventoryMap = {}
 
     for (const item of items) {
@@ -172,37 +240,67 @@ const addOrder = async (req, res) => {
       inventoryMap[item.product_id] = row
     }
 
-    //  BUILD TRANSACTION QUERIES
+    // build transaction
     const queries = []
 
     // INSERT ORDER
     queries.push({
       sql: `
         INSERT INTO orders
-        (or_date, or_customer_id, or_total, or_payment_type, or_payment_reference, or_details, or_status)
-        VALUES (NOW(), ?, ?, ?, ?, ?, ?)
+        (or_date, or_customer_id, or_total, or_payment_type, 
+         or_payment_reference, or_details, or_status, or_delivery_address)
+        VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)
       `,
-      values: [customer_id, total, payment_type, payment_reference, details, status],
+      values: [
+        customer_id,
+        total,
+        payment_type,
+        payment_reference,
+        details,
+        status,
+        delivery_address,
+      ],
+      returnId: 'order_id', // assuming your Transaction util supports capturing IDs
     })
 
-    // PROCESS ITEMS
+    // Execute first to get order ID
+    const result = await Transaction(queries, true)
+    const orderId = result.order_id
+
+    //  second transaction
+
+    const followUpQueries = []
+
+    // INSERT DELIVERY SCHEDULES
+    for (const schedule of delivery_schedules) {
+      followUpQueries.push({
+        sql: `
+          INSERT INTO delivery_schedule
+          (ds_order_id, ds_date, ds_time_slot, ds_status)
+          VALUES (?, ?, ?, 'PENDING')
+        `,
+        values: [orderId, schedule.date, schedule.time_slot],
+      })
+    }
+
+    // PROCESS ORDER ITEMS + INVENTORY
     for (const item of items) {
       const inventory = inventoryMap[item.product_id]
       const previousStock = inventory.i_current_stock
       const newStock = previousStock - item.quantity
 
-      // ORDER ITEM
-      queries.push({
+      // Order item
+      followUpQueries.push({
         sql: `
           INSERT INTO order_item
           (oi_order_id, oi_product_id, oi_quantity, oi_price)
-          VALUES (LAST_INSERT_ID(), ?, ?, ?)
+          VALUES (?, ?, ?, ?)
         `,
-        values: [item.product_id, item.quantity, item.price],
+        values: [orderId, item.product_id, item.quantity, item.price],
       })
 
-      // INVENTORY UPDATE
-      queries.push({
+      // Inventory update
+      followUpQueries.push({
         sql: `
           UPDATE inventory
           SET i_previous_stock = ?, i_current_stock = ?
@@ -211,8 +309,8 @@ const addOrder = async (req, res) => {
         values: [previousStock, newStock, inventory.i_id],
       })
 
-      // INVENTORY HISTORY
-      queries.push({
+      // Inventory history
+      followUpQueries.push({
         sql: `
           INSERT INTO inventory_history
           (ih_inventory_id, ih_date, ih_stock_before, ih_stock_after, ih_status)
@@ -222,17 +320,14 @@ const addOrder = async (req, res) => {
       })
     }
 
-    //  EXECUTE TRANSACTIONS
-    await Transaction(queries)
+    await Transaction(followUpQueries)
 
-    // FETCH ORDER ID
-    const [orderRow] = await Query('SELECT LAST_INSERT_ID() AS order_id')
-
-    res.status(200).json({
-      message: 'Order created successfully and inventory updated.',
-      order_id: orderRow.order_id,
+    res.status(201).json({
+      message: 'Order created successfully.',
+      order_id: orderId,
       total,
       items_count: items.length,
+      delivery_count: delivery_schedules.length,
       status,
     })
   } catch (error) {

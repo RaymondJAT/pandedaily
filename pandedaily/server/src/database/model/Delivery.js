@@ -131,6 +131,73 @@ const Delivery = {
     createddate: "DATE"
   }
 },
+ 	delivery_schedule: {
+  tablename: "delivery_schedule",
+  prefix: "ds",
+  prefix_: "ds_",
+  insertColumns: [
+      "order_id",
+      "name",
+      "start_time",
+      "end_time",
+      "cutoff",
+      "status"
+    ],
+  selectColumns: [
+      "ds_id",
+      "ds_order_id",
+      "ds_name",
+      "ds_date",
+      "ds_start_time",
+      "ds_end_time",
+      "ds_cutoff",
+      "ds_status",
+      "ds_createddate"
+    ],
+  selectOptionColumns: {
+    id: "ds_id",
+    order_id: "ds_order_id",
+    name: "ds_name",
+    date: "ds_date",
+    start_time: "ds_start_time",
+    end_time: "ds_end_time",
+    cutoff: "ds_cutoff",
+    status: "ds_status",
+    createddate: "ds_createddate"
+  },
+  updateOptionColumns: {
+    id: "id",
+    order_id: "order_id",
+    name: "name",
+    date: "date",
+    start_time: "start_time",
+    end_time: "end_time",
+    cutoff: "cutoff",
+    status: "status",
+    createddate: "createddate"
+  },
+  selectDateFormatColumns: {
+    date: "REPLACE(REPLACE(ds_date, 'T', ' '), 'Z', '') AS ds_date",
+    start_time: "REPLACE(REPLACE(ds_start_time, 'T', ' '), 'Z', '') AS ds_start_time",
+    end_time: "REPLACE(REPLACE(ds_end_time, 'T', ' '), 'Z', '') AS ds_end_time",
+    cutoff: "REPLACE(REPLACE(ds_cutoff, 'T', ' '), 'Z', '') AS ds_cutoff",
+    createddate: "REPLACE(REPLACE(ds_createddate, 'T', ' '), 'Z', '') AS ds_createddate"
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    order_id: "INTEGER",
+    name: "STRING",
+    date: "DATE",
+    start_time: "DATE",
+    end_time: "DATE",
+    cutoff: "DATE",
+    status: "ENUM",
+    createddate: "DATE"
+  }
+},
 };
 
 exports.Delivery = Delivery;

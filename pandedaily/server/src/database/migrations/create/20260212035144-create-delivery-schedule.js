@@ -3,46 +3,49 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('orders', {
-      or_id: {
+    await queryInterface.createTable('delivery_schedule', {
+      ds_id: {
         type: Sequelize.INTEGER,
-        autoIncrement: true,
         primaryKey: true,
+        autoIncrement: true,
         allowNull: false,
-        unique: true,
       },
-      or_customer_id: {
+      ds_order_id: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'customer',
-          key: 'c_id',
+          model: 'orders',
+          key: 'or_id',
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT',
         allowNull: false,
       },
-      or_total: {
-        type: Sequelize.DECIMAL(10, 2),
+      ds_name: {
+        type: Sequelize.STRING(300),
         allowNull: false,
       },
-      or_payment_type: {
-        type: Sequelize.STRING(20),
+      ds_date: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+      },
+      ds_start_time: {
+        type: Sequelize.DATE,
         allowNull: false,
       },
-      or_payment_reference: {
-        type: Sequelize.TEXT('long'),
+      ds_end_time: {
+        type: Sequelize.DATE,
         allowNull: false,
       },
-      or_details: {
-        type: Sequelize.TEXT('long'),
+      ds_cutoff: {
+        type: Sequelize.DATE,
         allowNull: false,
       },
-      or_status: {
-        type: Sequelize.ENUM('PAID', 'OUT-FOR-DELIVERY', 'COMPLETED'),
-        defaultValue: 'OUT-FOR-DELIVERY',
+      ds_status: {
+        type: Sequelize.ENUM('PENDING', 'FOR-PICKUP', 'ON-DELIVERY', 'COMPLETED'),
         allowNull: false,
       },
-      or_createddate: {
+      ds_createddate: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
@@ -51,6 +54,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('orders')
+    await queryInterface.dropTable('delivery_schedule')
   },
 }
