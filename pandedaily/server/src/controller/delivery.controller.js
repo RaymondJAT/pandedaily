@@ -380,17 +380,21 @@ const addDelivery = async (req, res) => {
     }
 
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    const queries = []
 
-    // Insert delivery
-    queries.push({
-      sql: `
-        INSERT INTO delivery
-        (d_delivery_schedule_id, d_rider_id, d_status, d_createddate)
-        VALUES (?, ?, 'PENDING', ?)
+    // FIX: Insert delivery first using Query to get insertId
+    const deliveryResult = await Query(
+      `
+      INSERT INTO delivery
+      (d_delivery_schedule_id, d_rider_id, d_status, d_createddate)
+      VALUES (?, ?, 'PENDING', ?)
       `,
-      values: [delivery_schedule_id, rider_id, now],
-    })
+      [delivery_schedule_id, rider_id, now],
+    )
+
+    const deliveryId = deliveryResult.insertId
+
+    // FIX: Separate transaction for updates only
+    const queries = []
 
     // Update schedule status
     queries.push({
@@ -402,7 +406,7 @@ const addDelivery = async (req, res) => {
       values: [delivery_schedule_id],
     })
 
-    // 3. Update order status
+    // Update order status
     queries.push({
       sql: `
         UPDATE orders
@@ -412,9 +416,10 @@ const addDelivery = async (req, res) => {
       values: [schedule.ds_order_id],
     })
 
-    // Execute first transaction to get delivery ID
-    const result = await Transaction(queries, true)
-    const deliveryId = result.insertId || (await Query('SELECT LAST_INSERT_ID() as id'))[0].id
+    // Execute transaction for updates
+    if (queries.length > 0) {
+      await Transaction(queries)
+    }
 
     // delivery activity
     await Query(

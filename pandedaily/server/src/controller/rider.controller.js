@@ -39,7 +39,6 @@ const getRiders = async (req, res) => {
   }
 }
 
-// GET ALL RIDER ACTIVITIES
 const getAllRiderActivities = async (req, res) => {
   const { access_id } = req.context
 
@@ -121,8 +120,6 @@ const getRiderById = async (req, res) => {
   }
 }
 
-
-// GET RIDER ACTIVITY HISTORY
 const getRiderActivityById = async (req, res) => {
   const { id } = req.params
   const { access_id } = req.context
@@ -172,10 +169,10 @@ const getRiderActivityById = async (req, res) => {
   }
 }
 
-// CREATE NEW RIDER
+// CREATE
 const createRider = async (req, res) => {
   const { access_id } = req.context
-  const { r_fullname, r_username, r_password } = req.body
+  const { r_fullname, r_contact, r_username, r_password } = req.body
 
   try {
     if (access_id !== 1) {
@@ -184,9 +181,9 @@ const createRider = async (req, res) => {
       })
     }
 
-    if (!r_fullname || !r_username || !r_password) {
+    if (!r_fullname || !r_contact || !r_username || !r_password) {
       return res.status(400).json({
-        message: 'Fullname, username, and password are required.',
+        message: 'Fullname, contact, username, and password are required.',
       })
     }
 
@@ -203,11 +200,11 @@ const createRider = async (req, res) => {
     }
 
     const statement = `
-      INSERT INTO rider (r_fullname, r_username, r_password, r_status) 
-      VALUES (?, ?, ?, 'ACTIVE')
+      INSERT INTO rider (r_fullname, r_contact, r_username, r_password, r_status) 
+      VALUES (?, ?, ?, ?, 'ACTIVE')
     `
 
-    const result = await Query(statement, [r_fullname, r_username, r_password])
+    const result = await Query(statement, [r_fullname, r_contact, r_username, r_password])
 
     res.status(201).json({
       message: 'Rider created successfully.',
@@ -222,7 +219,7 @@ const createRider = async (req, res) => {
   }
 }
 
-// UPDATE RIDER (Includes soft delete via status = 'DELETE')
+// UPDATE
 const updateRider = async (req, res) => {
   const { id } = req.params
   const { r_fullname, r_username, r_status } = req.body

@@ -123,7 +123,6 @@ const addOrder = async (req, res) => {
   } = req.body
 
   const validStatuses = ['PAID', 'APPROVED', 'REJECTED', 'OUT-FOR-DELIVERY', 'COMPLETE']
-  const validTimeSlots = ['MORNING', 'EVENING']
 
   // Basic validation
   if (!customer_id) {
@@ -215,39 +214,30 @@ const addOrder = async (req, res) => {
       inventoryMap[item.product_id] = row
     }
 
-    // Build transaction
-    const queries = []
+    // FIRST: Insert order and get ID using Query function (not Transaction)
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
-    queries.push({
-      sql: `
-        INSERT INTO orders
-        (or_customer_id, or_total, or_payment_type, 
-         or_payment_reference, or_details, or_status, or_createddate)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+    const orderResult = await Query(
+      `
+      INSERT INTO orders
+      (or_customer_id, or_total, or_payment_type, 
+       or_payment_reference, or_details, or_status, or_createddate)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      values: [
-        customer_id,
-        total,
-        payment_type,
-        payment_reference,
-        details,
-        status,
-        new Date().toISOString().slice(0, 19).replace('T', ' '),
-      ],
-    })
+      [customer_id, total, payment_type, payment_reference, details, status, now],
+    )
 
-    // Execute first to get order ID
-    const result = await Transaction(queries, true)
-    const orderId =
-      result.insertId || result.order_id || (await Query('SELECT LAST_INSERT_ID() as id'))[0].id
+    const orderId = orderResult.insertId
 
-    // Second transaction
+    if (!orderId) {
+      throw new Error('Failed to get order ID after insertion')
+    }
+
+    // SECOND: Build transaction for the rest of the operations
     const followUpQueries = []
 
     // INSERT DELIVERY SCHEDULES
     for (const schedule of delivery_schedules) {
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-
       followUpQueries.push({
         sql: `
           INSERT INTO delivery_schedule
@@ -304,7 +294,10 @@ const addOrder = async (req, res) => {
       })
     }
 
-    await Transaction(followUpQueries)
+    // Execute transaction for follow-up queries
+    if (followUpQueries.length > 0) {
+      await Transaction(followUpQueries)
+    }
 
     // Get the created delivery schedules to return
     const createdSchedules = await Query(
@@ -345,8 +338,145 @@ const addOrder = async (req, res) => {
   }
 }
 
+// UPDATE
+const approvalOrder = async (req, res) => {
+  const { id } = req.params
+  const { status } = req.body
+
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({ message: 'Valid order ID is required.' })
+  }
+
+  if (!status) {
+    return res.status(400).json({ message: 'Status is required.' })
+  }
+
+  // Normalize status to uppercase and validate against exact ENUM values
+  const normalizedStatus = String(status).toUpperCase().trim()
+  console.log('Received status:', status)
+  console.log('Normalized status:', normalizedStatus)
+  console.log('Status length:', normalizedStatus.length)
+
+  // Must exactly match ENUM values: 'APPROVED', 'REJECTED'
+  const validStatuses = ['APPROVED', 'REJECTED']
+
+  if (!validStatuses.includes(normalizedStatus)) {
+    return res.status(400).json({
+      message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+      received: status,
+    })
+  }
+
+  try {
+    // Check if order exists
+    const order = await Query(
+      `SELECT or_id, or_status, or_customer_id
+       FROM orders
+       WHERE or_id = ?`,
+      [id],
+    )
+
+    if (!order.length) {
+      return res.status(404).json({ message: 'Order not found.' })
+    }
+
+    const previousStatus = order[0].or_status
+    console.log('Previous status:', previousStatus)
+
+    // Don't allow updating to same status
+    if (previousStatus === normalizedStatus) {
+      return res.status(400).json({
+        message: `Order is already ${normalizedStatus}.`,
+      })
+    }
+
+    // Don't allow updating if order is already OUT-FOR-DELIVERY or COMPLETE
+    if (['OUT-FOR-DELIVERY', 'COMPLETE'].includes(previousStatus)) {
+      return res.status(400).json({
+        message: `Cannot update order that is already ${previousStatus}.`,
+      })
+    }
+
+    // Start transaction
+    const queries = []
+
+    // Update order status - use normalized uppercase value
+    console.log('Updating order status to:', normalizedStatus)
+    queries.push({
+      sql: `
+        UPDATE orders
+        SET or_status = ?
+        WHERE or_id = ?
+      `,
+      values: [normalizedStatus, id],
+    })
+
+    // If APPROVED, automatically create deliveries for all schedules
+    if (normalizedStatus === 'APPROVED') {
+      // Get all delivery schedules for this order
+      const schedules = await Query(
+        `SELECT ds_id, ds_name, ds_date, ds_start_time, ds_end_time, ds_cutoff
+         FROM delivery_schedule 
+         WHERE ds_order_id = ? AND ds_status = 'PENDING'`,
+        [id],
+      )
+
+      console.log('Found schedules:', schedules.length)
+
+      // For each schedule, create a delivery (without rider - to be assigned later)
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+
+      for (const schedule of schedules) {
+        queries.push({
+          sql: `
+            INSERT INTO delivery
+            (d_delivery_schedule_id, d_rider_id, d_status, d_createddate)
+            VALUES (?, NULL, 'PENDING', ?)
+          `,
+          values: [schedule.ds_id, now],
+        })
+      }
+    }
+
+    // Execute all queries in transaction
+    console.log('Executing transaction with', queries.length, 'queries')
+    await Transaction(queries)
+
+    // Get the created deliveries if order was approved
+    let deliveries = []
+    if (normalizedStatus === 'APPROVED') {
+      deliveries = await Query(
+        `SELECT d_id as delivery_id, d_delivery_schedule_id as schedule_id
+         FROM delivery
+         WHERE d_delivery_schedule_id IN (
+           SELECT ds_id FROM delivery_schedule WHERE ds_order_id = ?
+         )`,
+        [id],
+      )
+    }
+
+    res.status(200).json({
+      message: `Order ${normalizedStatus.toLowerCase()} successfully.`,
+      order_id: id,
+      previous_status: previousStatus,
+      current_status: normalizedStatus,
+      ...(normalizedStatus === 'APPROVED' && {
+        deliveries_created: deliveries.length,
+        deliveries: deliveries,
+      }),
+    })
+  } catch (error) {
+    console.error('Error updating order:', error)
+    res.status(500).json({
+      message: 'Failed to update order.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    })
+  }
+}
+
 module.exports = {
   getOrders,
   getOrderItem,
   addOrder,
+  approvalOrder,
 }

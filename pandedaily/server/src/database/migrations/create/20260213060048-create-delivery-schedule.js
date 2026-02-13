@@ -42,7 +42,7 @@ module.exports = {
         allowNull: false,
       },
       ds_status: {
-        type: Sequelize.ENUM('PENDING', 'FOR-PICKUP', 'ON-DELIVERY', 'COMPLETED'),
+        type: Sequelize.ENUM('PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE'),
         allowNull: false,
       },
       ds_createddate: {

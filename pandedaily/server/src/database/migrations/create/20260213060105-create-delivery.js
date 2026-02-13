@@ -10,15 +10,15 @@ module.exports = {
         autoIncrement: true,
         allowNull: false,
       },
-      d_order_id: {
+      d_delivery_schedule_id: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'orders',
-          key: 'or_id',
+          model: 'delivery_schedule',
+          key: 'ds_id',
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT',
-        allowNull: false,
+        allowNull: true,
       },
       d_rider_id: {
         type: Sequelize.INTEGER,
@@ -30,14 +30,14 @@ module.exports = {
         onDelete: 'RESTRICT',
         allowNull: false,
       },
-      d_date: {
+      d_status: {
+        type: Sequelize.ENUM('PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE'),
+        allowNull: false,
+      },
+      d_createddate: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-      },
-      d_status: {
-        type: Sequelize.ENUM('PENDING', 'FOR-PICKUP', 'ON-DELIVERY', 'COMPLETED'),
-        allowNull: false,
       },
     })
   },

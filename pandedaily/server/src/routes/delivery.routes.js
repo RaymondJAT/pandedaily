@@ -1,7 +1,9 @@
 const express = require('express')
 const {
   getDelivery,
+  getDeliveryActivities,
   getDeliveryById,
+  getDeliveryActivitiesById,
   addDelivery,
   addDeliveryImages,
   updateDeliveryStatus,
@@ -11,6 +13,8 @@ const deliveryRouter = express.Router()
 
 // GET
 deliveryRouter.get('/', getDelivery)
+deliveryRouter.get('/activities', getDeliveryActivities)
+deliveryRouter.get('/:id/activities', getDeliveryActivitiesById)
 deliveryRouter.get('/:id', getDeliveryById)
 
 // POST

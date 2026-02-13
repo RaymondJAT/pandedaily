@@ -3,32 +3,32 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('delivery_image', {
-      di_id: {
+    await queryInterface.createTable('delivery_activity', {
+      da_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         allowNull: false,
       },
-      di_delivery_activity_id: {
+      da_delivery_id: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'delivery_activity',
-          key: 'da_id',
+          model: 'delivery',
+          key: 'd_id',
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT',
         allowNull: false,
       },
-      di_type: {
-        type: Sequelize.ENUM('PICK', 'DELIVER'),
+      da_status: {
+        type: Sequelize.ENUM('PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE'),
         allowNull: false,
       },
-      di_image: {
+      da_remarks: {
         type: Sequelize.TEXT('long'),
         allowNull: false,
       },
-      di_createddate: {
+      da_createddate: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
@@ -37,6 +37,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('delivery_image')
+    await queryInterface.dropTable('delivery_activity')
   },
 }

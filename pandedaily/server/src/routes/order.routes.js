@@ -1,5 +1,10 @@
 const express = require('express')
-const { getOrders, getOrderItem, addOrder } = require('../controller/order.controller')
+const {
+  getOrders,
+  getOrderItem,
+  addOrder,
+  approvalOrder,
+} = require('../controller/order.controller')
 
 const orderRouter = express.Router()
 
@@ -9,5 +14,8 @@ orderRouter.get('/:id/item', getOrderItem)
 
 // POST
 orderRouter.post('/', addOrder)
+
+// PUT
+orderRouter.put('/:id', approvalOrder)
 
 module.exports = { orderRouter }
