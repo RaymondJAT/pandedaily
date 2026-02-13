@@ -212,3 +212,41 @@ export const createOrder = async (orderData) => {
 //     method: 'DELETE',
 //   })
 // }
+
+// Delivery API calls
+export const getDeliveries = async () => {
+  return fetchApi('/delivery')
+}
+
+export const getDeliveryById = async (id) => {
+  return fetchApi(`/delivery/${id}`)
+}
+
+export const getDeliveryActivities = async () => {
+  return fetchApi('/delivery/activities')
+}
+
+export const getDeliveryActivitiesById = async (id) => {
+  return fetchApi(`/delivery/${id}/activities`)
+}
+
+export const createDelivery = async (deliveryData) => {
+  return fetchApi('/delivery', {
+    method: 'POST',
+    body: JSON.stringify(deliveryData),
+  })
+}
+
+export const updateDeliveryStatus = async (id, statusData) => {
+  return fetchApi(`/delivery/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify(statusData),
+  })
+}
+
+export const addDeliveryImages = async (activityId, imagesData) => {
+  return fetchApi(`/delivery/${activityId}/images`, {
+    method: 'POST',
+    body: JSON.stringify(imagesData),
+  })
+}

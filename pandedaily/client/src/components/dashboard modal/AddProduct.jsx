@@ -79,7 +79,7 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
         category_id: values.category,
         price: parseFloat(values.price),
         cost: parseFloat(values.cost || values.price * 0.6), // Default cost if not provided
-        status: 'available',
+        status: 'AVAILABLE',
         initial_stock: parseInt(values.initial_stock || 0),
       }
 
@@ -401,10 +401,10 @@ const AddProduct = ({ isOpen, onClose, onProductAdded }) => {
           </Col>
 
           <Col span={12}>
-            <Form.Item label="Status" name="status" initialValue="available">
+            <Form.Item label="Status" name="status" initialValue="AVAILABLE">
               <Select disabled={isSubmitting}>
-                <Option value="available">Available</Option>
-                <Option value="unavailable">Unavailable</Option>
+                <Option value="AVAILABLE">Available</Option>
+                <Option value="UNAVAILABLE">Unavailable</Option>
               </Select>
             </Form.Item>
           </Col>

@@ -9,6 +9,7 @@ import Customer from './pages/dashboard/Customer'
 import Product from './pages/dashboard/Product'
 import Inventory from './pages/dashboard/Inventory'
 import Orders from './pages/dashboard/Orders'
+import Delivery from './pages/dashboard/Delivery'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
             <Route path="product" element={<Product />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="delivery" element={<Delivery />} />
           </Route>
 
           {/* Public Website Routes */}
