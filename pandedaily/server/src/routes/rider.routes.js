@@ -4,7 +4,7 @@ const {
   getRiderById,
   createRider,
   updateRider,
-  getRiderActivityHistory,
+  getRiderActivityById,
   getAllRiderActivities,
 } = require('../controller/rider.controller')
 
@@ -14,7 +14,7 @@ const riderRouter = express.Router()
 riderRouter.get('/', getRiders)
 riderRouter.get('/:id', getRiderById)
 
-riderRouter.get('/activity', getRiderActivityHistory)
+riderRouter.get('/activity', getRiderActivityById)
 riderRouter.get('/activity/all', getAllRiderActivities)
 
 // POST

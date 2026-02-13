@@ -15,7 +15,8 @@ const getRiders = async (req, res) => {
     const statement = `
       SELECT r_id, r_fullname, r_username, r_status
       FROM rider
-      WHERE r_status != 'DELETED'
+      WHERE r_status != 'DELETE'
+      ORDER BY r_fullname ASC
     `
 
     const data = await Query(statement, [], Rider.rider.prefix_)
@@ -38,6 +39,7 @@ const getRiders = async (req, res) => {
   }
 }
 
+// GET ALL RIDER ACTIVITIES
 const getAllRiderActivities = async (req, res) => {
   const { access_id } = req.context
 
@@ -58,7 +60,7 @@ const getAllRiderActivities = async (req, res) => {
         ra.ra_date AS date
       FROM rider_activity ra
       INNER JOIN rider r ON ra.ra_rider_id = r.r_id
-      WHERE r.r_status != 'DELETED'
+      WHERE r.r_status != 'DELETE'
       ORDER BY ra.ra_date DESC
     `
 
@@ -97,7 +99,7 @@ const getRiderById = async (req, res) => {
     const statement = `
       SELECT r_id, r_fullname, r_username, r_status
       FROM rider
-      WHERE r_id = ? AND r_status != 'DELETED'
+      WHERE r_id = ? AND r_status != 'DELETE'
     `
 
     const data = await Query(statement, [id], Rider.rider.prefix_)
@@ -119,7 +121,9 @@ const getRiderById = async (req, res) => {
   }
 }
 
-const getRiderActivityHistory = async (req, res) => {
+
+// GET RIDER ACTIVITY HISTORY
+const getRiderActivityById = async (req, res) => {
   const { id } = req.params
   const { access_id } = req.context
 
@@ -147,6 +151,12 @@ const getRiderActivityHistory = async (req, res) => {
     `
 
     const data = await Query(statement, [id])
+
+    if (!data.length) {
+      return res.status(404).json({
+        message: 'No activity history found for this rider.',
+      })
+    }
 
     res.status(200).json({
       message: 'Rider activity history retrieved successfully.',
@@ -182,7 +192,7 @@ const createRider = async (req, res) => {
 
     // Check if username already exists
     const existingUser = await Query(
-      'SELECT r_id FROM rider WHERE r_username = ? AND r_status != "DELETED"',
+      'SELECT r_id FROM rider WHERE r_username = ? AND r_status != "DELETE"',
       [r_username],
     )
 
@@ -212,7 +222,7 @@ const createRider = async (req, res) => {
   }
 }
 
-// UPDATE RIDER
+// UPDATE RIDER (Includes soft delete via status = 'DELETE')
 const updateRider = async (req, res) => {
   const { id } = req.params
   const { r_fullname, r_username, r_status } = req.body
@@ -231,7 +241,7 @@ const updateRider = async (req, res) => {
 
     // Check if rider exists
     const riderExists = await Query(
-      'SELECT r_id FROM rider WHERE r_id = ? AND r_status != "DELETED"',
+      'SELECT r_id, r_status FROM rider WHERE r_id = ? AND r_status != "DELETE"',
       [id],
     )
 
@@ -239,10 +249,24 @@ const updateRider = async (req, res) => {
       return res.status(404).json({ message: 'Rider not found.' })
     }
 
+    // If trying to soft delete, check for active deliveries
+    if (r_status === 'DELETE') {
+      const activeDeliveries = await Query(
+        `SELECT d_id FROM delivery WHERE d_rider_id = ? AND d_status != 'COMPLETE'`,
+        [id],
+      )
+
+      if (activeDeliveries.length > 0) {
+        return res.status(400).json({
+          message: 'Cannot delete rider with active deliveries. Please reassign deliveries first.',
+        })
+      }
+    }
+
     // Check if username already exists
     if (r_username) {
       const existingUser = await Query(
-        'SELECT r_id FROM rider WHERE r_username = ? AND r_id != ? AND r_status != "DELETED"',
+        'SELECT r_id FROM rider WHERE r_username = ? AND r_id != ? AND r_status != "DELETE"',
         [r_username, id],
       )
 
@@ -268,7 +292,7 @@ const updateRider = async (req, res) => {
     }
 
     if (r_status !== undefined) {
-      const validStatuses = ['ACTIVE', 'INACTIVE', 'DELETED']
+      const validStatuses = ['ACTIVE', 'INACTIVE', 'DELETE']
 
       if (!validStatuses.includes(r_status)) {
         return res.status(400).json({
@@ -314,6 +338,6 @@ module.exports = {
   getRiderById,
   createRider,
   updateRider,
-  getRiderActivityHistory,
+  getRiderActivityById,
   getAllRiderActivities,
 }

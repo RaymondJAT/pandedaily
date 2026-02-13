@@ -21,18 +21,14 @@ const getOrders = async (req, res) => {
       params.push(userId)
     }
 
-    statement += ' ORDER BY o.or_date DESC'
+    statement += ' ORDER BY o.or_createddate DESC'
 
     const data = await Query(statement, params, Order.orders.prefix_)
 
-    if (!data.length) {
-      return res.status(404).json({ message: 'No orders found.' })
-    }
-
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Orders retrieved successfully.',
       count: data.length,
-      data,
+      data: data || [],
     })
   } catch (error) {
     console.error('Error retrieving orders:', error)
@@ -51,7 +47,6 @@ const getOrderItem = async (req, res) => {
   }
 
   try {
-    // Build WHERE clause based on access
     let whereClause = 'o.or_id = ?'
     const params = [id]
 
@@ -65,13 +60,12 @@ const getOrderItem = async (req, res) => {
       `
       SELECT 
         o.or_id,
-        o.or_date,
+        o.or_createddate,
         o.or_total,
         o.or_status,
         o.or_payment_type,
         o.or_payment_reference,
         o.or_details,
-        o.or_delivery_address,
         c.c_id,
         c.c_fullname as customer_name,
         c.c_email as customer_email
@@ -86,23 +80,7 @@ const getOrderItem = async (req, res) => {
       return res.status(403).json({ message: 'You are not allowed to access this order.' })
     }
 
-    // Get delivery information for this order
-    const deliveries = await Query(
-      `
-      SELECT 
-        d.*,
-        r.r_fullname as rider_name,
-        r.r_contact as rider_contact
-      FROM delivery d
-      LEFT JOIN rider r ON d.d_rider_id = r.r_id
-      WHERE d.d_order_id = ?
-      ORDER BY d.d_date DESC
-    `,
-      [id],
-      Delivery?.delivery?.prefix_,
-    )
-
-    // ORDER ITEMS with product information
+    // ORDER ITEMS
     const items = await Query(
       `SELECT 
         oi.*,
@@ -121,10 +99,6 @@ const getOrderItem = async (req, res) => {
     res.status(200).json({
       message: 'Order details retrieved successfully.',
       order: order[0],
-      deliveries: {
-        count: deliveries?.length || 0,
-        data: deliveries || [],
-      },
       items: {
         count: items.length,
         data: items,
@@ -144,15 +118,14 @@ const addOrder = async (req, res) => {
     payment_reference,
     details,
     status = 'PAID',
-    delivery_address,
     delivery_schedules,
     items,
   } = req.body
 
-  const validStatuses = ['PAID', 'ON-DELIVERY', 'COMPLETE']
+  const validStatuses = ['PAID', 'APPROVED', 'REJECTED', 'OUT-FOR-DELIVERY', 'COMPLETE']
   const validTimeSlots = ['MORNING', 'EVENING']
 
-  // basic validation
+  // Basic validation
   if (!customer_id) {
     return res.status(400).json({ message: 'Customer ID is required.' })
   }
@@ -163,23 +136,23 @@ const addOrder = async (req, res) => {
     })
   }
 
-  if (!delivery_address) {
-    return res.status(400).json({
-      message: 'Delivery address is required.',
-    })
-  }
-
   if (!Array.isArray(delivery_schedules) || delivery_schedules.length === 0) {
     return res.status(400).json({
       message: 'At least one delivery schedule is required.',
     })
   }
 
+  // Validate delivery schedules
   for (const schedule of delivery_schedules) {
-    if (!schedule.date || !validTimeSlots.includes(schedule.time_slot)) {
+    if (
+      !schedule.name ||
+      !schedule.date ||
+      !schedule.start_time ||
+      !schedule.end_time ||
+      !schedule.cutoff
+    ) {
       return res.status(400).json({
-        message:
-          'Each delivery schedule must have a valid date and time_slot (MORNING or EVENING).',
+        message: 'Each delivery schedule must have name, date, start_time, end_time, and cutoff.',
       })
     }
   }
@@ -201,11 +174,11 @@ const addOrder = async (req, res) => {
   const total = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.price), 0)
 
   try {
-    //  check inventory
+    // Check inventory
     const inventoryMap = {}
 
     for (const item of items) {
-      const [row] = await Query(
+      const rows = await Query(
         `
         SELECT 
           i.i_id,
@@ -218,6 +191,8 @@ const addOrder = async (req, res) => {
         `,
         [item.product_id],
       )
+
+      const row = rows[0]
 
       if (!row) {
         return res.status(404).json({
@@ -240,16 +215,15 @@ const addOrder = async (req, res) => {
       inventoryMap[item.product_id] = row
     }
 
-    // build transaction
+    // Build transaction
     const queries = []
 
-    // INSERT ORDER
     queries.push({
       sql: `
         INSERT INTO orders
-        (or_date, or_customer_id, or_total, or_payment_type, 
-         or_payment_reference, or_details, or_status, or_delivery_address)
-        VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)
+        (or_customer_id, or_total, or_payment_type, 
+         or_payment_reference, or_details, or_status, or_createddate)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       values: [
         customer_id,
@@ -258,32 +232,42 @@ const addOrder = async (req, res) => {
         payment_reference,
         details,
         status,
-        delivery_address,
+        new Date().toISOString().slice(0, 19).replace('T', ' '),
       ],
-      returnId: 'order_id', // assuming your Transaction util supports capturing IDs
     })
 
     // Execute first to get order ID
     const result = await Transaction(queries, true)
-    const orderId = result.order_id
+    const orderId =
+      result.insertId || result.order_id || (await Query('SELECT LAST_INSERT_ID() as id'))[0].id
 
-    //  second transaction
-
+    // Second transaction
     const followUpQueries = []
 
     // INSERT DELIVERY SCHEDULES
     for (const schedule of delivery_schedules) {
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+
       followUpQueries.push({
         sql: `
           INSERT INTO delivery_schedule
-          (ds_order_id, ds_date, ds_time_slot, ds_status)
-          VALUES (?, ?, ?, 'PENDING')
+          (ds_order_id, ds_name, ds_date, ds_start_time, ds_end_time, ds_status, ds_createddate, ds_cutoff)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        values: [orderId, schedule.date, schedule.time_slot],
+        values: [
+          orderId,
+          schedule.name,
+          schedule.date,
+          schedule.start_time,
+          schedule.end_time,
+          'PENDING',
+          now,
+          schedule.cutoff,
+        ],
       })
     }
 
-    // PROCESS ORDER ITEMS + INVENTORY
+    // process order items and inventory
     for (const item of items) {
       const inventory = inventoryMap[item.product_id]
       const previousStock = inventory.i_current_stock
@@ -322,12 +306,21 @@ const addOrder = async (req, res) => {
 
     await Transaction(followUpQueries)
 
+    // Get the created delivery schedules to return
+    const createdSchedules = await Query(
+      `SELECT ds_id, ds_name, ds_date, ds_status 
+       FROM delivery_schedule 
+       WHERE ds_order_id = ?`,
+      [orderId],
+    )
+
     res.status(201).json({
       message: 'Order created successfully.',
       order_id: orderId,
       total,
       items_count: items.length,
-      delivery_count: delivery_schedules.length,
+      delivery_schedules_count: delivery_schedules.length,
+      delivery_schedules: createdSchedules,
       status,
     })
   } catch (error) {

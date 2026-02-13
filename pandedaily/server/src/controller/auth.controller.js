@@ -231,9 +231,9 @@ const registerCustomer = async (req, res) => {
     }
 
     // Validate password strength
-    if (password.length < 5) {
+    if (password.length < 3) {
       return res.status(400).json({
-        message: 'Password must be at least 8 characters long.',
+        message: 'Password must be at least 3 characters long.',
       })
     }
 

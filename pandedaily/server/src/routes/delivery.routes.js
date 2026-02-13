@@ -3,7 +3,8 @@ const {
   getDelivery,
   getDeliveryById,
   addDelivery,
-  updateDelivery,
+  addDeliveryImages,
+  updateDeliveryStatus,
 } = require('../controller/delivery.controller')
 
 const deliveryRouter = express.Router()
@@ -14,8 +15,9 @@ deliveryRouter.get('/:id', getDeliveryById)
 
 // POST
 deliveryRouter.post('/', addDelivery)
+deliveryRouter.post('/:id/images', addDeliveryImages)
 
 // PUT
-deliveryRouter.put('/:id', updateDelivery)
+deliveryRouter.put('/:id/status', updateDeliveryStatus)
 
 module.exports = { deliveryRouter }

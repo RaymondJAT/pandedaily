@@ -15,33 +15,108 @@ const getDelivery = async (req, res) => {
     const statement = `
       SELECT 
         d.*,
+        ds.ds_id as schedule_id,
+        ds.ds_name as schedule_name,
+        ds.ds_date as schedule_date,
+        ds.ds_start_time,
+        ds.ds_end_time,
+        ds.ds_status as schedule_status,
+        ds.ds_cutoff,
+        o.or_id as order_id,
         o.or_customer_id,
-        c.c_fullname as customer_name,
+        o.or_total,
         o.or_status as order_status,
+        o.or_createddate as order_date,
+        c.c_fullname as customer_name,
+        c.c_address as customer_address,
+        c.c_contact as customer_contact,
         r.r_fullname as rider_name,
+        r.r_contact as rider_contact,
         r.r_status as rider_status
       FROM delivery d
-      INNER JOIN orders o ON d.d_order_id = o.or_id
+      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
       INNER JOIN customer c ON o.or_customer_id = c.c_id
       LEFT JOIN rider r ON d.d_rider_id = r.r_id
-      WHERE r.r_status != 'DELETED' OR r.r_status IS NULL
-      ORDER BY d.d_date DESC
+      ORDER BY d.d_createddate DESC
     `
 
     const data = await Query(statement, [], Delivery.delivery.prefix_)
 
-    if (!data.length) {
-      return res.status(404).json({ message: 'No deliveries found.' })
-    }
-
     res.status(200).json({
       message: 'Deliveries retrieved successfully.',
       count: data.length,
-      data,
+      data: data || [],
     })
   } catch (error) {
     console.error('Error retrieving deliveries:', error)
     res.status(500).json({ message: 'Error retrieving deliveries.' })
+  }
+}
+
+const getDeliveryActivities = async (req, res) => {
+  const { access_id } = req.context
+
+  try {
+    if (access_id !== 1) {
+      return res.status(403).json({
+        message: 'You are not allowed to access delivery activity data.',
+      })
+    }
+
+    const statement = `
+      SELECT 
+        da.da_id AS id,
+        da.da_delivery_id AS delivery_id,
+        da.da_status AS status,
+        da.da_remarks AS remarks,
+        da.da_createddate AS createddate,
+        d.d_delivery_schedule_id AS schedule_id,
+        ds.ds_name AS schedule_name,
+        ds.ds_order_id AS order_id,
+        o.or_customer_id AS customer_id,
+        c.c_fullname AS customer_name,
+        r.r_fullname AS rider_name,
+        (
+          SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'image_id', di.di_id,
+              'type', di.di_type,
+              'image', di.di_image,
+              'createddate', di.di_createddate
+            )
+          )
+          FROM delivery_image di
+          WHERE di.di_delivery_activity_id = da.da_id
+        ) AS images
+      FROM delivery_activity da
+      INNER JOIN delivery d ON da.da_delivery_id = d.d_id
+      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
+      INNER JOIN customer c ON o.or_customer_id = c.c_id
+      LEFT JOIN rider r ON d.d_rider_id = r.r_id
+      ORDER BY da.da_createddate DESC
+    `
+
+    const data = await Query(statement)
+
+    // Parse JSON arrays
+    const parsedData = data.map((row) => ({
+      ...row,
+      images: row.images ? JSON.parse(row.images) : [],
+    }))
+
+    res.status(200).json({
+      message: 'All delivery activities retrieved successfully.',
+      count: data.length,
+      data: parsedData,
+    })
+  } catch (error) {
+    console.error('Error retrieving delivery activities:', error)
+    res.status(500).json({
+      message: 'Error retrieving delivery activities.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    })
   }
 }
 
@@ -57,18 +132,36 @@ const getDeliveryById = async (req, res) => {
       })
     }
 
-    // Get delivery with order and rider info
+    // Get delivery with schedule, order, customer, and rider info
     const deliveryStatement = `
       SELECT 
         d.*,
+        ds.ds_id as schedule_id,
+        ds.ds_name as schedule_name,
+        ds.ds_date as schedule_date,
+        ds.ds_start_time,
+        ds.ds_end_time,
+        ds.ds_status as schedule_status,
+        ds.ds_cutoff,
+        ds.ds_createddate as schedule_createddate,
+        o.or_id as order_id,
         o.or_customer_id,
-        c.c_fullname as customer_name,
-        o.or_delivery_address,
+        o.or_total,
         o.or_status as order_status,
+        o.or_payment_type,
+        o.or_payment_reference,
+        o.or_details,
+        o.or_createddate as order_date,
+        c.c_fullname as customer_name,
+        c.c_email as customer_email,
+        c.c_contact as customer_contact,
+        c.c_address as customer_address,
         r.r_fullname as rider_name,
+        r.r_contact as rider_contact,
         r.r_status as rider_status
       FROM delivery d
-      INNER JOIN orders o ON d.d_order_id = o.or_id
+      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
       INNER JOIN customer c ON o.or_customer_id = c.c_id
       LEFT JOIN rider r ON d.d_rider_id = r.r_id
       WHERE d.d_id = ?
@@ -80,30 +173,60 @@ const getDeliveryById = async (req, res) => {
       return res.status(404).json({ message: 'No delivery found.' })
     }
 
-    // Get delivery activity history
+    // Get delivery activity history (audit trail) with images
     const activityStatement = `
-  SELECT *
-  FROM delivery_activity
-  WHERE da_delivery_id = ?
-  ORDER BY da_date DESC  
-`
+      SELECT 
+        da.*,
+        di.di_id as image_id,
+        di.di_type as image_type,
+        di.di_image,
+        di.di_createddate as image_createddate
+      FROM delivery_activity da
+      LEFT JOIN delivery_image di ON da.da_id = di.di_delivery_activity_id
+      WHERE da.da_delivery_id = ?
+      ORDER BY da.da_createddate DESC
+    `
     const activities = await Query(activityStatement, [id])
 
-    // Get rider activity for this delivery
-    const riderActivityStatement = `
-      SELECT *
-      FROM rider_activity
-      WHERE ra_delivery_id = ?
-      ORDER BY ra_date DESC
-    `
-    const riderActivities = await Query(riderActivityStatement, [id])
+    // Group activities with their images
+    const activitiesWithImages = activities.reduce((acc, row) => {
+      const existingActivity = acc.find((a) => a.da_id === row.da_id)
+
+      if (!existingActivity) {
+        acc.push({
+          da_id: row.da_id,
+          da_delivery_id: row.da_delivery_id,
+          da_status: row.da_status,
+          da_remarks: row.da_remarks,
+          da_createddate: row.da_createddate,
+          images: row.di_id
+            ? [
+                {
+                  di_id: row.di_id,
+                  di_type: row.di_type,
+                  di_image: row.di_image,
+                  di_createddate: row.di_createddate,
+                },
+              ]
+            : [],
+        })
+      } else if (row.di_id) {
+        existingActivity.images.push({
+          di_id: row.di_id,
+          di_type: row.di_type,
+          di_image: row.di_image,
+          di_createddate: row.di_createddate,
+        })
+      }
+
+      return acc
+    }, [])
 
     res.status(200).json({
       message: 'Delivery retrieved successfully.',
       data: {
         ...deliveryData[0],
-        activities: activities,
-        rider_activities: riderActivities,
+        activities: activitiesWithImages,
       },
     })
   } catch (error) {
@@ -112,36 +235,125 @@ const getDeliveryById = async (req, res) => {
   }
 }
 
-// CREATE
-const addDelivery = async (req, res) => {
-  const { order_id, rider_id, date } = req.body
+const getDeliveryActivitiesById = async (req, res) => {
+  const { id } = req.params
+  const { access_id } = req.context
 
-  if (!order_id || !rider_id || !date) {
-    return res.status(400).json({ message: 'Delivery data is required.' })
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({
+      message: 'Valid Delivery ID is required.',
+    })
   }
 
   try {
-    // CONNECT TO ORDER
-    const orderCheck = await Query(
-      `SELECT or_id, or_status 
-       FROM orders 
-       WHERE or_id = ?`,
-      [order_id],
-    )
-
-    if (!orderCheck.length) {
-      return res.status(404).json({ message: 'Order not found.' })
-    }
-
-    if (orderCheck[0].or_status !== 'PAID') {
-      return res.status(400).json({
-        message: `Cannot create delivery. Order status must be PAID, current: ${orderCheck[0].or_status}`,
+    if (access_id !== 1) {
+      return res.status(403).json({
+        message: 'You are not allowed to access delivery activity data.',
       })
     }
 
-    // Validate rider exists and is ACTIVE
+    const statement = `
+      SELECT 
+        da.da_id AS id,
+        da.da_delivery_id AS delivery_id,
+        da.da_status AS status,
+        da.da_remarks AS remarks,
+        da.da_createddate AS createddate,
+        (
+          SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'image_id', di.di_id,
+              'type', di.di_type,
+              'image', di.di_image,
+              'createddate', di.di_createddate
+            )
+          )
+          FROM delivery_image di
+          WHERE di.di_delivery_activity_id = da.da_id
+        ) AS images
+      FROM delivery_activity da
+      WHERE da.da_delivery_id = ?
+      ORDER BY da.da_createddate DESC
+    `
+
+    const data = await Query(statement, [id], Delivery.delivery_activity?.prefix_)
+
+    if (!data.length) {
+      return res.status(404).json({
+        message: 'No delivery activities found for this delivery.',
+      })
+    }
+
+    // Parse JSON arrays
+    const parsedData = data.map((row) => ({
+      ...row,
+      images: row.images ? JSON.parse(row.images) : [],
+    }))
+
+    res.status(200).json({
+      message: 'Delivery activities retrieved successfully.',
+      count: data.length,
+      data: parsedData,
+    })
+  } catch (error) {
+    console.error('Error retrieving delivery activities:', error)
+    res.status(500).json({
+      message: 'Error retrieving delivery activities.',
+    })
+  }
+}
+
+// CREATE
+const addDelivery = async (req, res) => {
+  const { delivery_schedule_id, rider_id } = req.body
+
+  if (!delivery_schedule_id || !rider_id) {
+    return res.status(400).json({
+      message: 'delivery_schedule_id and rider_id are required.',
+    })
+  }
+
+  try {
+    // Check schedule exists and get order info
+    const scheduleCheck = await Query(
+      `
+      SELECT 
+        ds.ds_id,
+        ds.ds_status,
+        ds.ds_order_id,
+        o.or_status
+      FROM delivery_schedule ds
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
+      WHERE ds.ds_id = ?
+      `,
+      [delivery_schedule_id],
+    )
+
+    if (!scheduleCheck.length) {
+      return res.status(404).json({ message: 'Delivery schedule not found.' })
+    }
+
+    const schedule = scheduleCheck[0]
+
+    // Order must be APPROVED or PAID
+    if (!['APPROVED', 'PAID'].includes(schedule.or_status)) {
+      return res.status(400).json({
+        message: `Cannot create delivery. Order must be APPROVED or PAID. Current: ${schedule.or_status}`,
+      })
+    }
+
+    // Schedule must be PENDING
+    if (schedule.ds_status !== 'PENDING') {
+      return res.status(400).json({
+        message: `Delivery schedule must be PENDING. Current: ${schedule.ds_status}`,
+      })
+    }
+
+    // Validate rider
     const riderCheck = await Query(
-      'SELECT r_id, r_status FROM rider WHERE r_id = ? AND r_status != "DELETED"',
+      `SELECT r_id, r_status 
+       FROM rider 
+       WHERE r_id = ? AND r_status != 'DELETED'`,
       [rider_id],
     )
 
@@ -151,102 +363,110 @@ const addDelivery = async (req, res) => {
 
     if (riderCheck[0].r_status !== 'ACTIVE') {
       return res.status(400).json({
-        message: 'Cannot assign delivery to inactive rider. Rider must be ACTIVE.',
+        message: 'Cannot assign delivery to inactive rider.',
       })
     }
 
-    // Check if order already has delivery
-    const existingDelivery = await Query('SELECT d_id FROM delivery WHERE d_order_id = ?', [
-      order_id,
-    ])
+    // Ensure no delivery already exists for this schedule
+    const existingDelivery = await Query(
+      `SELECT d_id FROM delivery WHERE d_delivery_schedule_id = ?`,
+      [delivery_schedule_id],
+    )
 
     if (existingDelivery.length > 0) {
       return res.status(409).json({
-        message: 'This order already has a delivery assigned.',
+        message: 'This schedule already has a delivery assigned.',
       })
     }
 
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
     const queries = []
 
     // Insert delivery
     queries.push({
       sql: `
         INSERT INTO delivery
-        (d_order_id, d_rider_id, d_date, d_status)
-        VALUES (?, ?, ?, 'PENDING')
+        (d_delivery_schedule_id, d_rider_id, d_status, d_createddate)
+        VALUES (?, ?, 'PENDING', ?)
       `,
-      values: [order_id, rider_id, date],
+      values: [delivery_schedule_id, rider_id, now],
     })
 
-    // Log delivery activity
+    // Update schedule status
     queries.push({
       sql: `
-        INSERT INTO delivery_activity
-        (da_delivery_id, da_status, da_date)
-        VALUES (LAST_INSERT_ID(), 'PENDING', NOW())
+        UPDATE delivery_schedule
+        SET ds_status = 'ASSIGNED'
+        WHERE ds_id = ?
       `,
-      values: [],
+      values: [delivery_schedule_id],
     })
 
-    // Log rider activity with CORRECT status
-    queries.push({
-      sql: `
-        INSERT INTO rider_activity
-        (ra_rider_id, ra_delivery_id, ra_status, ra_date)
-        VALUES (?, LAST_INSERT_ID(), 'ASSIGNED', NOW())
-      `,
-      values: [rider_id],
-    })
-
-    // Update order status to ON-DELIVERY
+    // 3. Update order status
     queries.push({
       sql: `
         UPDATE orders
-        SET or_status = 'ON-DELIVERY'
+        SET or_status = 'OUT-FOR-DELIVERY'
         WHERE or_id = ?
       `,
-      values: [order_id],
+      values: [schedule.ds_order_id],
     })
 
-    await Transaction(queries)
+    // Execute first transaction to get delivery ID
+    const result = await Transaction(queries, true)
+    const deliveryId = result.insertId || (await Query('SELECT LAST_INSERT_ID() as id'))[0].id
+
+    // delivery activity
+    await Query(
+      `
+      INSERT INTO delivery_activity
+      (da_delivery_id, da_status, da_createddate)
+      VALUES (?, 'PENDING', ?)
+      `,
+      [deliveryId, now],
+    )
 
     res.status(201).json({
       message: 'Delivery created successfully.',
-      order_status: 'ON-DELIVERY',
+      delivery_id: deliveryId,
+      delivery_schedule_id,
+      order_id: schedule.ds_order_id,
+      order_status: 'OUT-FOR-DELIVERY',
+      status: 'PENDING',
     })
   } catch (error) {
-    console.error(error)
+    console.error('Error creating delivery:', error)
     res.status(500).json({
       message: 'Failed to create delivery.',
     })
   }
 }
 
-// UPDATE
-const updateDelivery = async (req, res) => {
+// UPDATE DELIVERY STATUS
+const updateDeliveryStatus = async (req, res) => {
   const { id } = req.params
-  const { order_id, rider_id, date, status } = req.body
+  const { status, remarks, images } = req.body
 
   const validStatuses = ['PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE']
 
-  // Map delivery status to rider activity status
-  const riderStatusMap = {
+  // Map delivery status to schedule status
+  const scheduleStatusMap = {
     PENDING: 'ASSIGNED',
-    'FOR-PICK-UP': 'OUT-FOR-DELIVERY',
+    'FOR-PICK-UP': 'ASSIGNED',
     'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
-    COMPLETE: 'DELIVERED',
+    COMPLETE: 'COMPLETE',
   }
 
   // Map delivery status to order status
   const orderStatusMap = {
-    PENDING: 'ON-DELIVERY',
-    'FOR-PICK-UP': 'ON-DELIVERY',
-    'OUT-FOR-DELIVERY': 'ON-DELIVERY',
+    PENDING: 'OUT-FOR-DELIVERY',
+    'FOR-PICK-UP': 'OUT-FOR-DELIVERY',
+    'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
     COMPLETE: 'COMPLETE',
   }
 
-  if (!order_id || !rider_id || !date || !status) {
-    return res.status(400).json({ message: 'Delivery data is required.' })
+  if (!status) {
+    return res.status(400).json({ message: 'Status is required.' })
   }
 
   if (!validStatuses.includes(status)) {
@@ -256,99 +476,194 @@ const updateDelivery = async (req, res) => {
   }
 
   try {
-    // Validate order exists
-    const orderCheck = await Query('SELECT or_id FROM orders WHERE or_id = ?', [order_id])
-
-    if (!orderCheck.length) {
-      return res.status(404).json({ message: 'Order not found.' })
-    }
-
-    // Validate rider exists and is ACTIVE
-    const riderCheck = await Query(
-      'SELECT r_id, r_status FROM rider WHERE r_id = ? AND r_status != "DELETED"',
-      [rider_id],
+    // Get current delivery info with schedule and order
+    const currentDelivery = await Query(
+      `
+      SELECT 
+        d.d_id,
+        d.d_status,
+        d.d_delivery_schedule_id,
+        ds.ds_order_id,
+        ds.ds_status as schedule_status,
+        o.or_status as order_status
+      FROM delivery d
+      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
+      WHERE d.d_id = ?
+      `,
+      [id],
     )
 
-    if (!riderCheck.length) {
-      return res.status(404).json({ message: 'Rider not found.' })
+    if (!currentDelivery.length) {
+      return res.status(404).json({ message: 'Delivery not found.' })
     }
 
-    if (riderCheck[0].r_status !== 'ACTIVE') {
+    const delivery = currentDelivery[0]
+    const previousStatus = delivery.d_status
+
+    // Don't allow updating to same status
+    if (previousStatus === status) {
       return res.status(400).json({
-        message: 'Cannot assign delivery to inactive rider. Rider must be ACTIVE.',
+        message: `Delivery is already ${status}.`,
       })
     }
 
-    // Get current delivery status
-    const currentDelivery = await Query('SELECT d_status FROM delivery WHERE d_id = ?', [id])
+    // Validate status transition
+    if (previousStatus === 'COMPLETE') {
+      return res.status(400).json({
+        message: 'Cannot update a completed delivery.',
+      })
+    }
 
-    const previousStatus = currentDelivery.length ? currentDelivery[0].d_status : null
-
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
     const queries = []
 
-    // Update delivery
+    // Update delivery status
     queries.push({
       sql: `
         UPDATE delivery
-        SET d_order_id = ?, d_rider_id = ?, d_date = ?, d_status = ?
+        SET d_status = ?
         WHERE d_id = ?
       `,
-      values: [order_id, rider_id, date, status, id],
+      values: [status, id],
     })
 
-    // Log delivery activity
+    // Update schedule status
     queries.push({
       sql: `
-    INSERT INTO delivery_activity
-    (da_delivery_id, da_status, da_date)
-    VALUES (?, ?, NOW())
-  `,
-      values: [id, status],
-    })
-
-    // Log rider activity with CORRECT mapped status
-    queries.push({
-      sql: `
-        INSERT INTO rider_activity
-        (ra_rider_id, ra_delivery_id, ra_status, ra_date)
-        VALUES (?, ?, ?, NOW())
+        UPDATE delivery_schedule
+        SET ds_status = ?
+        WHERE ds_id = ?
       `,
-      values: [rider_id, id, riderStatusMap[status]],
+      values: [scheduleStatusMap[status], delivery.d_delivery_schedule_id],
     })
 
-    // Update order status based on delivery status
-    queries.push({
-      sql: `
-        UPDATE orders
-        SET or_status = ?
-        WHERE or_id = ?
-      `,
-      values: [orderStatusMap[status], order_id],
-    })
+    // Update order status if needed
+    if (orderStatusMap[status] && orderStatusMap[status] !== delivery.order_status) {
+      queries.push({
+        sql: `
+          UPDATE orders
+          SET or_status = ?
+          WHERE or_id = ?
+        `,
+        values: [orderStatusMap[status], delivery.ds_order_id],
+      })
+    }
 
+    // Execute first part of transaction
     await Transaction(queries)
 
+    // delivery activity
+    const activityQuery = `
+      INSERT INTO delivery_activity
+      (da_delivery_id, da_status, da_remarks, da_createddate)
+      VALUES (?, ?, ?, ?)
+    `
+    const activityResult = await Query(activityQuery, [id, status, remarks || null, now])
+    const activityId = activityResult.insertId
+
+    // Add images if provided
+    if (images && Array.isArray(images) && images.length > 0) {
+      for (const image of images) {
+        if (!image.type || !['PICK-UP', 'DELIVERED'].includes(image.type)) {
+          return res.status(400).json({
+            message: 'Image type must be either PICK-UP or DELIVERED.',
+          })
+        }
+
+        await Query(
+          `
+          INSERT INTO delivery_image
+          (di_delivery_activity_id, di_type, di_image, di_createddate)
+          VALUES (?, ?, ?, ?)
+          `,
+          [activityId, image.type, image.data, now],
+        )
+      }
+    }
+
     res.status(200).json({
-      message: 'Delivery updated successfully.',
+      message: 'Delivery status updated successfully.',
       data: {
         delivery_id: id,
         previous_status: previousStatus,
         current_status: status,
-        rider_activity_status: riderStatusMap[status],
+        schedule_status: scheduleStatusMap[status],
         order_status: orderStatusMap[status],
+        activity_id: activityId,
       },
     })
   } catch (error) {
-    console.error(error)
+    console.error('Error updating delivery status:', error)
     res.status(500).json({
-      message: 'Failed to update delivery.',
+      message: 'Failed to update delivery status.',
+    })
+  }
+}
+
+// ADD IMAGES TO EXISTING DELIVERY ACTIVITY
+const addDeliveryImages = async (req, res) => {
+  const { activityId } = req.params
+  const { images } = req.body
+
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({
+      message: 'At least one image is required.',
+    })
+  }
+
+  try {
+    // Check if activity exists
+    const activityCheck = await Query('SELECT da_id FROM delivery_activity WHERE da_id = ?', [
+      activityId,
+    ])
+
+    if (!activityCheck.length) {
+      return res.status(404).json({ message: 'Delivery activity not found.' })
+    }
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const imageIds = []
+
+    for (const image of images) {
+      if (!image.type || !['PICK-UP', 'DELIVERED'].includes(image.type)) {
+        return res.status(400).json({
+          message: 'Image type must be either PICK-UP or DELIVERED.',
+        })
+      }
+
+      const result = await Query(
+        `
+        INSERT INTO delivery_image
+        (di_delivery_activity_id, di_type, di_image, di_createddate)
+        VALUES (?, ?, ?, ?)
+        `,
+        [activityId, image.type, image.data, now],
+      )
+
+      imageIds.push(result.insertId)
+    }
+
+    res.status(201).json({
+      message: 'Images added successfully.',
+      activity_id: activityId,
+      image_ids: imageIds,
+      count: imageIds.length,
+    })
+  } catch (error) {
+    console.error('Error adding delivery images:', error)
+    res.status(500).json({
+      message: 'Failed to add delivery images.',
     })
   }
 }
 
 module.exports = {
   getDelivery,
+  getDeliveryActivities,
   getDeliveryById,
+  getDeliveryActivitiesById,
   addDelivery,
-  updateDelivery,
+  updateDeliveryStatus,
+  addDeliveryImages,
 }
