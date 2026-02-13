@@ -7,7 +7,7 @@ export const orderColumns = [
     align: 'center',
   },
   {
-    key: 'or_date',
+    key: 'or_createddate',
     label: 'Order Date',
     sortable: true,
     width: '150px',

@@ -9,7 +9,7 @@ const Orders = () => {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [sortKey, setSortKey] = useState('or_date')
+  const [sortKey, setSortKey] = useState('or_createddate')
   const [sortDirection, setSortDirection] = useState('desc')
   const [statusFilter, setStatusFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
@@ -211,7 +211,7 @@ const Orders = () => {
         // Transform the data to ensure all fields exist
         const transformedData = data.map((order) => ({
           or_id: order.or_id || order.id || 0,
-          or_date: order.or_date || order.date || order.created_at || '',
+          or_createddate: order.or_createddate || order.createddate || order.created_at || '',
           or_customer_id: order.or_customer_id || order.customer_id || 0,
           customer_name: order.customer_name || 'Guest Customer',
           or_total: order.or_total || order.total || 0,

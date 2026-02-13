@@ -224,7 +224,7 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
               <Descriptions.Item label="Order Date">
                 <div className="flex items-center">
                   <FiCalendar className="mr-2 text-gray-400" />
-                  <span>{formatDate(order.or_date)}</span>
+                  <span>{formatDate(order.or_createddate)}</span>
                 </div>
               </Descriptions.Item>
               <Descriptions.Item label="Total Amount">
