@@ -353,7 +353,7 @@ const addDelivery = async (req, res) => {
     const riderCheck = await Query(
       `SELECT r_id, r_status 
        FROM rider 
-       WHERE r_id = ? AND r_status != 'DELETED'`,
+       WHERE r_id = ? AND r_status != 'DELETE'`,
       [rider_id],
     )
 
@@ -381,26 +381,26 @@ const addDelivery = async (req, res) => {
 
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
-    // FIX: Insert delivery first using Query to get insertId
+    // Insert delivery first using Query to get insertId
     const deliveryResult = await Query(
       `
       INSERT INTO delivery
       (d_delivery_schedule_id, d_rider_id, d_status, d_createddate)
-      VALUES (?, ?, 'PENDING', ?)
+      VALUES (?, ?, 'FOR-PICK-UP', ?)
       `,
       [delivery_schedule_id, rider_id, now],
     )
 
     const deliveryId = deliveryResult.insertId
 
-    // FIX: Separate transaction for updates only
+    // Separate transaction for updates only
     const queries = []
 
     // Update schedule status
     queries.push({
       sql: `
         UPDATE delivery_schedule
-        SET ds_status = 'ASSIGNED'
+        SET ds_status = 'FOR-PICK-UP'
         WHERE ds_id = ?
       `,
       values: [delivery_schedule_id],
@@ -421,23 +421,24 @@ const addDelivery = async (req, res) => {
       await Transaction(queries)
     }
 
-    // delivery activity
+    // delivery activity - now FOR-PICK-UP since rider is assigned
     await Query(
       `
       INSERT INTO delivery_activity
-      (da_delivery_id, da_status, da_createddate)
-      VALUES (?, 'PENDING', ?)
+      (da_delivery_id, da_status, da_remarks, da_createddate)
+      VALUES (?, 'FOR-PICK-UP', 'Delivery created with rider assigned', ?)
       `,
       [deliveryId, now],
     )
 
     res.status(201).json({
-      message: 'Delivery created successfully.',
+      message: 'Delivery created and rider assigned successfully.',
       delivery_id: deliveryId,
       delivery_schedule_id,
       order_id: schedule.ds_order_id,
       order_status: 'OUT-FOR-DELIVERY',
-      status: 'PENDING',
+      status: 'FOR-PICK-UP',
+      rider_id,
     })
   } catch (error) {
     console.error('Error creating delivery:', error)
@@ -447,166 +448,7 @@ const addDelivery = async (req, res) => {
   }
 }
 
-// UPDATE DELIVERY STATUS
-const updateDeliveryStatus = async (req, res) => {
-  const { id } = req.params
-  const { status, remarks, images } = req.body
-
-  const validStatuses = ['PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE']
-
-  // Map delivery status to schedule status
-  const scheduleStatusMap = {
-    PENDING: 'ASSIGNED',
-    'FOR-PICK-UP': 'ASSIGNED',
-    'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
-    COMPLETE: 'COMPLETE',
-  }
-
-  // Map delivery status to order status
-  const orderStatusMap = {
-    PENDING: 'OUT-FOR-DELIVERY',
-    'FOR-PICK-UP': 'OUT-FOR-DELIVERY',
-    'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
-    COMPLETE: 'COMPLETE',
-  }
-
-  if (!status) {
-    return res.status(400).json({ message: 'Status is required.' })
-  }
-
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({
-      message: `Invalid status. Must be: ${validStatuses.join(', ')}`,
-    })
-  }
-
-  try {
-    // Get current delivery info with schedule and order
-    const currentDelivery = await Query(
-      `
-      SELECT 
-        d.d_id,
-        d.d_status,
-        d.d_delivery_schedule_id,
-        ds.ds_order_id,
-        ds.ds_status as schedule_status,
-        o.or_status as order_status
-      FROM delivery d
-      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
-      INNER JOIN orders o ON ds.ds_order_id = o.or_id
-      WHERE d.d_id = ?
-      `,
-      [id],
-    )
-
-    if (!currentDelivery.length) {
-      return res.status(404).json({ message: 'Delivery not found.' })
-    }
-
-    const delivery = currentDelivery[0]
-    const previousStatus = delivery.d_status
-
-    // Don't allow updating to same status
-    if (previousStatus === status) {
-      return res.status(400).json({
-        message: `Delivery is already ${status}.`,
-      })
-    }
-
-    // Validate status transition
-    if (previousStatus === 'COMPLETE') {
-      return res.status(400).json({
-        message: 'Cannot update a completed delivery.',
-      })
-    }
-
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    const queries = []
-
-    // Update delivery status
-    queries.push({
-      sql: `
-        UPDATE delivery
-        SET d_status = ?
-        WHERE d_id = ?
-      `,
-      values: [status, id],
-    })
-
-    // Update schedule status
-    queries.push({
-      sql: `
-        UPDATE delivery_schedule
-        SET ds_status = ?
-        WHERE ds_id = ?
-      `,
-      values: [scheduleStatusMap[status], delivery.d_delivery_schedule_id],
-    })
-
-    // Update order status if needed
-    if (orderStatusMap[status] && orderStatusMap[status] !== delivery.order_status) {
-      queries.push({
-        sql: `
-          UPDATE orders
-          SET or_status = ?
-          WHERE or_id = ?
-        `,
-        values: [orderStatusMap[status], delivery.ds_order_id],
-      })
-    }
-
-    // Execute first part of transaction
-    await Transaction(queries)
-
-    // delivery activity
-    const activityQuery = `
-      INSERT INTO delivery_activity
-      (da_delivery_id, da_status, da_remarks, da_createddate)
-      VALUES (?, ?, ?, ?)
-    `
-    const activityResult = await Query(activityQuery, [id, status, remarks || null, now])
-    const activityId = activityResult.insertId
-
-    // Add images if provided
-    if (images && Array.isArray(images) && images.length > 0) {
-      for (const image of images) {
-        if (!image.type || !['PICK-UP', 'DELIVERED'].includes(image.type)) {
-          return res.status(400).json({
-            message: 'Image type must be either PICK-UP or DELIVERED.',
-          })
-        }
-
-        await Query(
-          `
-          INSERT INTO delivery_image
-          (di_delivery_activity_id, di_type, di_image, di_createddate)
-          VALUES (?, ?, ?, ?)
-          `,
-          [activityId, image.type, image.data, now],
-        )
-      }
-    }
-
-    res.status(200).json({
-      message: 'Delivery status updated successfully.',
-      data: {
-        delivery_id: id,
-        previous_status: previousStatus,
-        current_status: status,
-        schedule_status: scheduleStatusMap[status],
-        order_status: orderStatusMap[status],
-        activity_id: activityId,
-      },
-    })
-  } catch (error) {
-    console.error('Error updating delivery status:', error)
-    res.status(500).json({
-      message: 'Failed to update delivery status.',
-    })
-  }
-}
-
-// ADD IMAGES TO EXISTING DELIVERY ACTIVITY
+// ADD IMAGE
 const addDeliveryImages = async (req, res) => {
   const { activityId } = req.params
   const { images } = req.body
@@ -663,12 +505,341 @@ const addDeliveryImages = async (req, res) => {
   }
 }
 
+// ASSIGN RIDER TO EXISTING DELIVERY
+const assignRider = async (req, res) => {
+  const { id } = req.params
+  const { rider_id } = req.body
+
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({ message: 'Valid delivery ID is required.' })
+  }
+
+  if (!rider_id) {
+    return res.status(400).json({ message: 'rider_id is required.' })
+  }
+
+  try {
+    // Get current delivery info
+    const currentDelivery = await Query(
+      `
+      SELECT 
+        d.d_id,
+        d.d_status,
+        d.d_delivery_schedule_id,
+        d.d_rider_id,
+        ds.ds_order_id,
+        ds.ds_status as schedule_status,
+        o.or_status as order_status
+      FROM delivery d
+      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
+      WHERE d.d_id = ?
+      `,
+      [id],
+    )
+
+    if (!currentDelivery.length) {
+      return res.status(404).json({ message: 'Delivery not found.' })
+    }
+
+    const delivery = currentDelivery[0]
+
+    // Check if rider already assigned
+    if (delivery.d_rider_id) {
+      return res.status(400).json({
+        message: 'Rider already assigned to this delivery.',
+      })
+    }
+
+    // Validate rider
+    const riderCheck = await Query(
+      `SELECT r_id, r_status 
+       FROM rider 
+       WHERE r_id = ? AND r_status != 'DELETE'`,
+      [rider_id],
+    )
+
+    if (!riderCheck.length) {
+      return res.status(404).json({ message: 'Rider not found.' })
+    }
+
+    if (riderCheck[0].r_status !== 'ACTIVE') {
+      return res.status(400).json({
+        message: 'Cannot assign inactive rider.',
+      })
+    }
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const queries = []
+
+    // Update delivery with rider and change status to FOR-PICK-UP
+    queries.push({
+      sql: `
+        UPDATE delivery
+        SET d_rider_id = ?, d_status = 'FOR-PICK-UP'
+        WHERE d_id = ?
+      `,
+      values: [rider_id, id],
+    })
+
+    // Update schedule status to FOR-PICK-UP (not ASSIGNED)
+    if (delivery.schedule_status !== 'FOR-PICK-UP') {
+      console.log(`Updating schedule from ${delivery.schedule_status} to FOR-PICK-UP`)
+      queries.push({
+        sql: `
+          UPDATE delivery_schedule
+          SET ds_status = ?
+          WHERE ds_id = ?
+        `,
+        values: ['FOR-PICK-UP', delivery.d_delivery_schedule_id], // Changed from 'ASSIGNED' to 'FOR-PICK-UP'
+      })
+    }
+
+    // Update order status if needed
+    if (delivery.order_status !== 'OUT-FOR-DELIVERY') {
+      queries.push({
+        sql: `
+          UPDATE orders
+          SET or_status = ?
+          WHERE or_id = ?
+        `,
+        values: ['OUT-FOR-DELIVERY', delivery.ds_order_id],
+      })
+    }
+
+    // Add delivery activity to the same transaction
+    queries.push({
+      sql: `
+        INSERT INTO delivery_activity
+        (da_delivery_id, da_status, da_remarks, da_createddate)
+        VALUES (?, 'FOR-PICK-UP', 'Rider assigned', ?)
+      `,
+      values: [id, now],
+    })
+
+    // Execute all queries in a single transaction
+    await Transaction(queries)
+
+    // Update rider activity
+    try {
+      await Query(
+        `
+        INSERT INTO rider_activity
+        (ra_rider_id, ra_delivery_id, ra_status, ra_date)
+        VALUES (?, ?, 'FOR-PICK-UP', ?)
+        `,
+        [rider_id, id, now],
+      )
+    } catch (riderActivityError) {
+      console.log('Note: Could not update rider_activity:', riderActivityError.message)
+    }
+
+    res.status(200).json({
+      message: 'Rider assigned successfully.',
+      delivery_id: id,
+      rider_id,
+      status: 'FOR-PICK-UP',
+    })
+  } catch (error) {
+    console.error('Error assigning rider:', error)
+    res.status(500).json({
+      message: 'Failed to assign rider.',
+    })
+  }
+}
+
+// UPDATE
+const updateDeliveryStatus = async (req, res) => {
+  const { id } = req.params
+  const { status, remarks, images } = req.body
+
+  const validStatuses = ['PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE']
+
+  // Map delivery status to schedule status - FIXED to match actual ENUM values
+  const scheduleStatusMap = {
+    PENDING: 'PENDING', // When delivery is PENDING, schedule should be PENDING
+    'FOR-PICK-UP': 'FOR-PICK-UP', // When delivery is FOR-PICK-UP, schedule should be FOR-PICK-UP
+    'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
+    COMPLETE: 'COMPLETE',
+  }
+
+  // Map delivery status to order status
+  const orderStatusMap = {
+    PENDING: 'OUT-FOR-DELIVERY',
+    'FOR-PICK-UP': 'OUT-FOR-DELIVERY',
+    'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
+    COMPLETE: 'COMPLETE',
+  }
+
+  if (!status) {
+    return res.status(400).json({ message: 'Status is required.' })
+  }
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({
+      message: `Invalid status. Must be: ${validStatuses.join(', ')}`,
+    })
+  }
+
+  try {
+    // Get current delivery info with schedule and order
+    const currentDelivery = await Query(
+      `
+      SELECT 
+        d.d_id,
+        d.d_status,
+        d.d_delivery_schedule_id,
+        d.d_rider_id,
+        ds.ds_order_id,
+        ds.ds_status as schedule_status,
+        o.or_status as order_status
+      FROM delivery d
+      INNER JOIN delivery_schedule ds ON d.d_delivery_schedule_id = ds.ds_id
+      INNER JOIN orders o ON ds.ds_order_id = o.or_id
+      WHERE d.d_id = ?
+      `,
+      [id],
+    )
+
+    if (!currentDelivery.length) {
+      return res.status(404).json({ message: 'Delivery not found.' })
+    }
+
+    const delivery = currentDelivery[0]
+    const previousStatus = delivery.d_status
+
+    // Don't allow updating to same status
+    if (previousStatus === status) {
+      return res.status(400).json({
+        message: `Delivery is already ${status}.`,
+      })
+    }
+
+    // Validate status transition
+    if (previousStatus === 'COMPLETE') {
+      return res.status(400).json({
+        message: 'Cannot update a completed delivery.',
+      })
+    }
+
+    // If moving to FOR-PICK-UP, ensure rider is assigned
+    if (status === 'FOR-PICK-UP' && !delivery.d_rider_id) {
+      return res.status(400).json({
+        message: 'Cannot set to FOR-PICK-UP. No rider assigned.',
+      })
+    }
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const queries = []
+
+    // Update delivery status
+    queries.push({
+      sql: `
+        UPDATE delivery
+        SET d_status = ?
+        WHERE d_id = ?
+      `,
+      values: [status, id],
+    })
+
+    // Update schedule status using the fixed map
+    const newScheduleStatus = scheduleStatusMap[status]
+    console.log(`Updating schedule from ${delivery.schedule_status} to ${newScheduleStatus}`)
+    queries.push({
+      sql: `
+        UPDATE delivery_schedule
+        SET ds_status = ?
+        WHERE ds_id = ?
+      `,
+      values: [newScheduleStatus, delivery.d_delivery_schedule_id],
+    })
+
+    // Update order status if needed
+    if (orderStatusMap[status] && orderStatusMap[status] !== delivery.order_status) {
+      queries.push({
+        sql: `
+          UPDATE orders
+          SET or_status = ?
+          WHERE or_id = ?
+        `,
+        values: [orderStatusMap[status], delivery.ds_order_id],
+      })
+    }
+
+    // Execute first part of transaction
+    await Transaction(queries)
+
+    // delivery activity
+    const activityQuery = `
+      INSERT INTO delivery_activity
+      (da_delivery_id, da_status, da_remarks, da_createddate)
+      VALUES (?, ?, ?, ?)
+    `
+    const activityResult = await Query(activityQuery, [id, status, remarks || null, now])
+    const activityId = activityResult.insertId
+
+    // Update rider activity if rider is assigned
+    if (delivery.d_rider_id) {
+      try {
+        await Query(
+          `
+          INSERT INTO rider_activity
+          (ra_rider_id, ra_delivery_id, ra_status, ra_date)
+          VALUES (?, ?, ?, ?)
+          `,
+          [delivery.d_rider_id, id, status, now],
+        )
+      } catch (riderActivityError) {
+        console.log('Note: Could not update rider_activity:', riderActivityError.message)
+      }
+    }
+
+    // Add images if provided
+    if (images && Array.isArray(images) && images.length > 0) {
+      for (const image of images) {
+        if (!image.type || !['PICK-UP', 'DELIVERED'].includes(image.type)) {
+          return res.status(400).json({
+            message: 'Image type must be either PICK-UP or DELIVERED.',
+          })
+        }
+
+        await Query(
+          `
+          INSERT INTO delivery_image
+          (di_delivery_activity_id, di_type, di_image, di_createddate)
+          VALUES (?, ?, ?, ?)
+          `,
+          [activityId, image.type, image.data, now],
+        )
+      }
+    }
+
+    res.status(200).json({
+      message: 'Delivery status updated successfully.',
+      data: {
+        delivery_id: id,
+        previous_status: previousStatus,
+        current_status: status,
+        schedule_status: newScheduleStatus,
+        order_status: orderStatusMap[status] || delivery.order_status,
+        activity_id: activityId,
+      },
+    })
+  } catch (error) {
+    console.error('Error updating delivery status:', error)
+    res.status(500).json({
+      message: 'Failed to update delivery status.',
+    })
+  }
+}
+
 module.exports = {
   getDelivery,
   getDeliveryActivities,
   getDeliveryById,
   getDeliveryActivitiesById,
   addDelivery,
+  assignRider,
   updateDeliveryStatus,
   addDeliveryImages,
 }
