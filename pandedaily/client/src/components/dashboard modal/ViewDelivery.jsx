@@ -1,6 +1,6 @@
 // src/components/dashboard modal/ViewDelivery.jsx
 import { useState, useEffect } from 'react'
-import { Modal, Descriptions, Card, Tag, Timeline } from 'antd'
+import { Modal, Descriptions, Card, Tag } from 'antd'
 import {
   FiTruck,
   FiCalendar,
@@ -11,13 +11,12 @@ import {
   FiPackage,
   FiClock,
 } from 'react-icons/fi'
-import { getDeliveryById, getDeliveryActivitiesById } from '../../services/api'
+import { getDeliveryById } from '../../services/api'
 
 const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [delivery, setDelivery] = useState(null)
-  const [activities, setActivities] = useState([])
 
   const deliveryStatusConfig = {
     PENDING: { color: 'default', label: 'Pending' },
@@ -62,7 +61,6 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
   useEffect(() => {
     if (isOpen && numericDeliveryId) {
       fetchDeliveryDetails()
-      fetchDeliveryActivities()
     }
   }, [isOpen, numericDeliveryId])
 
@@ -121,11 +119,6 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
         customer_contact: deliveryData.customer_contact || deliveryData.c_contact,
         customer_email: deliveryData.customer_email,
 
-        // Rider fields
-        rider_name: deliveryData.rider_name || deliveryData.r_fullname,
-        rider_contact: deliveryData.rider_contact || deliveryData.r_contact,
-        rider_status: deliveryData.rider_status,
-
         // Keep original data
         ...deliveryData,
       }
@@ -136,34 +129,6 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
       setError(err.message || 'Failed to load delivery details')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchDeliveryActivities = async () => {
-    try {
-      const response = await getDeliveryActivitiesById(numericDeliveryId)
-
-      // Handle response structure
-      let activitiesData = []
-      if (response.data && Array.isArray(response.data)) {
-        activitiesData = response.data
-      } else if (Array.isArray(response)) {
-        activitiesData = response
-      }
-
-      // Transform activities data
-      const transformedActivities = activitiesData.map((activity) => ({
-        id: activity.id || activity.da_id,
-        status: activity.status || activity.da_status,
-        remarks: activity.remarks || activity.da_remarks,
-        createddate: activity.createddate || activity.da_createddate,
-        images: activity.images || [],
-      }))
-
-      setActivities(transformedActivities)
-    } catch (err) {
-      console.error('Error fetching delivery activities:', err)
-      setActivities([])
     }
   }
 
@@ -297,10 +262,10 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
           {/* Delivery Information */}
           <Card title="Delivery Information" size="small">
             <Descriptions column={2}>
-              <Descriptions.Item label="Delivery Status">
+              <Descriptions.Item label="Delivery Status" span={1}>
                 {getStatusTag(delivery.d_status, 'delivery')}
               </Descriptions.Item>
-              <Descriptions.Item label="Created Date">
+              <Descriptions.Item label="Created Date" span={1}>
                 <div className="flex items-center">
                   <FiCalendar className="mr-2 text-gray-400" />
                   <span>{formatDate(delivery.d_createddate)}</span>
@@ -312,22 +277,22 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
           {/* Schedule Information */}
           <Card title="Schedule Information" size="small">
             <Descriptions column={2}>
-              <Descriptions.Item label="Schedule Name">
+              <Descriptions.Item label="Schedule Name" span={1}>
                 <div className="flex items-center">
                   <FiClock className="mr-2 text-gray-400" />
                   <span>{delivery.schedule_name || 'N/A'}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Schedule Status">
+              <Descriptions.Item label="Schedule Status" span={1}>
                 {getStatusTag(delivery.schedule_status, 'schedule')}
               </Descriptions.Item>
-              <Descriptions.Item label="Schedule Date">
+              <Descriptions.Item label="Schedule Date" span={1}>
                 <div className="flex items-center">
                   <FiCalendar className="mr-2 text-gray-400" />
                   <span>{formatDate(delivery.schedule_date)}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Schedule Time">
+              <Descriptions.Item label="Schedule Time" span={1}>
                 <div className="flex items-center">
                   <FiClock className="mr-2 text-gray-400" />
                   <span>
@@ -360,19 +325,19 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
                   <span>{delivery.customer_address || 'N/A'}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Contact Number">
+              <Descriptions.Item label="Contact Number" span={1}>
                 <div className="flex items-center">
                   <FiPhone className="mr-2 text-gray-400" />
                   <span>{delivery.customer_contact || 'N/A'}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Email Address">
+              <Descriptions.Item label="Email Address" span={1}>
                 <div className="flex items-center">
                   <FiMail className="mr-2 text-gray-400" />
                   <span>{delivery.customer_email || 'N/A'}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Customer ID">
+              <Descriptions.Item label="Customer ID" span={2}>
                 <span className="font-mono">
                   #{delivery.or_customer_id?.toString().padStart(5, '0') || 'N/A'}
                 </span>
@@ -380,138 +345,40 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
             </Descriptions>
           </Card>
 
-          {/* Rider Information */}
-          <Card title="Rider Information" size="small">
-            {delivery.rider_name ? (
-              <Descriptions column={2}>
-                <Descriptions.Item label="Rider Name">
-                  <div className="flex items-center">
-                    <FiTruck className="mr-2 text-gray-400" />
-                    <span className="font-medium">{delivery.rider_name}</span>
-                  </div>
-                </Descriptions.Item>
-                <Descriptions.Item label="Contact Number">
-                  <div className="flex items-center">
-                    <FiPhone className="mr-2 text-gray-400" />
-                    <span>{delivery.rider_contact || 'N/A'}</span>
-                  </div>
-                </Descriptions.Item>
-                <Descriptions.Item label="Rider Status">
-                  <Tag color={delivery.rider_status === 'ACTIVE' ? 'green' : 'default'}>
-                    {delivery.rider_status || 'N/A'}
-                  </Tag>
-                </Descriptions.Item>
-              </Descriptions>
-            ) : (
-              <div className="text-center py-4">
-                <FiTruck className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500">No rider assigned yet</p>
-              </div>
-            )}
-          </Card>
-
           {/* Order Information */}
           <Card title="Order Information" size="small">
             <Descriptions column={2}>
-              <Descriptions.Item label="Order ID">
+              <Descriptions.Item label="Order ID" span={1}>
                 <span className="font-mono font-semibold text-blue-700">
                   #{delivery.order_id?.toString().padStart(5, '0')}
                 </span>
               </Descriptions.Item>
-              <Descriptions.Item label="Order Status">
+              <Descriptions.Item label="Order Status" span={1}>
                 {getStatusTag(delivery.order_status, 'order')}
               </Descriptions.Item>
-              <Descriptions.Item label="Order Date">
+              <Descriptions.Item label="Order Date" span={1}>
                 <div className="flex items-center">
                   <FiCalendar className="mr-2 text-gray-400" />
                   <span>{formatDate(delivery.order_date)}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Total Amount">
+              <Descriptions.Item label="Total Amount" span={1}>
                 <span className="font-bold text-green-700">
                   {formatCurrency(delivery.or_total || delivery.order_total)}
                 </span>
               </Descriptions.Item>
-              <Descriptions.Item label="Payment Method">
+              <Descriptions.Item label="Payment Method" span={1}>
                 <div className="flex items-center">
                   <FiPackage className="mr-2 text-gray-400" />
                   <span>{delivery.or_payment_type || 'N/A'}</span>
                 </div>
               </Descriptions.Item>
-              <Descriptions.Item label="Payment Reference" span={2}>
+              <Descriptions.Item label="Payment Reference" span={1}>
                 <span className="font-mono text-sm break-all">
                   {delivery.or_payment_reference || 'N/A'}
                 </span>
               </Descriptions.Item>
             </Descriptions>
-          </Card>
-
-          {/* Delivery Activity Timeline */}
-          <Card title="Delivery Activity History" size="small">
-            {activities.length === 0 ? (
-              <div className="text-center py-8">
-                <FiClock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No activity records found</p>
-              </div>
-            ) : (
-              <Timeline
-                mode="left"
-                items={activities.map((activity) => ({
-                  color:
-                    activity.status === 'COMPLETE'
-                      ? 'green'
-                      : activity.status === 'CANCELLED'
-                        ? 'red'
-                        : activity.status === 'OUT-FOR-DELIVERY'
-                          ? 'orange'
-                          : activity.status === 'FOR-PICK-UP'
-                            ? 'blue'
-                            : 'gray',
-                  label: (
-                    <span className="text-xs text-gray-500">
-                      {formatDate(activity.createddate)}
-                    </span>
-                  ),
-                  children: (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">
-                          {getStatusTag(activity.status, 'delivery')}
-                        </span>
-                      </div>
-                      {activity.remarks && (
-                        <p className="text-sm text-gray-600 mt-1">{activity.remarks}</p>
-                      )}
-                      {activity.images && activity.images.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs text-gray-500 mb-1">
-                            {activity.images.length} image(s) attached
-                          </p>
-                          <div className="flex gap-2">
-                            {activity.images.slice(0, 3).map((img, idx) => (
-                              <div
-                                key={img.image_id || img.id || idx}
-                                className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors"
-                                title="Click to view image"
-                              >
-                                <FiPackage className="w-6 h-6 text-gray-400" />
-                              </div>
-                            ))}
-                            {activity.images.length > 3 && (
-                              <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
-                                <span className="text-xs text-gray-500">
-                                  +{activity.images.length - 3}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ),
-                }))}
-              />
-            )}
           </Card>
         </div>
       )}
