@@ -163,10 +163,18 @@ const CheckSession = async (req, res) => {
  * Method: POST
  */
 const Logout = async (req, res) => {
-  req.session.jwt = null
-
   try {
-    res.clearCookie('token')
+    // Clear the cookie if you're using httpOnly cookies
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    })
+
+    // Optional: Clear any server-side session data if you're using sessions
+    if (req.session) {
+      req.session.destroy()
+    }
 
     return res.status(200).json({
       success: true,
