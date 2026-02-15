@@ -10,6 +10,7 @@ const getOrders = async (req, res) => {
     let statement = `
       SELECT 
         o.*,
+        DATE_FORMAT(o.or_createddate, '%Y-%m-%d %H:%i:%s') as or_createddate,
         c.c_fullname as customer_name
       FROM orders o
       LEFT JOIN customer c ON o.or_customer_id = c.c_id
@@ -60,7 +61,7 @@ const getOrderItem = async (req, res) => {
       `
       SELECT 
         o.or_id,
-        o.or_createddate,
+        DATE_FORMAT(o.or_createddate, '%Y-%m-%d %H:%i:%s') as or_createddate,
         o.or_total,
         o.or_status,
         o.or_payment_type,
@@ -122,7 +123,14 @@ const addOrder = async (req, res) => {
     items,
   } = req.body
 
-  const validStatuses = ['PAID', 'APPROVED', 'REJECTED', 'OUT-FOR-DELIVERY', 'COMPLETE']
+  const validStatuses = [
+    'PAID',
+    'APPROVED',
+    'REJECTED',
+    'FOR-PICK-UP',
+    'OUT-FOR-DELIVERY',
+    'COMPLETE',
+  ]
 
   // Basic validation
   if (!customer_id) {
@@ -214,7 +222,7 @@ const addOrder = async (req, res) => {
       inventoryMap[item.product_id] = row
     }
 
-    // FIRST: Insert order and get ID using Query function (not Transaction)
+    // Insert order and get ID using Query function
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
     const orderResult = await Query(
@@ -233,7 +241,7 @@ const addOrder = async (req, res) => {
       throw new Error('Failed to get order ID after insertion')
     }
 
-    // SECOND: Build transaction for the rest of the operations
+    // Build transaction for the rest of the operations
     const followUpQueries = []
 
     // INSERT DELIVERY SCHEDULES
@@ -353,9 +361,6 @@ const approvalOrder = async (req, res) => {
 
   // Normalize status to uppercase and validate against exact ENUM values
   const normalizedStatus = String(status).toUpperCase().trim()
-  console.log('Received status:', status)
-  console.log('Normalized status:', normalizedStatus)
-  console.log('Status length:', normalizedStatus.length)
 
   // Must exactly match ENUM values: 'APPROVED', 'REJECTED'
   const validStatuses = ['APPROVED', 'REJECTED']
@@ -381,7 +386,6 @@ const approvalOrder = async (req, res) => {
     }
 
     const previousStatus = order[0].or_status
-    console.log('Previous status:', previousStatus)
 
     // Don't allow updating to same status
     if (previousStatus === normalizedStatus) {
@@ -401,7 +405,6 @@ const approvalOrder = async (req, res) => {
     const queries = []
 
     // Update order status - use normalized uppercase value
-    console.log('Updating order status to:', normalizedStatus)
     queries.push({
       sql: `
         UPDATE orders
@@ -421,9 +424,7 @@ const approvalOrder = async (req, res) => {
         [id],
       )
 
-      console.log('Found schedules:', schedules.length)
-
-      // For each schedule, create a delivery (without rider - to be assigned later)
+      // For each schedule, create a delivery
       const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
       for (const schedule of schedules) {
@@ -439,7 +440,6 @@ const approvalOrder = async (req, res) => {
     }
 
     // Execute all queries in transaction
-    console.log('Executing transaction with', queries.length, 'queries')
     await Transaction(queries)
 
     // Get the created deliveries if order was approved

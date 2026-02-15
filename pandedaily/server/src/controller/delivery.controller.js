@@ -582,7 +582,7 @@ const assignRider = async (req, res) => {
       values: [rider_id, id],
     })
 
-    // Update schedule status to FOR-PICK-UP (not ASSIGNED)
+    // Update schedule status to FOR-PICK-UP
     if (delivery.schedule_status !== 'FOR-PICK-UP') {
       console.log(`Updating schedule from ${delivery.schedule_status} to FOR-PICK-UP`)
       queries.push({
@@ -591,19 +591,19 @@ const assignRider = async (req, res) => {
           SET ds_status = ?
           WHERE ds_id = ?
         `,
-        values: ['FOR-PICK-UP', delivery.d_delivery_schedule_id], // Changed from 'ASSIGNED' to 'FOR-PICK-UP'
+        values: ['FOR-PICK-UP', delivery.d_delivery_schedule_id],
       })
     }
 
-    // Update order status if needed
-    if (delivery.order_status !== 'OUT-FOR-DELIVERY') {
+    // Update order status to FOR-PICK-UP (changed from OUT-FOR-DELIVERY)
+    if (delivery.order_status !== 'FOR-PICK-UP') {
       queries.push({
         sql: `
           UPDATE orders
           SET or_status = ?
           WHERE or_id = ?
         `,
-        values: ['OUT-FOR-DELIVERY', delivery.ds_order_id],
+        values: ['FOR-PICK-UP', delivery.ds_order_id],
       })
     }
 

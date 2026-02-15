@@ -38,7 +38,14 @@ module.exports = {
         allowNull: false,
       },
       or_status: {
-        type: Sequelize.ENUM('PAID', 'APPROVED', 'REJECTED', 'OUT-FOR-DELIVERY', 'COMPLETE'),
+        type: Sequelize.ENUM(
+          'PAID',
+          'APPROVED',
+          'REJECTED',
+          'FOR-PICK-UP',
+          'OUT-FOR-DELIVERY',
+          'COMPLETE',
+        ),
         defaultValue: 'PAID',
         allowNull: false,
       },
