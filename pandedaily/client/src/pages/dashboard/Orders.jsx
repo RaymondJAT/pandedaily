@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiUser, FiCheckCircle, FiClock, FiTruck, FiCreditCard } from 'react-icons/fi'
+import {
+  FiUser,
+  FiCheckCircle,
+  FiClock,
+  FiTruck,
+  FiCreditCard,
+  FiXCircle,
+  FiPackage,
+} from 'react-icons/fi'
 import { orderColumns } from '../../mapping/orderColumns'
 import { getOrders } from '../../services/api'
 import ViewOrder from '../../components/dashboard modal/ViewOrder'
@@ -130,7 +138,28 @@ const Orders = () => {
                   border: 'border-green-200',
                   label: 'Paid',
                 },
-                'ON-DELIVERY': {
+                APPROVED: {
+                  icon: FiCheckCircle,
+                  bg: 'bg-blue-100',
+                  text: 'text-blue-800',
+                  border: 'border-blue-200',
+                  label: 'Approved',
+                },
+                REJECTED: {
+                  icon: FiXCircle,
+                  bg: 'bg-red-100',
+                  text: 'text-red-800',
+                  border: 'border-red-200',
+                  label: 'Rejected',
+                },
+                'FOR-PICK-UP': {
+                  icon: FiPackage,
+                  bg: 'bg-blue-100',
+                  text: 'text-blue-800',
+                  border: 'border-blue-200',
+                  label: 'For Pick-Up',
+                },
+                'OUT-FOR-DELIVERY': {
                   icon: FiTruck,
                   bg: 'bg-amber-100',
                   text: 'text-amber-800',

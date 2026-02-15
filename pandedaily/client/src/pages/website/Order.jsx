@@ -3,16 +3,19 @@ import { motion } from 'framer-motion'
 import AuthChoiceModal from '../../components/website modal/AuthChoiceModal'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { createOrder } from '../../services/api'
 
 const Order = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDates, setSelectedDates] = useState([])
   const [currentMonth, setCurrentMonth] = useState([])
   const [deliverySchedule, setDeliverySchedule] = useState('morning')
+  const [selectedTime, setSelectedTime] = useState('') // New state for selected time
   const [quantity, setQuantity] = useState(20)
   const [customQuantity, setCustomQuantity] = useState('')
   const [specialInstructions, setSpecialInstructions] = useState('')
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [orderError, setOrderError] = useState('')
 
   // Get user authentication status
   const { user, isAuthenticated } = useAuth()
@@ -27,6 +30,38 @@ const Order = () => {
 
   // Price configuration
   const PANDESAL_PRICE_PER_PIECE = 15
+  const PRODUCT_ID = 1 // Assuming pandesal product ID is 1
+
+  // Time options based on schedule
+  const morningTimes = [
+    '06:30:00',
+    '07:00:00',
+    '07:30:00',
+    '08:00:00',
+    '08:30:00',
+    '09:00:00',
+    '09:30:00',
+  ]
+
+  const eveningTimes = [
+    '15:00:00',
+    '15:30:00',
+    '16:00:00',
+    '16:30:00',
+    '17:00:00',
+    '17:30:00',
+    '18:00:00',
+    '18:30:00',
+  ]
+
+  // Format time for display
+  const formatTimeForDisplay = (time) => {
+    const [hours, minutes] = time.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour > 12 ? hour - 12 : hour
+    return `${displayHour}:${minutes} ${ampm}`
+  }
 
   // Animation variants
   const fadeInUp = {
@@ -188,6 +223,11 @@ const Order = () => {
 
   const handleScheduleChange = (schedule) => {
     setDeliverySchedule(schedule)
+    setSelectedTime('') // Reset selected time when schedule changes
+  }
+
+  const handleTimeSelect = (time) => {
+    setSelectedTime(time)
   }
 
   const isDateSelected = (date) => {
@@ -241,30 +281,60 @@ const Order = () => {
     return `${getDayName(date.getDay())}, ${getMonthName(date.getMonth())} ${date.getDate()}`
   }
 
-  const submitOrder = (isGuest = false) => {
-    const orderDetails = {
-      dates: selectedDates,
-      schedule: deliverySchedule,
-      quantity: getFinalQuantity(),
-      instructions: specialInstructions,
-      totalPieces: getTotalPandesal(),
-      totalPrice: getTotalPrice(),
-      pricePerPiece: PANDESAL_PRICE_PER_PIECE,
-      customerId: isGuest ? null : user?.c_id,
-      isGuest: isGuest,
-      timestamp: new Date().toISOString(),
+  const formatDateForAPI = (dateStr) => {
+    const date = new Date(dateStr)
+    return date.toISOString().split('T')[0] // Returns YYYY-MM-DD format
+  }
+
+  const getDeliveryTimeSlots = () => {
+    if (!selectedTime) return null
+
+    // For morning delivery, end time is 2.5 hours after start time
+    // For evening delivery, end time is 3 hours after start time
+    const startHour = parseInt(selectedTime.split(':')[0])
+    const startMinute = parseInt(selectedTime.split(':')[1])
+
+    let endHour, endMinute
+
+    if (deliverySchedule === 'morning') {
+      // Add 2.5 hours for morning deliveries
+      endHour = startHour + 2
+      endMinute = startMinute + 30
+      if (endMinute >= 60) {
+        endHour += 1
+        endMinute -= 60
+      }
+    } else {
+      // Add 3 hours for evening deliveries
+      endHour = startHour + 3
+      endMinute = startMinute
+      if (endHour >= 24) {
+        endHour = 23
+        endMinute = 59
+      }
     }
 
-    console.log('Order submitted:', orderDetails)
+    const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
 
-    localStorage.setItem('currentOrder', JSON.stringify(orderDetails))
-
-    navigate('/checkout')
+    return {
+      start_time: selectedTime,
+      end_time: endTimeFormatted,
+      cutoff: '23:59:59', // Cutoff at midnight before delivery day
+    }
   }
 
   const handleSubmitOrder = () => {
+    // Reset any previous errors
+    setOrderError('')
+
+    // Validation
     if (selectedDates.length === 0) {
       alert('Please select at least one delivery date')
+      return
+    }
+
+    if (!selectedTime) {
+      alert('Please select a delivery time')
       return
     }
 
@@ -275,9 +345,37 @@ const Order = () => {
 
     // Check if user is already logged in
     if (isAuthenticated && user) {
-      // User is logged in, submit order directly
-      console.log('User is logged in, submitting order directly...')
-      submitOrder(false)
+      // User is logged in, prepare order details and go to confirmation
+      console.log('User is logged in, preparing order details...')
+
+      const finalQuantity = getFinalQuantity()
+      const timeSlots = getDeliveryTimeSlots()
+
+      // Prepare order details to pass to confirmation page
+      const orderDetails = {
+        dates: selectedDates,
+        schedule: deliverySchedule,
+        selectedTime: selectedTime,
+        timeSlots: timeSlots,
+        quantity: finalQuantity,
+        instructions: specialInstructions,
+        totalPieces: getTotalPandesal(),
+        totalPrice: getTotalPrice(),
+        pricePerPiece: PANDESAL_PRICE_PER_PIECE,
+        customerId: user.id,
+        customerName: user.fullname || user.c_fullname,
+      }
+
+      // Store in localStorage as backup
+      localStorage.setItem('pendingOrder', JSON.stringify(orderDetails))
+
+      // Navigate to order confirmation page with state
+      navigate('/checkout', {
+        state: {
+          orderDetails: orderDetails,
+          totalAmount: getTotalPrice(),
+        },
+      })
     } else {
       // User is not logged in, show auth modal
       console.log('User is not logged in, showing auth modal...')
@@ -286,9 +384,15 @@ const Order = () => {
   }
 
   const handleGuestContinue = () => {
-    // Submit order as guest
-    submitOrder(true)
+    // For now, since customer_id is required, we'll redirect to login
+    alert('Please login or register to place an order')
     setShowAuthModal(false)
+    navigate('/login', {
+      state: {
+        fromOrder: true,
+        message: 'Please login or register to place your order',
+      },
+    })
   }
 
   const handleLoginRegister = () => {
@@ -296,6 +400,7 @@ const Order = () => {
     const tempOrder = {
       dates: selectedDates,
       schedule: deliverySchedule,
+      selectedTime: selectedTime,
       quantity: getFinalQuantity(),
       instructions: specialInstructions,
       totalPieces: getTotalPandesal(),
@@ -314,6 +419,8 @@ const Order = () => {
       },
     })
   }
+
+  const currentTimeOptions = deliverySchedule === 'morning' ? morningTimes : eveningTimes
 
   return (
     <section className="py-12 md:py-10" style={{ backgroundColor: '#F5EFE7' }}>
@@ -346,6 +453,33 @@ const Order = () => {
 
           <div className="h-1 w-24 mx-auto" style={{ backgroundColor: '#9C4A15' }}></div>
         </motion.div>
+
+        {/* Login reminder if not authenticated */}
+        {!isAuthenticated && (
+          <motion.div
+            className="mb-6 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <p className="font-[titleFont]">
+              Please{' '}
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="font-bold underline hover:text-blue-900"
+              >
+                login or register
+              </button>{' '}
+              to place your order.
+            </p>
+          </motion.div>
+        )}
+
+        {/* Error message display */}
+        {orderError && (
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {orderError}
+          </div>
+        )}
 
         <motion.div
           className="mx-auto"
@@ -466,12 +600,12 @@ const Order = () => {
                     <h3 className="font-bold font-[titleFont] text-lg" style={{ color: '#2A1803' }}>
                       Selected Delivery Dates ({selectedDates.length})
                     </h3>
-                    {selectedDates.length > 0 && (
+                    {selectedDates.length > 0 && selectedTime && (
                       <span
                         className="text-sm font-[titleFont] px-3 py-1 rounded-full"
                         style={{ backgroundColor: '#F5EFE7', color: '#9C4A15' }}
                       >
-                        {deliverySchedule === 'morning' ? 'Morning Delivery' : 'Evening Delivery'}
+                        {formatTimeForDisplay(selectedTime)}
                       </span>
                     )}
                   </div>
@@ -540,7 +674,7 @@ const Order = () => {
                                 className="text-sm font-[titleFont] font-medium block"
                                 style={{ color: '#9C4A15' }}
                               >
-                                {deliverySchedule === 'morning' ? '6:30-10 AM' : '3-7 PM'}
+                                {selectedTime ? formatTimeForDisplay(selectedTime) : 'Select time'}
                               </span>
                               <span
                                 className="text-xs font-[titleFont] block mt-1"
@@ -570,11 +704,12 @@ const Order = () => {
                 </h2>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1">
+                  {/* Schedule Selection */}
                   <h3
                     className="text-lg font-medium mb-4 font-[titleFont]"
                     style={{ color: '#9C4A15' }}
                   >
-                    Choose Delivery Time
+                    Choose Delivery Schedule
                   </h3>
                   <div className="flex gap-4 mb-6">
                     <button
@@ -588,7 +723,7 @@ const Order = () => {
                     >
                       <div className="font-medium">Morning</div>
                       <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
-                        6:30-10 AM
+                        6:30 AM - 9:30 AM
                       </div>
                     </button>
                     <button
@@ -602,9 +737,32 @@ const Order = () => {
                     >
                       <div className="font-medium">Evening</div>
                       <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
-                        3-7 PM
+                        3:00 PM - 6:30 PM
                       </div>
                     </button>
+                  </div>
+
+                  {/* Time Selection */}
+                  <h3
+                    className="text-lg font-medium mb-4 font-[titleFont]"
+                    style={{ color: '#9C4A15' }}
+                  >
+                    Select Delivery Time
+                  </h3>
+                  <div className="grid grid-cols-4 gap-2 mb-6">
+                    {currentTimeOptions.map((time) => (
+                      <button
+                        key={time}
+                        onClick={() => handleTimeSelect(time)}
+                        className={`py-3 rounded-lg transition-all duration-200 font-[titleFont] text-sm cursor-pointer ${
+                          selectedTime === time
+                            ? 'bg-[#9C4A15] text-white'
+                            : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
+                        }`}
+                      >
+                        {formatTimeForDisplay(time)}
+                      </button>
+                    ))}
                   </div>
 
                   {/* Quantity Selection */}
@@ -697,6 +855,17 @@ const Order = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
+                        Delivery Time
+                      </span>
+                      <span
+                        className="font-bold font-[titleFont] text-lg"
+                        style={{ color: '#9C4A15' }}
+                      >
+                        {selectedTime ? formatTimeForDisplay(selectedTime) : 'Not selected'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
                         Pieces per delivery
                       </span>
                       <span
@@ -773,22 +942,30 @@ const Order = () => {
                   <div className="mt-6">
                     <motion.button
                       onClick={handleSubmitOrder}
-                      className="w-full py-4 rounded-full font-bold font-[titleFont] text-base transition-all duration-200 shadow-lg cursor-pointer"
+                      disabled={
+                        selectedDates.length === 0 ||
+                        !selectedTime ||
+                        (quantity === 'custom' &&
+                          (!customQuantity || parseInt(customQuantity) < 20)) ||
+                        !isAuthenticated
+                      }
+                      className={`w-full py-4 rounded-full font-bold font-[titleFont] text-base transition-all duration-200 shadow-lg cursor-pointer ${
+                        !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
                       style={{
                         backgroundColor: '#9C4A15',
                         color: '#F5EFE7',
                       }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      disabled={
-                        selectedDates.length === 0 ||
-                        (quantity === 'custom' &&
-                          (!customQuantity || parseInt(customQuantity) < 20))
-                      }
+                      whileHover={isAuthenticated ? { scale: 1.02 } : {}}
+                      whileTap={isAuthenticated ? { scale: 0.98 } : {}}
                     >
-                      {selectedDates.length === 0
-                        ? 'Select Delivery Dates'
-                        : `Place Order • ${formatCurrency(getTotalPrice())}`}
+                      {!isAuthenticated
+                        ? 'Login to Place Order'
+                        : selectedDates.length === 0
+                          ? 'Select Delivery Dates'
+                          : !selectedTime
+                            ? 'Select Delivery Time'
+                            : `Proceed to Payment • ${formatCurrency(getTotalPrice())}`}
                     </motion.button>
 
                     {/* Show user status message */}
@@ -799,7 +976,7 @@ const Order = () => {
                       >
                         Ordering as:{' '}
                         <span style={{ color: '#9C4A15', fontWeight: '600' }}>
-                          {user.c_fullname}
+                          {user.fullname || user.c_fullname}
                         </span>
                       </p>
                     )}

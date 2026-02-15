@@ -250,3 +250,58 @@ export const addDeliveryImages = async (activityId, imagesData) => {
     body: JSON.stringify(imagesData),
   })
 }
+
+export const assignRiderToDelivery = async (deliveryId, data) => {
+  return fetchApi(`/delivery/${deliveryId}/assign`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+// export const getAvailableRiders = async () => {
+//   return fetchApi('/riders/available')
+// }
+
+// Rider API calls
+export const getRiders = async () => {
+  return fetchApi('/rider')
+}
+
+export const getRiderById = async (id) => {
+  return fetchApi(`/rider/${id}`)
+}
+
+export const createRider = async (riderData) => {
+  return fetchApi('/rider', {
+    method: 'POST',
+    body: JSON.stringify(riderData),
+  })
+}
+
+export const updateRider = async (id, riderData) => {
+  return fetchApi(`/rider/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(riderData),
+  })
+}
+
+export const getRiderActivity = async (id) => {
+  return fetchApi(`/rider/activity/${id}`)
+}
+
+export const getAllRiderActivities = async () => {
+  return fetchApi('/rider/activity/all')
+}
+
+// Get available riders (active riders)
+export const getAvailableRiders = async () => {
+  const response = await fetchApi('/rider')
+
+  if (response && response.data) {
+    return {
+      ...response,
+      data: response.data.filter((rider) => rider.status === 'ACTIVE'),
+    }
+  }
+  return response
+}

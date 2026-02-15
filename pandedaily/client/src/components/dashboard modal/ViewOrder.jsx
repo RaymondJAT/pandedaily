@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Modal, Table, Tag, Descriptions, Card } from 'antd'
-import { FiPackage, FiCreditCard, FiCalendar } from 'react-icons/fi'
+import { Modal, Table, Tag, Descriptions, Card, message } from 'antd'
+import { FiPackage, FiCreditCard, FiCalendar, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import { getOrderItem } from '../../services/api'
 
 const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
@@ -8,15 +8,28 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
   const [error, setError] = useState(null)
   const [order, setOrder] = useState(null)
   const [items, setItems] = useState([])
+  const [actionLoading, setActionLoading] = useState(false)
 
   const statusConfig = {
     PAID: {
-      color: 'green',
+      color: 'blue',
       label: 'Paid',
     },
-    'ON-DELIVERY': {
+    APPROVED: {
+      color: 'green',
+      label: 'Approved',
+    },
+    REJECTED: {
+      color: 'red',
+      label: 'Rejected',
+    },
+    'FOR-PICK-UP': {
+      color: 'purple',
+      label: 'For Pick-Up',
+    },
+    'OUT-FOR-DELIVERY': {
       color: 'orange',
-      label: 'On Delivery',
+      label: 'Out for Delivery',
     },
     COMPLETE: {
       color: 'green',
@@ -81,6 +94,77 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     return null
   }
 
+  // API call for approval/rejection
+  const updateOrderStatus = async (orderId, status) => {
+    const API_URL = 'http://localhost:3080'
+    const token = localStorage.getItem('token')
+
+    const response = await fetch(`${API_URL}/orders/${orderId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ status }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || `Failed to update order status`)
+    }
+
+    return data
+  }
+
+  const handleApprove = async () => {
+    try {
+      setActionLoading(true)
+      const actualOrderId = extractOrderId(orderId)
+
+      const response = await updateOrderStatus(actualOrderId, 'APPROVED')
+
+      message.success(response.message || 'Order approved successfully')
+
+      // Refresh data
+      await fetchOrderDetails()
+
+      // Call parent refresh callback if provided
+      if (onRefresh) {
+        onRefresh()
+      }
+    } catch (err) {
+      console.error('Error approving order:', err)
+      message.error(err.message || 'Failed to approve order')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    try {
+      setActionLoading(true)
+      const actualOrderId = extractOrderId(orderId)
+
+      const response = await updateOrderStatus(actualOrderId, 'REJECTED')
+
+      message.success(response.message || 'Order rejected successfully')
+
+      // Refresh data
+      await fetchOrderDetails()
+
+      // Call parent refresh callback if provided
+      if (onRefresh) {
+        onRefresh()
+      }
+    } catch (err) {
+      console.error('Error rejecting order:', err)
+      message.error(err.message || 'Failed to reject order')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
     try {
@@ -111,7 +195,15 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     return <Tag color={config.color}>{config.label}</Tag>
   }
 
-  // Table columns for order items - removed Total column
+  // Check if order can be approved/rejected
+  const canModifyStatus = () => {
+    if (!order) return false
+    const currentStatus = order.or_status?.toUpperCase()
+    // Can only modify if status is PAID and not already APPROVED/REJECTED/COMPLETE/OUT-FOR-DELIVERY
+    return currentStatus === 'PAID'
+  }
+
+  // Table columns for order items
   const itemColumns = [
     {
       title: 'Product',
@@ -179,14 +271,42 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
       onCancel={onClose}
       width={800}
       footer={[
+        // Action Buttons
+        canModifyStatus() && (
+          <button
+            key="reject"
+            onClick={handleReject}
+            disabled={actionLoading}
+            className="px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors mr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center gap-2">
+              <FiXCircle />
+              <span>Reject Order</span>
+            </div>
+          </button>
+        ),
+        canModifyStatus() && (
+          <button
+            key="approve"
+            onClick={handleApprove}
+            disabled={actionLoading}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors mr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center gap-2">
+              <FiCheckCircle />
+              <span>Approve Order</span>
+            </div>
+          </button>
+        ),
         <button
           key="close"
           onClick={onClose}
-          className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+          disabled={actionLoading}
+          className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Close
         </button>,
-      ]}
+      ].filter(Boolean)}
     >
       {loading ? (
         <div className="flex justify-center py-10">
@@ -274,8 +394,6 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex justify-end">
                     <div className="w-64 space-y-2">
-                      {/* Subtotal is now shown in the table summary */}
-
                       {Math.abs(calculateSubtotal() - parseFloat(order.or_total || 0)) > 0.01 && (
                         <div className="flex justify-between text-sm text-amber-600">
                           <span>Adjustments</span>

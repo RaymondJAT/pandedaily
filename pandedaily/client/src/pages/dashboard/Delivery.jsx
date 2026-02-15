@@ -13,9 +13,9 @@ import {
   FiHome,
 } from 'react-icons/fi'
 import { deliveryColumns } from '../../mapping/deliveryColumns'
-import { getDeliveries, getDeliveryById } from '../../services/api'
+import { getDeliveries, getDeliveryById, assignRiderToDelivery } from '../../services/api'
 import ViewDelivery from '../../components/dashboard modal/ViewDelivery'
-// import UpdateDeliveryStatus from '../../components/dashboard modal/UpdateDeliveryStatus'
+import AssignRider from '../../components/dashboard modal/AssignRider'
 
 const Delivery = () => {
   const [deliveries, setDeliveries] = useState([])
@@ -31,7 +31,7 @@ const Delivery = () => {
 
   const [viewingDeliveryId, setViewingDeliveryId] = useState(null)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
-  const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState(false)
+  const [isAssignRiderModalOpen, setIsAssignRiderModalOpen] = useState(false)
   const [selectedDelivery, setSelectedDelivery] = useState(null)
 
   const columnsWithRender = useMemo(() => {
@@ -406,7 +406,7 @@ const Delivery = () => {
     setIsViewModalOpen(true)
   }
 
-  const handleUpdateStatus = async (delivery) => {
+  const handleAssignRider = async (delivery) => {
     try {
       // Extract the actual ID
       const actualId =
@@ -416,12 +416,12 @@ const Delivery = () => {
       const response = await getDeliveryById(actualId)
       const deliveryData = response.data || response
       setSelectedDelivery(deliveryData)
-      setIsUpdateStatusModalOpen(true)
+      setIsAssignRiderModalOpen(true)
     } catch (err) {
       console.error('Error fetching delivery details:', err)
       // Still open modal with basic data if full fetch fails
       setSelectedDelivery(delivery)
-      setIsUpdateStatusModalOpen(true)
+      setIsAssignRiderModalOpen(true)
     }
   }
 
@@ -549,8 +549,10 @@ const Delivery = () => {
                   showView: true,
                   onView: (id) => handleViewDelivery(id),
                   showEdit: true,
-                  onEdit: (row) => handleUpdateStatus(row),
-                  editLabel: 'Update Status',
+                  onEdit: (row) => handleAssignRider(row),
+                  editLabel: 'Assign Rider',
+                  editButtonClassName: 'bg-blue-600 hover:bg-blue-700 text-white',
+                  editIcon: FiTruck,
                 }}
               />
             )}
@@ -571,21 +573,21 @@ const Delivery = () => {
         />
       )}
 
-      {/* {isUpdateStatusModalOpen && selectedDelivery && (
-        <UpdateDeliveryStatus
+      {isAssignRiderModalOpen && selectedDelivery && (
+        <AssignRider
           delivery={selectedDelivery}
-          isOpen={isUpdateStatusModalOpen}
+          isOpen={isAssignRiderModalOpen}
           onClose={() => {
-            setIsUpdateStatusModalOpen(false)
+            setIsAssignRiderModalOpen(false)
             setSelectedDelivery(null)
           }}
           onSuccess={() => {
             fetchDeliveries()
-            setIsUpdateStatusModalOpen(false)
+            setIsAssignRiderModalOpen(false)
             setSelectedDelivery(null)
           }}
         />
-      )} */}
+      )}
     </div>
   )
 }

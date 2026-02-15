@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiUser,
@@ -20,9 +20,11 @@ import {
   FiShoppingBag,
 } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
+import { createOrder } from '../../services/api'
 
 const Checkout = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
 
   const [orderDetails, setOrderDetails] = useState(null)
@@ -31,6 +33,10 @@ const Checkout = () => {
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState(null)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [customerInfo, setCustomerInfo] = useState(null)
+  const [apiError, setApiError] = useState('')
+
+  // Product ID constant (should match your database)
+  const PRODUCT_ID = 1 // Pandesal product ID
 
   useEffect(() => {
     console.log('=== DEBUG: User object from AuthContext ===')
@@ -98,15 +104,84 @@ const Checkout = () => {
     },
   ]
 
-  // Load order details from localStorage
-  useEffect(() => {
-    const savedOrder = localStorage.getItem('currentOrder')
-    if (savedOrder) {
-      setOrderDetails(JSON.parse(savedOrder))
+  // Helper function to format date for API (YYYY-MM-DD)
+  const formatDateForAPI = (dateStr) => {
+    const date = new Date(dateStr)
+    return date.toISOString().split('T')[0]
+  }
+
+  // Helper function to combine date and time for datetime fields
+  const combineDateAndTime = (dateStr, timeStr) => {
+    // timeStr is in format 'HH:MM:SS'
+    return `${formatDateForAPI(dateStr)} ${timeStr}`
+  }
+
+  // Helper function to format time for display
+  const formatTimeForDisplay = (time) => {
+    if (!time) return ''
+    const [hours, minutes] = time.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour > 12 ? hour - 12 : hour
+    return `${displayHour}:${minutes} ${ampm}`
+  }
+
+  // Helper function to calculate end time based on start time
+  const calculateEndTime = (startTime, schedule) => {
+    const [startHour, startMinute] = startTime.split(':').map(Number)
+
+    let endHour, endMinute
+
+    if (schedule === 'morning') {
+      // Add 2.5 hours for morning deliveries
+      endHour = startHour + 2
+      endMinute = startMinute + 30
+      if (endMinute >= 60) {
+        endHour += 1
+        endMinute -= 60
+      }
     } else {
-      navigate('/order')
+      // Add 3 hours for evening deliveries
+      endHour = startHour + 3
+      endMinute = startMinute
+      if (endHour >= 24) {
+        endHour = 23
+        endMinute = 59
+      }
     }
-  }, [navigate])
+
+    // Format as HH:MM:SS
+    return `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
+  }
+
+  // Load order details from navigation state or localStorage
+  useEffect(() => {
+    // First try to get from navigation state
+    const orderFromState = location.state?.orderDetails
+
+    if (orderFromState) {
+      console.log('Order details from state:', orderFromState)
+      setOrderDetails(orderFromState)
+      // Also save to localStorage as backup
+      localStorage.setItem('currentOrder', JSON.stringify(orderFromState))
+    } else {
+      // Fallback to localStorage
+      const savedOrder = localStorage.getItem('currentOrder')
+      if (savedOrder) {
+        console.log('Order details from localStorage:', JSON.parse(savedOrder))
+        setOrderDetails(JSON.parse(savedOrder))
+      } else {
+        // Try pendingOrder as last resort
+        const pendingOrder = localStorage.getItem('pendingOrder')
+        if (pendingOrder) {
+          console.log('Order details from pendingOrder:', JSON.parse(pendingOrder))
+          setOrderDetails(JSON.parse(pendingOrder))
+        } else {
+          navigate('/order')
+        }
+      }
+    }
+  }, [location.state, navigate])
 
   // Extract customer information from user object
   useEffect(() => {
@@ -114,9 +189,7 @@ const Checkout = () => {
       console.log('User object in Checkout:', user)
 
       // Map user data to customer info
-      // Try different possible property names from your API
       const customerData = {
-        // Try c_ prefixed properties first (what you expect)
         c_fullname:
           user.c_fullname || user.fullname || user.name || user.username || 'Not provided',
         c_contact:
@@ -129,8 +202,6 @@ const Checkout = () => {
         c_email: user.c_email || user.email || 'Not provided',
         c_address: user.c_address || user.address || user.delivery_address || 'Not provided',
         c_id: user.c_id || user.id || user._id || user.user_id || null,
-
-        // Also store the raw user for reference
         rawUser: user,
       }
 
@@ -180,16 +251,20 @@ const Checkout = () => {
     setPaymentMethod(methodId)
     const method = paymentMethods.find((m) => m.id === methodId)
     setSelectedPaymentDetails(method)
+    setApiError('') // Clear any previous errors
   }
 
   const calculateTotalWithFee = () => {
     if (!orderDetails || !selectedPaymentDetails) return orderDetails?.totalPrice || 0
-
     const fee = selectedPaymentDetails.fee * orderDetails.totalPrice
     return orderDetails.totalPrice + fee
   }
 
   const handlePaymentSubmit = async () => {
+    // Reset any previous errors
+    setApiError('')
+
+    // Validation
     if (!paymentMethod) {
       alert('Please select a payment method')
       return
@@ -200,50 +275,124 @@ const Checkout = () => {
       return
     }
 
-    if (!customerInfo) {
-      alert('Customer information not loaded. Please try again.')
+    if (!customerInfo || !customerInfo.c_id) {
+      alert('Customer information not loaded properly. Please try again.')
+      return
+    }
+
+    if (!orderDetails) {
+      alert('Order details not found. Please start over.')
+      return
+    }
+
+    if (!orderDetails.selectedTime) {
+      alert('Delivery time not selected. Please go back to order page.')
       return
     }
 
     setIsProcessing(true)
 
     try {
+      // Calculate end time based on selected start time
+      const endTime = calculateEndTime(orderDetails.selectedTime, orderDetails.schedule)
+
+      // Format delivery schedules from selected dates
+      const delivery_schedules = orderDetails.dates.map((dateStr) => {
+        const formattedDate = formatDateForAPI(dateStr)
+
+        // Combine date with time for start_time and end_time
+        const startDateTime = combineDateAndTime(dateStr, orderDetails.selectedTime)
+        const endDateTime = combineDateAndTime(dateStr, endTime)
+
+        return {
+          name: orderDetails.schedule === 'morning' ? 'Morning Delivery' : 'Evening Delivery',
+          date: formattedDate,
+          start_time: startDateTime, // Now in format: YYYY-MM-DD HH:MM:SS
+          end_time: endDateTime, // Now in format: YYYY-MM-DD HH:MM:SS
+          cutoff: combineDateAndTime(dateStr, '23:59:59'), // Cutoff at midnight before delivery day
+        }
+      })
+
+      // Create order items
+      const items = [
+        {
+          product_id: PRODUCT_ID,
+          quantity: orderDetails.totalPieces, // Total quantity across all delivery dates
+          price: orderDetails.pricePerPiece,
+        },
+      ]
+
+      // Prepare order data for API
       const orderData = {
         customer_id: customerInfo.c_id,
-        order_type: 'subscription',
-        delivery_schedule: orderDetails.schedule,
-        quantity_per_delivery: orderDetails.quantity,
-        total_quantity: orderDetails.totalPieces,
-        total_amount: orderDetails.totalPrice,
-        payment_amount: calculateTotalWithFee(),
-        payment_method: paymentMethod,
-        payment_fee: selectedPaymentDetails.fee * orderDetails.totalPrice,
-        special_instructions: orderDetails.instructions,
-        status: 'pending_confirmation',
-        delivery_dates: orderDetails.dates,
+        payment_type: paymentMethod.toUpperCase(), // e.g., 'GCASH', 'MAYA', 'CARD'
+        payment_reference: '', // Will be updated after payment confirmation
+        details: orderDetails.instructions || '',
+        status: 'PAID', // Initial status is PAID (order placed)
+        delivery_schedules: delivery_schedules,
+        items: items,
+      }
+
+      console.log('Submitting order to API:', JSON.stringify(orderData, null, 2))
+
+      // Call the API to create order
+      const response = await createOrder(orderData)
+
+      console.log('Order created successfully:', response)
+
+      // Store confirmed order details
+      const confirmedOrder = {
+        order_id: response.order_id,
+        order_number: `ORD-${response.order_id}`,
+        customer_info: customerInfo,
+        order_details: {
+          ...orderDetails,
+          selectedTimeFormatted: formatTimeForDisplay(orderDetails.selectedTime),
+          endTimeFormatted: formatTimeForDisplay(endTime),
+        },
+        payment_details: {
+          id: selectedPaymentDetails.id,
+          name: selectedPaymentDetails.name,
+          color: selectedPaymentDetails.color,
+          fee: selectedPaymentDetails.fee,
+          // Remove the icon property
+        },
+        total_amount: calculateTotalWithFee(),
+        delivery_schedules: response.delivery_schedules,
         created_at: new Date().toISOString(),
       }
 
-      console.log('Submitting order:', orderData)
+      localStorage.setItem('confirmedOrder', JSON.stringify(confirmedOrder))
 
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      localStorage.setItem(
-        'confirmedOrder',
-        JSON.stringify({
-          ...orderData,
-          order_number: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          customer_info: customerInfo,
-          order_details: orderDetails,
-          payment_details: selectedPaymentDetails,
-        }),
-      )
-
+      // Clear temporary data
       localStorage.removeItem('currentOrder')
-      navigate('/order/confirmation')
+      localStorage.removeItem('pendingOrder')
+
+      // Navigate to confirmation page with only serializable data
+      navigate('/order/confirmation', {
+        state: {
+          orderId: response.order_id,
+          // Only pass the order ID, let the confirmation page read from localStorage
+        },
+      })
+
+      localStorage.setItem('confirmedOrder', JSON.stringify(confirmedOrder))
+
+      // Clear temporary data
+      localStorage.removeItem('currentOrder')
+      localStorage.removeItem('pendingOrder')
+
+      // Navigate to confirmation page
+      navigate('/order/confirmation', {
+        state: {
+          orderId: response.order_id,
+          orderDetails: confirmedOrder,
+        },
+      })
     } catch (error) {
-      console.error('Error submitting order:', error)
-      alert('Failed to process order. Please try again.')
+      console.error('Error creating order:', error)
+      setApiError(error.message || 'Failed to create order. Please try again.')
+      alert(`Error: ${error.message || 'Failed to create order. Please try again.'}`)
     } finally {
       setIsProcessing(false)
     }
@@ -313,6 +462,13 @@ const Checkout = () => {
           </div>
           <div className="h-1 w-32 mx-auto" style={{ backgroundColor: '#9C4A15' }}></div>
         </motion.div>
+
+        {/* Error message display */}
+        {apiError && (
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {apiError}
+          </div>
+        )}
 
         <motion.div
           className="mx-auto"
@@ -573,13 +729,13 @@ const Checkout = () => {
                         <div className="flex items-center gap-2 mb-1">
                           <FiClock className="w-4 h-4" style={{ color: '#9C4A15' }} />
                           <span className="text-xs font-medium" style={{ color: '#9C4A15' }}>
-                            Schedule
+                            Delivery Time
                           </span>
                         </div>
                         <p className="text-sm font-[titleFont]" style={{ color: '#2A1803' }}>
-                          {orderDetails.schedule === 'morning'
-                            ? 'Morning (6:30-10 AM)'
-                            : 'Evening (3-7 PM)'}
+                          {orderDetails.selectedTime
+                            ? formatTimeForDisplay(orderDetails.selectedTime)
+                            : 'Not selected'}
                         </p>
                       </div>
 
@@ -638,7 +794,9 @@ const Checkout = () => {
                           <div key={index} className="flex justify-between">
                             <span style={{ color: '#2A1803' }}>{formatDateDisplay(dateStr)}</span>
                             <span style={{ color: '#9C4A15' }}>
-                              {orderDetails.schedule === 'morning' ? 'AM' : 'PM'}
+                              {orderDetails.selectedTime
+                                ? formatTimeForDisplay(orderDetails.selectedTime)
+                                : 'Time TBD'}
                             </span>
                           </div>
                         ))}

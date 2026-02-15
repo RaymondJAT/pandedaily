@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiCheckCircle,
@@ -15,16 +15,66 @@ import {
 
 const OrderConfirmation = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [orderData, setOrderData] = useState(null)
 
   useEffect(() => {
-    const savedOrder = localStorage.getItem('confirmedOrder')
-    if (savedOrder) {
-      setOrderData(JSON.parse(savedOrder))
+    // First try to get from navigation state (from Checkout page)
+    const orderFromState = location.state?.orderDetails
+
+    if (orderFromState) {
+      console.log('Order confirmation from state:', orderFromState)
+      setOrderData(orderFromState)
+      // Save to localStorage as backup
+      localStorage.setItem('confirmedOrder', JSON.stringify(orderFromState))
     } else {
-      navigate('/order')
+      // Fallback to localStorage
+      const savedOrder = localStorage.getItem('confirmedOrder')
+      if (savedOrder) {
+        console.log('Order confirmation from localStorage:', JSON.parse(savedOrder))
+        setOrderData(JSON.parse(savedOrder))
+      } else {
+        // Try pendingOrder as last resort
+        const pendingOrder = localStorage.getItem('pendingOrder')
+        if (pendingOrder) {
+          const parsedOrder = JSON.parse(pendingOrder)
+          // Format the pending order data
+          const formattedOrder = {
+            order_id: 'PENDING',
+            order_number: `ORD-${Date.now()}`,
+            customer_info: {
+              c_fullname: parsedOrder.customerName || 'Customer',
+            },
+            order_details: {
+              dates: parsedOrder.dates || [],
+              quantity: parsedOrder.quantity || 0,
+              selectedTime: parsedOrder.selectedTime,
+              selectedTimeFormatted: parsedOrder.selectedTime
+                ? formatTimeForDisplay(parsedOrder.selectedTime)
+                : '',
+            },
+            delivery_schedule: parsedOrder.schedule || 'morning',
+            total_amount: parsedOrder.totalPrice || 0,
+          }
+          setOrderData(formattedOrder)
+          localStorage.setItem('confirmedOrder', JSON.stringify(formattedOrder))
+        } else {
+          // No order data found, redirect back to order page
+          navigate('/order')
+        }
+      }
     }
-  }, [navigate])
+  }, [location.state, navigate])
+
+  // Helper function to format time for display
+  const formatTimeForDisplay = (time) => {
+    if (!time) return ''
+    const [hours, minutes] = time.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour > 12 ? hour - 12 : hour
+    return `${displayHour}:${minutes} ${ampm}`
+  }
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {
@@ -69,6 +119,16 @@ const OrderConfirmation = () => {
     )
   }
 
+  // Get the display values
+  const orderNumber = orderData.order_number || `ORD-${orderData.order_id || 'NEW'}`
+  const customerName = orderData.customer_info?.c_fullname || 'Customer'
+  const firstName = customerName.split(' ')[0]
+
+  // Get delivery time display
+  const deliveryTime =
+    orderData.order_details?.selectedTimeFormatted ||
+    (orderData.delivery_schedule === 'morning' ? 'Morning' : 'Evening')
+
   return (
     <section className="min-h-screen py-12 md:py-16" style={{ backgroundColor: '#F5EFE7' }}>
       <div className="container mx-auto px-4">
@@ -92,13 +152,13 @@ const OrderConfirmation = () => {
             Order Confirmed!
           </h1>
           <p className="text-lg md:text-xl font-[titleFont] mb-6" style={{ color: '#9C4A15' }}>
-            Thank you for your order, {orderData.customer_info.c_fullname?.split(' ')[0]}!
+            Thank you for your order, {firstName}!
           </p>
           <div
             className="inline-block px-6 py-2 rounded-full mb-8"
             style={{ backgroundColor: 'rgba(156, 74, 21, 0.1)', color: '#9C4A15' }}
           >
-            <span className="font-bold font-[titleFont]">Order #{orderData.order_number}</span>
+            <span className="font-bold font-[titleFont]">Order #{orderNumber}</span>
           </div>
         </motion.div>
 
@@ -129,7 +189,7 @@ const OrderConfirmation = () => {
                         Delivery Days
                       </p>
                       <p className="font-[titleFont]" style={{ color: '#2A1803' }}>
-                        {orderData.order_details.dates.length} days
+                        {orderData.order_details?.dates?.length || 0} days
                       </p>
                     </div>
                   </div>
@@ -140,7 +200,7 @@ const OrderConfirmation = () => {
                         Pieces per delivery
                       </p>
                       <p className="font-[titleFont]" style={{ color: '#2A1803' }}>
-                        {orderData.order_details.quantity} pcs
+                        {orderData.order_details?.quantity || 0} pcs
                       </p>
                     </div>
                   </div>
@@ -151,9 +211,7 @@ const OrderConfirmation = () => {
                         Delivery Time
                       </p>
                       <p className="font-[titleFont]" style={{ color: '#2A1803' }}>
-                        {orderData.delivery_schedule === 'morning'
-                          ? 'Morning (6:30-10 AM)'
-                          : 'Evening (3-7 PM)'}
+                        {deliveryTime}
                       </p>
                     </div>
                   </div>
@@ -166,7 +224,7 @@ const OrderConfirmation = () => {
                         className="font-bold font-[titleFont] text-xl"
                         style={{ color: '#9C4A15' }}
                       >
-                        {formatCurrency(orderData.total_amount)}
+                        {formatCurrency(orderData.total_amount || 0)}
                       </span>
                     </div>
                   </div>
@@ -209,7 +267,9 @@ const OrderConfirmation = () => {
                     <p className="text-sm" style={{ color: '#2A1803' }}>
                       Your first delivery will be on{' '}
                       <span className="font-medium">
-                        {formatDateDisplay(orderData.order_details.dates[0])}
+                        {orderData.order_details?.dates?.length > 0
+                          ? formatDateDisplay(orderData.order_details.dates[0])
+                          : 'your selected date'}
                       </span>
                     </p>
                   </div>
