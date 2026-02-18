@@ -17,6 +17,7 @@ import AuthChoiceModal from '../website modal/AuthChoiceModal'
 import GuestInformation from '../../pages/website/GuestInformation'
 import Checkout from '../../pages/website/Checkout'
 import OrderConfirmation from '../../pages/website/OrderConfirmation'
+import Payment from '../../pages/website/Payment'
 import ProtectedRoute from '../../routes/ProtectedRoute'
 
 const WebsiteLayout = () => {
@@ -34,8 +35,7 @@ const WebsiteLayout = () => {
 
   const handleGuestContinue = () => {
     setShowAuthModal(false)
-    // Navigate to order page as guest
-    window.location.href = '/order'
+    window.location.href = '/guest-info'
   }
 
   const handleLogin = () => {
@@ -83,25 +83,54 @@ const WebsiteLayout = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
-          {/* Protected Routes for registered customers */}
+          {/* Checkout Routes */}
           <Route
             path="/checkout"
             element={
-              <ProtectedRoute allowedTypes={['customer']}>
+              <ProtectedRoute>
                 <Checkout />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/order/confirmation"
             element={
-              <ProtectedRoute allowedTypes={['customer']}>
+              <ProtectedRoute>
                 <OrderConfirmation />
               </ProtectedRoute>
             }
           />
 
-          {/* Add a 404 page for better UX */}
+          <Route
+            path="/order/payment"
+            element={
+              <ProtectedRoute>
+                <Payment />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Routes */}
+          {/* <Route
+            path="/account"
+            element={
+              <ProtectedRoute requireAuth allowedTypes={['customer']}>
+                <div>Account Settings (Placeholder)</div>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/order-history"
+            element={
+              <ProtectedRoute requireAuth allowedTypes={['customer']}>
+                <div>Order History (Placeholder)</div>
+              </ProtectedRoute>
+            }
+          /> */}
+
+          {/* 404 Page */}
           <Route
             path="*"
             element={

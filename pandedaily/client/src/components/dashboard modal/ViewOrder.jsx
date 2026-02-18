@@ -96,7 +96,7 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
 
   // API call for approval/rejection
   const updateOrderStatus = async (orderId, status) => {
-    const API_URL = 'http://localhost:3080'
+    const API_URL = 'http://192.168.40.101:3080'
     const token = localStorage.getItem('token')
 
     const response = await fetch(`${API_URL}/orders/${orderId}`, {

@@ -118,7 +118,7 @@ const NavigationBar = () => {
   }, [location])
 
   return (
-    <nav className="sticky top-0 z-50" style={{ backgroundColor: '#2A1803' }}>
+    <nav className="sticky top-0 z-50 font-[titleFont]" style={{ backgroundColor: '#2A1803' }}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-24">
           {/* Left Side: Navigation Links */}

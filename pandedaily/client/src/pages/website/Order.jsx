@@ -3,19 +3,24 @@ import { motion } from 'framer-motion'
 import AuthChoiceModal from '../../components/website modal/AuthChoiceModal'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { createOrder } from '../../services/api'
+import { getProducts, getProductCategories } from '../../services/api'
+import { FiPackage, FiCoffee, FiBattery } from 'react-icons/fi'
 
 const Order = () => {
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDates, setSelectedDates] = useState([])
-  const [currentMonth, setCurrentMonth] = useState([])
-  const [deliverySchedule, setDeliverySchedule] = useState('morning')
-  const [selectedTime, setSelectedTime] = useState('') // New state for selected time
-  const [quantity, setQuantity] = useState(20)
-  const [customQuantity, setCustomQuantity] = useState('')
-  const [specialInstructions, setSpecialInstructions] = useState('')
+  // Product state only
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [selectedProducts, setSelectedProducts] = useState([])
+  const [loadingProducts, setLoadingProducts] = useState(false)
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const [productError, setProductError] = useState('')
+  const [categoryError, setCategoryError] = useState('')
+  const [activeCategory, setActiveCategory] = useState('all')
   const [showAuthModal, setShowAuthModal] = useState(false)
-  const [orderError, setOrderError] = useState('')
+
+  // For products with "desal" in name (Pandesal and similar)
+  const [desalCustomQuantities, setDesalCustomQuantities] = useState({})
+  const [desalQuantityTypes, setDesalQuantityTypes] = useState({}) // '20', '40', or 'custom'
 
   // Get user authentication status
   const { user, isAuthenticated } = useAuth()
@@ -28,39 +33,110 @@ const Order = () => {
     }
   }, [user])
 
-  // Price configuration
-  const PANDESAL_PRICE_PER_PIECE = 15
-  const PRODUCT_ID = 1 // Assuming pandesal product ID is 1
+  // Fetch products and categories on component mount
+  useEffect(() => {
+    fetchProducts()
+    fetchCategories()
+  }, [])
 
-  // Time options based on schedule
-  const morningTimes = [
-    '06:30:00',
-    '07:00:00',
-    '07:30:00',
-    '08:00:00',
-    '08:30:00',
-    '09:00:00',
-    '09:30:00',
-  ]
+  // Restore selected products from localStorage after products are loaded
+  useEffect(() => {
+    if (products.length > 0) {
+      const savedSelectedProducts = localStorage.getItem('selectedProducts')
+      if (savedSelectedProducts) {
+        try {
+          const parsed = JSON.parse(savedSelectedProducts)
 
-  const eveningTimes = [
-    '15:00:00',
-    '15:30:00',
-    '16:00:00',
-    '16:30:00',
-    '17:00:00',
-    '17:30:00',
-    '18:00:00',
-    '18:30:00',
-  ]
+          // Filter out any products that no longer exist in the current product list
+          const validProducts = parsed.filter((savedProduct) =>
+            products.some((product) => product.id === savedProduct.id),
+          )
 
-  // Format time for display
-  const formatTimeForDisplay = (time) => {
-    const [hours, minutes] = time.split(':')
-    const hour = parseInt(hours)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    const displayHour = hour > 12 ? hour - 12 : hour
-    return `${displayHour}:${minutes} ${ampm}`
+          setSelectedProducts(validProducts)
+
+          // Restore desal-specific states
+          const desalQuantities = {}
+          const desalTypes = {}
+
+          validProducts.forEach((product) => {
+            if (isDesalProduct(product)) {
+              // Determine quantity type based on quantity value
+              if (product.quantity === 20) desalTypes[product.id] = '20'
+              else if (product.quantity === 40) desalTypes[product.id] = '40'
+              else {
+                desalTypes[product.id] = 'custom'
+                desalQuantities[product.id] = product.quantity.toString()
+              }
+            }
+          })
+
+          setDesalQuantityTypes(desalTypes)
+          setDesalCustomQuantities(desalQuantities)
+
+          // Clear the saved products after restoring
+          localStorage.removeItem('selectedProducts')
+        } catch (error) {
+          console.error('Error restoring selected products:', error)
+        }
+      }
+    }
+  }, [products])
+
+  const fetchProducts = async () => {
+    setLoadingProducts(true)
+    try {
+      const response = await getProducts()
+      const productsData = response.data || response
+      setProducts(Array.isArray(productsData) ? productsData : [])
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      setProductError('Failed to load products')
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
+
+  const fetchCategories = async () => {
+    setLoadingCategories(true)
+    try {
+      const response = await getProductCategories()
+      const categoriesData = response.data || []
+
+      // Transform API categories to our format
+      const transformedCategories = [
+        { id: 'all', name: 'All Products', icon: FiPackage },
+        ...categoriesData.map((cat) => ({
+          id: cat.id?.toString() || cat.category_id?.toString() || cat.name?.toLowerCase(),
+          name: cat.name || cat.category_name || 'Unnamed Category',
+          icon: getCategoryIcon(cat.name || cat.category_name || ''),
+          originalData: cat,
+        })),
+      ]
+
+      setCategories(transformedCategories)
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+      setCategoryError('Failed to load categories')
+      // Fallback to default categories if API fails
+      setCategories([
+        { id: 'all', name: 'All Products', icon: FiPackage },
+        { id: 'pandesal', name: 'Pandesal', icon: FiPackage },
+        { id: 'bread', name: 'Other Breads', icon: FiPackage },
+        { id: 'drink', name: 'Drinks', icon: FiCoffee },
+        { id: 'other', name: 'Other Items', icon: FiBattery },
+      ])
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
+
+  // Helper function to get icon based on category name
+  const getCategoryIcon = (categoryName) => {
+    const name = categoryName?.toLowerCase() || ''
+    if (name.includes('pandesal') || name.includes('bread')) return FiPackage
+    if (name.includes('drink') || name.includes('beverage') || name.includes('coffee'))
+      return FiCoffee
+    return FiBattery
   }
 
   // Animation variants
@@ -92,179 +168,183 @@ const Order = () => {
     transition: { duration: 0.5, ease: 'easeOut' },
   }
 
-  // Initialize calendar without selecting today
-  useEffect(() => {
-    generateMonthData()
-  }, [currentDate])
+  // Check if product name contains "desal" (case insensitive)
+  const isDesalProduct = (product) => {
+    return product.name?.toLowerCase().includes('desal')
+  }
 
-  const generateMonthData = () => {
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const firstDay = new Date(year, month, 1).getDay()
-    const daysInMonth = getDaysInMonth(year, month)
+  // Get product category
+  const getProductCategory = (product) => {
+    if (isDesalProduct(product)) return 'pandesal'
 
-    const monthArray = []
-
-    // Add empty cells for alignment
-    for (let i = 0; i < firstDay; i++) {
-      monthArray.push(null)
+    // Use API category if available
+    if (product.category_id || product.product_category_id) {
+      return product.category_id?.toString() || product.product_category_id?.toString()
     }
 
-    // Add actual days
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      monthArray.push({
-        date,
-        dayOfWeek: date.getDay(),
-        dayName: getDayName(date.getDay()),
-        isToday: date.toDateString() === new Date().toDateString(),
+    // Fallback to name-based categorization
+    if (product.category_name?.toLowerCase().includes('bread')) return 'bread'
+    if (product.category_name?.toLowerCase().includes('drink')) return 'drink'
+    if (product.category?.toLowerCase().includes('bread')) return 'bread'
+    if (product.category?.toLowerCase().includes('drink')) return 'drink'
+
+    return 'other'
+  }
+
+  // Get display category for a product
+  const getProductDisplayCategory = (product) => {
+    if (isDesalProduct(product)) return 'pandesal'
+
+    // Try to find matching category from API data
+    if (product.category_id || product.product_category_id) {
+      const categoryId = product.category_id?.toString() || product.product_category_id?.toString()
+      const matchingCategory = categories.find((c) => c.id === categoryId)
+      if (matchingCategory) return matchingCategory.id
+    }
+
+    // Fallback to name-based
+    if (
+      product.category_name?.toLowerCase().includes('bread') ||
+      product.category?.toLowerCase().includes('bread')
+    )
+      return 'bread'
+    if (
+      product.category_name?.toLowerCase().includes('drink') ||
+      product.category?.toLowerCase().includes('drink')
+    )
+      return 'drink'
+
+    return 'other'
+  }
+
+  // Save selected products to localStorage
+  const saveSelectedProducts = (products) => {
+    localStorage.setItem('selectedProducts', JSON.stringify(products))
+  }
+
+  // Product handlers
+  const handleProductSelect = (product) => {
+    setSelectedProducts((prev) => {
+      let newSelected
+      const exists = prev.find((p) => p.id === product.id)
+
+      if (exists) {
+        newSelected = prev.filter((p) => p.id !== product.id)
+      } else {
+        // Set initial quantity based on product type
+        let initialQuantity = 1
+
+        if (isDesalProduct(product)) {
+          // For desal products, use the saved quantity type or default to 20
+          const productType = desalQuantityTypes[product.id] || '20'
+          if (productType === 'custom') {
+            initialQuantity = parseInt(desalCustomQuantities[product.id]) || 20
+          } else {
+            initialQuantity = parseInt(productType)
+          }
+        } else if (
+          getProductCategory(product) === 'bread' ||
+          getProductCategory(product) === 'pandesal'
+        ) {
+          initialQuantity = 20
+        }
+
+        newSelected = [
+          ...prev,
+          {
+            ...product,
+            quantity: initialQuantity,
+            price: product.price,
+          },
+        ]
+      }
+
+      saveSelectedProducts(newSelected)
+      return newSelected
+    })
+  }
+
+  const handleProductQuantityChange = (productId, quantity) => {
+    setSelectedProducts((prev) => {
+      const newSelected = prev.map((p) => {
+        if (p.id === productId) {
+          const minQty = isDesalProduct(p) || getProductCategory(p) === 'bread' ? 20 : 1
+          return {
+            ...p,
+            quantity: Math.max(minQty, parseInt(quantity) || minQty),
+          }
+        }
+        return p
+      })
+
+      saveSelectedProducts(newSelected)
+      return newSelected
+    })
+  }
+
+  const handleDesalQuantityTypeChange = (productId, type) => {
+    setDesalQuantityTypes((prev) => ({
+      ...prev,
+      [productId]: type,
+    }))
+
+    // Update selected product quantity if it's already selected
+    setSelectedProducts((prev) => {
+      const newSelected = prev.map((p) => {
+        if (p.id === productId && isDesalProduct(p)) {
+          let newQuantity
+          if (type === 'custom') {
+            newQuantity = parseInt(desalCustomQuantities[productId]) || 20
+          } else {
+            newQuantity = parseInt(type)
+          }
+          return { ...p, quantity: newQuantity }
+        }
+        return p
+      })
+
+      saveSelectedProducts(newSelected)
+      return newSelected
+    })
+  }
+
+  const handleDesalCustomQuantityChange = (productId, value) => {
+    setDesalCustomQuantities((prev) => ({
+      ...prev,
+      [productId]: value,
+    }))
+
+    // Update selected product quantity if custom is selected
+    if (desalQuantityTypes[productId] === 'custom') {
+      setSelectedProducts((prev) => {
+        const newSelected = prev.map((p) => {
+          if (p.id === productId && isDesalProduct(p)) {
+            return { ...p, quantity: parseInt(value) || 20 }
+          }
+          return p
+        })
+
+        saveSelectedProducts(newSelected)
+        return newSelected
       })
     }
-
-    setCurrentMonth(monthArray)
   }
 
-  const getDaysInMonth = (year, month) => {
-    return new Date(year, month + 1, 0).getDate()
-  }
-
-  const getDayName = (dayIndex) => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    return days[dayIndex]
-  }
-
-  const getMonthName = (month) => {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ]
-    return months[month]
-  }
-
-  const handleDateClick = (date) => {
-    const dateString = date.toDateString()
-    let newSelectedDates
-
-    if (selectedDates.includes(dateString)) {
-      newSelectedDates = selectedDates.filter((d) => d !== dateString)
-    } else {
-      newSelectedDates = [...selectedDates, dateString]
-    }
-
-    setSelectedDates(newSelectedDates)
-  }
-
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
-  }
-
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
-  }
-
-  const handleToday = () => {
-    setCurrentDate(new Date())
-  }
-
-  const handleSelectAllWeekdays = () => {
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const daysInMonth = getDaysInMonth(year, month)
-    const newSelectedDates = []
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      const dayOfWeek = date.getDay()
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        newSelectedDates.push(date.toDateString())
-      }
-    }
-
-    setSelectedDates(newSelectedDates)
-  }
-
-  const handleSelectAllWeekends = () => {
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const daysInMonth = getDaysInMonth(year, month)
-    const newSelectedDates = []
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      const dayOfWeek = date.getDay()
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        newSelectedDates.push(date.toDateString())
-      }
-    }
-
-    setSelectedDates(newSelectedDates)
-  }
-
+  // Clear all selections
   const handleClearAll = () => {
-    setSelectedDates([])
+    setSelectedProducts([])
+    setDesalCustomQuantities({})
+    setDesalQuantityTypes({})
+    localStorage.removeItem('selectedProducts')
   }
 
-  const handleQuantityChange = (value) => {
-    setQuantity(value)
-    if (value !== 'custom') {
-      setCustomQuantity('')
-    }
+  // Calculation functions
+  const getTotalItems = () => {
+    return selectedProducts.reduce((sum, product) => sum + product.quantity, 0)
   }
 
-  const handleScheduleChange = (schedule) => {
-    setDeliverySchedule(schedule)
-    setSelectedTime('') // Reset selected time when schedule changes
-  }
-
-  const handleTimeSelect = (time) => {
-    setSelectedTime(time)
-  }
-
-  const isDateSelected = (date) => {
-    return selectedDates.includes(date.toDateString())
-  }
-
-  const getDateStyle = (date, isToday) => {
-    const isSelected = isDateSelected(date)
-
-    if (isSelected) {
-      if (isToday) {
-        return 'bg-gradient-to-br from-[#9C4A15] to-[#7a3a12] text-white shadow-sm'
-      }
-      return 'bg-gradient-to-br from-[#F5EFE7] to-[#e8dfd2] text-[#2A1803] border border-[#9C4A15]'
-    }
-
-    if (isToday) {
-      return 'bg-[#F5EFE7] text-[#2A1803] border border-[#9C4A15]'
-    }
-
-    return 'bg-white hover:bg-[#F5EFE7] text-[#2A1803] hover:text-[#9C4A15]'
-  }
-
-  const getFinalQuantity = () => {
-    if (quantity === 'custom') {
-      return parseInt(customQuantity) || 0
-    }
-    return quantity
-  }
-
-  const getTotalPandesal = () => {
-    return selectedDates.length * getFinalQuantity()
-  }
-
-  const getTotalPrice = () => {
-    const totalPieces = getTotalPandesal()
-    return totalPieces * PANDESAL_PRICE_PER_PIECE
+  const getTotalPricePerDelivery = () => {
+    return selectedProducts.reduce((sum, product) => sum + product.quantity * product.price, 0)
   }
 
   const formatCurrency = (amount) => {
@@ -276,104 +356,35 @@ const Order = () => {
     }).format(amount)
   }
 
-  const formatDateDisplay = (dateStr) => {
-    const date = new Date(dateStr)
-    return `${getDayName(date.getDay())}, ${getMonthName(date.getMonth())} ${date.getDate()}`
-  }
-
-  const formatDateForAPI = (dateStr) => {
-    const date = new Date(dateStr)
-    return date.toISOString().split('T')[0] // Returns YYYY-MM-DD format
-  }
-
-  const getDeliveryTimeSlots = () => {
-    if (!selectedTime) return null
-
-    // For morning delivery, end time is 2.5 hours after start time
-    // For evening delivery, end time is 3 hours after start time
-    const startHour = parseInt(selectedTime.split(':')[0])
-    const startMinute = parseInt(selectedTime.split(':')[1])
-
-    let endHour, endMinute
-
-    if (deliverySchedule === 'morning') {
-      // Add 2.5 hours for morning deliveries
-      endHour = startHour + 2
-      endMinute = startMinute + 30
-      if (endMinute >= 60) {
-        endHour += 1
-        endMinute -= 60
-      }
-    } else {
-      // Add 3 hours for evening deliveries
-      endHour = startHour + 3
-      endMinute = startMinute
-      if (endHour >= 24) {
-        endHour = 23
-        endMinute = 59
-      }
-    }
-
-    const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
-
-    return {
-      start_time: selectedTime,
-      end_time: endTimeFormatted,
-      cutoff: '23:59:59', // Cutoff at midnight before delivery day
-    }
-  }
-
-  const handleSubmitOrder = () => {
-    // Reset any previous errors
-    setOrderError('')
-
+  const handleProceedToCheckout = () => {
     // Validation
-    if (selectedDates.length === 0) {
-      alert('Please select at least one delivery date')
-      return
-    }
-
-    if (!selectedTime) {
-      alert('Please select a delivery time')
-      return
-    }
-
-    if (quantity === 'custom' && (!customQuantity || parseInt(customQuantity) < 20)) {
-      alert('Please enter a valid quantity (minimum 20 pieces)')
+    if (selectedProducts.length === 0) {
+      alert('Please select at least one product')
       return
     }
 
     // Check if user is already logged in
     if (isAuthenticated && user) {
-      // User is logged in, prepare order details and go to confirmation
+      // User is logged in, prepare order details and go to checkout
       console.log('User is logged in, preparing order details...')
 
-      const finalQuantity = getFinalQuantity()
-      const timeSlots = getDeliveryTimeSlots()
-
-      // Prepare order details to pass to confirmation page
+      // Prepare order details to pass to checkout page
       const orderDetails = {
-        dates: selectedDates,
-        schedule: deliverySchedule,
-        selectedTime: selectedTime,
-        timeSlots: timeSlots,
-        quantity: finalQuantity,
-        instructions: specialInstructions,
-        totalPieces: getTotalPandesal(),
-        totalPrice: getTotalPrice(),
-        pricePerPiece: PANDESAL_PRICE_PER_PIECE,
-        customerId: user.id,
-        customerName: user.fullname || user.c_fullname,
+        products: selectedProducts,
+        totalPieces: getTotalItems(),
+        totalPricePerDelivery: getTotalPricePerDelivery(),
       }
 
       // Store in localStorage as backup
       localStorage.setItem('pendingOrder', JSON.stringify(orderDetails))
 
-      // Navigate to order confirmation page with state
+      // Clear the selected products since we're moving to checkout
+      localStorage.removeItem('selectedProducts')
+
+      // Navigate to checkout page with state
       navigate('/checkout', {
         state: {
           orderDetails: orderDetails,
-          totalAmount: getTotalPrice(),
         },
       })
     } else {
@@ -384,7 +395,6 @@ const Order = () => {
   }
 
   const handleGuestContinue = () => {
-    // For now, since customer_id is required, we'll redirect to login
     alert('Please login or register to place an order')
     setShowAuthModal(false)
     navigate('/login', {
@@ -396,19 +406,8 @@ const Order = () => {
   }
 
   const handleLoginRegister = () => {
-    // Save order details temporarily before redirecting to login
-    const tempOrder = {
-      dates: selectedDates,
-      schedule: deliverySchedule,
-      selectedTime: selectedTime,
-      quantity: getFinalQuantity(),
-      instructions: specialInstructions,
-      totalPieces: getTotalPandesal(),
-      totalPrice: getTotalPrice(),
-      pricePerPiece: PANDESAL_PRICE_PER_PIECE,
-    }
-
-    localStorage.setItem('pendingOrder', JSON.stringify(tempOrder))
+    // Save selected products before redirecting to login
+    localStorage.setItem('selectedProducts', JSON.stringify(selectedProducts))
     setShowAuthModal(false)
 
     // Redirect to login page
@@ -420,14 +419,66 @@ const Order = () => {
     })
   }
 
-  const currentTimeOptions = deliverySchedule === 'morning' ? morningTimes : eveningTimes
+  // Get products by category
+  const getProductsByCategory = (categoryId) => {
+    if (categoryId === 'all') return products
+
+    return products.filter((product) => {
+      // Check if product belongs to this category using API data
+      if (
+        product.category_id?.toString() === categoryId ||
+        product.product_category_id?.toString() === categoryId
+      ) {
+        return true
+      }
+
+      // Special handling for Pandesal
+      if (categoryId === 'pandesal' && isDesalProduct(product)) {
+        return true
+      }
+
+      // Fallback to name-based for other categories
+      if (
+        categoryId === 'bread' &&
+        (product.category_name?.toLowerCase().includes('bread') ||
+          product.category?.toLowerCase().includes('bread')) &&
+        !isDesalProduct(product)
+      ) {
+        return true
+      }
+
+      if (
+        categoryId === 'drink' &&
+        (product.category_name?.toLowerCase().includes('drink') ||
+          product.category?.toLowerCase().includes('drink'))
+      ) {
+        return true
+      }
+
+      if (categoryId === 'other') {
+        const hasCategory =
+          product.category_id ||
+          product.product_category_id ||
+          product.category_name ||
+          product.category
+        return !hasCategory
+      }
+
+      return false
+    })
+  }
+
+  const displayedProducts = getProductsByCategory(activeCategory)
 
   return (
-    <section className="py-12 md:py-10" style={{ backgroundColor: '#F5EFE7' }}>
+    <section
+      className="min-h-screen py-8 md:py-12 font-[titleFont]"
+      style={{ backgroundColor: '#F5EFE7' }}
+    >
       <div className="container mx-auto px-4">
         {/* Header Section */}
         <motion.div
-          className="text-center mb-10 md:mb-12"
+          className="text-center mb-8 md:mb-12"
           initial="initial"
           whileInView="animate"
           viewport={{ once: true, amount: 0.2 }}
@@ -454,33 +505,6 @@ const Order = () => {
           <div className="h-1 w-24 mx-auto" style={{ backgroundColor: '#9C4A15' }}></div>
         </motion.div>
 
-        {/* Login reminder if not authenticated */}
-        {!isAuthenticated && (
-          <motion.div
-            className="mb-6 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <p className="font-[titleFont]">
-              Please{' '}
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="font-bold underline hover:text-blue-900"
-              >
-                login or register
-              </button>{' '}
-              to place your order.
-            </p>
-          </motion.div>
-        )}
-
-        {/* Error message display */}
-        {orderError && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            {orderError}
-          </div>
-        )}
-
         <motion.div
           className="mx-auto"
           initial="initial"
@@ -488,509 +512,354 @@ const Order = () => {
           viewport={{ once: true, amount: 0.1 }}
           variants={staggerContainer}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
-            {/* Calendar Section */}
-            <motion.div className="flex flex-col" variants={faqItem}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* LEFT COLUMN - Products Grid (8 columns) */}
+            <motion.div className="lg:col-span-8" variants={faqItem}>
               <h2
                 className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
                 style={{ color: '#2A1803' }}
               >
-                Select Delivery Dates
+                Select Products
               </h2>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1 flex flex-col">
-                {/* Month Navigation */}
-                <div className="flex items-center justify-between mb-6">
-                  <button
-                    onClick={handlePrevMonth}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F5EFE7] transition-colors text-base cursor-pointer"
-                    style={{ color: '#2A1803' }}
-                  >
-                    ←
-                  </button>
-                  <h3 className="text-lg font-medium font-[titleFont]" style={{ color: '#2A1803' }}>
-                    {getMonthName(currentDate.getMonth())} {currentDate.getFullYear()}
-                  </h3>
-                  <button
-                    onClick={handleNextMonth}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F5EFE7] transition-colors text-base cursor-pointer"
-                    style={{ color: '#2A1803' }}
-                  >
-                    →
-                  </button>
-                </div>
-
-                {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-2 mb-6">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                    <div
-                      key={index}
-                      className="text-center py-2 text-sm font-semibold font-[titleFont]"
-                      style={{ color: '#9C4A15' }}
-                    >
-                      {day}
-                    </div>
-                  ))}
-
-                  {currentMonth.map((dayData, index) => {
-                    if (!dayData) {
-                      return <div key={index} className="aspect-square"></div>
-                    }
-
-                    const { date, isToday } = dayData
-                    const isSelected = isDateSelected(date)
-
-                    return (
-                      <button
-                        key={index}
-                        onClick={() => handleDateClick(date)}
-                        className={`aspect-square flex items-center justify-center rounded-lg transition-all duration-200 cursor-pointer ${getDateStyle(
-                          date,
-                          isToday,
-                        )} 
-                          ${isSelected ? 'transform hover:scale-105' : 'hover:scale-102'} 
-                          font-[titleFont] text-sm`}
-                      >
-                        <span className={`font-medium`}>{date.getDate()}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* Quick Actions */}
-                <div className="flex flex-wrap gap-3 mb-6">
-                  <button
-                    onClick={handleSelectAllWeekdays}
-                    className="px-4 py-2 rounded-full font-[titleFont] text-sm cursor-pointer"
-                    style={{
-                      backgroundColor: '#F5EFE7',
-                      color: '#2A1803',
-                      border: '1px solid #9C4A15',
-                    }}
-                  >
-                    Weekdays
-                  </button>
-                  <button
-                    onClick={handleSelectAllWeekends}
-                    className="px-4 py-2 rounded-full font-[titleFont] text-sm cursor-pointer"
-                    style={{
-                      backgroundColor: '#F5EFE7',
-                      color: '#2A1803',
-                      border: '1px solid #9C4A15',
-                    }}
-                  >
-                    Weekends
-                  </button>
-                  <button
-                    onClick={handleClearAll}
-                    className="px-4 py-2 rounded-full font-[titleFont] text-sm cursor-pointer"
-                    style={{
-                      backgroundColor: '#F5EFE7',
-                      color: '#2A1803',
-                      border: '1px solid #9C4A15',
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                {/* Selected Dates Preview */}
-                <div className="mt-4 pt-6 border-t" style={{ borderColor: '#F5EFE7' }}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold font-[titleFont] text-lg" style={{ color: '#2A1803' }}>
-                      Selected Delivery Dates ({selectedDates.length})
-                    </h3>
-                    {selectedDates.length > 0 && selectedTime && (
-                      <span
-                        className="text-sm font-[titleFont] px-3 py-1 rounded-full"
-                        style={{ backgroundColor: '#F5EFE7', color: '#9C4A15' }}
-                      >
-                        {formatTimeForDisplay(selectedTime)}
-                      </span>
-                    )}
+              <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 h-175 flex flex-col">
+                {loadingProducts || loadingCategories ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#9C4A15]"></div>
                   </div>
+                ) : productError ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center py-4 text-red-600">{productError}</div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Category Tabs - Fixed at top */}
+                    <div className="flex overflow-x-auto pb-4 mb-4 gap-2 scrollbar-hide shrink-0">
+                      {categories.map((category) => {
+                        const Icon = category.icon
+                        const isActive = activeCategory === category.id
+                        const count = getProductsByCategory(category.id).length
 
-                  {selectedDates.length === 0 ? (
-                    <div
-                      className="flex flex-col items-center justify-center py-8 md:py-12 text-center"
-                      style={{ color: '#9C4A15' }}
-                    >
-                      <svg
-                        className="w-12 h-12 mb-4 opacity-50"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <p className="font-[titleFont] text-base">No dates selected yet</p>
-                      <p className="text-sm mt-1">
-                        Click on dates in the calendar above to add delivery dates
+                        return (
+                          <button
+                            key={category.id}
+                            onClick={() => setActiveCategory(category.id)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all ${
+                              isActive
+                                ? 'bg-[#9C4A15] text-white'
+                                : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span>{category.name}</span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                isActive ? 'bg-white/20 text-white' : 'bg-white text-[#9C4A15]'
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Products Grid - Scrollable area with fixed height */}
+                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {displayedProducts.map((product) => {
+                          const isSelected = selectedProducts.some((p) => p.id === product.id)
+                          const selectedProduct = selectedProducts.find((p) => p.id === product.id)
+                          const isDesal = isDesalProduct(product)
+                          const isBread =
+                            isDesal ||
+                            product.category_name?.toLowerCase().includes('bread') ||
+                            product.category?.toLowerCase().includes('bread')
+                          const isDrink =
+                            product.category_name?.toLowerCase().includes('drink') ||
+                            product.category?.toLowerCase().includes('drink')
+
+                          return (
+                            <div
+                              key={product.id}
+                              className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-[#9C4A15] bg-[#F5EFE7]'
+                                  : 'border-gray-200 hover:border-[#9C4A15]'
+                              }`}
+                              onClick={() => handleProductSelect(product)}
+                            >
+                              <div className="flex flex-col">
+                                {/* Product Image */}
+                                <div className="w-full h-24 bg-gray-200 rounded-lg flex items-center justify-center mb-2">
+                                  {product.image ? (
+                                    <img
+                                      src={product.image}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover rounded-lg"
+                                    />
+                                  ) : (
+                                    <FiPackage className="w-8 h-8 text-gray-400" />
+                                  )}
+                                </div>
+
+                                <div className="flex-1">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <h3
+                                      className="text-sm font-bold font-[titleFont] truncate"
+                                      style={{ color: '#2A1803' }}
+                                      title={product.name}
+                                    >
+                                      {product.name}
+                                    </h3>
+                                    <span
+                                      className="text-sm font-bold font-[titleFont] ml-1 shrink-0"
+                                      style={{ color: '#9C4A15' }}
+                                    >
+                                      ₱{product.price}
+                                    </span>
+                                  </div>
+
+                                  {/* Category Badge */}
+                                  <div className="mb-2">
+                                    {isDesal && (
+                                      <span className="inline-block text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
+                                        Min 20
+                                      </span>
+                                    )}
+                                    {!isDesal && isBread && (
+                                      <span className="inline-block text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
+                                        Min 20
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Quantity Options for Desal Products */}
+                                  {isSelected && isDesal && (
+                                    <div
+                                      className="space-y-2 mt-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="flex gap-1">
+                                        <button
+                                          onClick={() =>
+                                            handleDesalQuantityTypeChange(product.id, '20')
+                                          }
+                                          className={`flex-1 py-1 px-2 text-xs rounded ${
+                                            desalQuantityTypes[product.id] === '20' ||
+                                            !desalQuantityTypes[product.id]
+                                              ? 'bg-[#9C4A15] text-white'
+                                              : 'bg-[#F5EFE7] text-[#2A1803]'
+                                          }`}
+                                        >
+                                          20
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleDesalQuantityTypeChange(product.id, '40')
+                                          }
+                                          className={`flex-1 py-1 px-2 text-xs rounded ${
+                                            desalQuantityTypes[product.id] === '40'
+                                              ? 'bg-[#9C4A15] text-white'
+                                              : 'bg-[#F5EFE7] text-[#2A1803]'
+                                          }`}
+                                        >
+                                          40
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleDesalQuantityTypeChange(product.id, 'custom')
+                                          }
+                                          className={`flex-1 py-1 px-2 text-xs rounded ${
+                                            desalQuantityTypes[product.id] === 'custom'
+                                              ? 'bg-[#9C4A15] text-white'
+                                              : 'bg-[#F5EFE7] text-[#2A1803]'
+                                          }`}
+                                        >
+                                          Custom
+                                        </button>
+                                      </div>
+
+                                      {desalQuantityTypes[product.id] === 'custom' && (
+                                        <input
+                                          type="number"
+                                          min="20"
+                                          value={desalCustomQuantities[product.id] || ''}
+                                          onChange={(e) =>
+                                            handleDesalCustomQuantityChange(
+                                              product.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="Enter quantity"
+                                          className="w-full px-2 py-1 text-xs border-2 border-[#9C4A15] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15]"
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Regular Quantity Input for Other Selected Products */}
+                                  {isSelected && !isDesal && (
+                                    <div
+                                      className="flex items-center gap-2 mt-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <span
+                                        className="text-xs font-medium"
+                                        style={{ color: '#9C4A15' }}
+                                      >
+                                        Qty:
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min={isBread ? 20 : 1}
+                                        value={selectedProduct?.quantity || (isBread ? 20 : 1)}
+                                        onChange={(e) =>
+                                          handleProductQuantityChange(product.id, e.target.value)
+                                        }
+                                        className="w-16 px-2 py-0.5 text-sm border-2 border-[#9C4A15] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] text-center"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {/* Empty State */}
+                        {displayedProducts.length === 0 && (
+                          <div className="col-span-4 text-center py-8">
+                            <FiPackage className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <p className="text-gray-500">No products in this category</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+
+            {/* RIGHT COLUMN - Order Summary (4 columns) */}
+            <motion.div className="lg:col-span-4" variants={faqItem} transition={{ delay: 0.1 }}>
+              <h2
+                className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
+                style={{ color: '#2A1803' }}
+              >
+                Your Order
+              </h2>
+
+              <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 sticky top-4 h-175 flex flex-col">
+                {selectedProducts.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <FiPackage className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No products selected yet</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        Click on products to add them to your order
                       </p>
                     </div>
-                  ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {selectedDates.map((dateStr, index) => (
+                  </div>
+                ) : (
+                  <>
+                    {/* Selected Products List - Scrollable */}
+                    <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                      <div className="flex justify-between items-center mb-3 shrink-0">
+                        <h3 className="font-medium text-sm" style={{ color: '#9C4A15' }}>
+                          Selected Items ({selectedProducts.length})
+                        </h3>
+                        <button
+                          onClick={handleClearAll}
+                          className="text-xs text-[#9C4A15] hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                        {selectedProducts.map((product) => (
                           <div
-                            key={index}
-                            className="flex items-center justify-between p-4 rounded-lg hover:shadow-sm transition-shadow"
-                            style={{
-                              backgroundColor: '#F5EFE7',
-                              border: '1px solid rgba(156, 74, 21, 0.2)',
-                            }}
+                            key={product.id}
+                            className="flex justify-between items-center text-sm py-2 border-b border-gray-100"
                           >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-10 h-10 flex items-center justify-center rounded-lg"
-                                style={{ backgroundColor: '#9C4A15', color: '#F5EFE7' }}
-                              >
-                                <span className="font-bold font-[titleFont]">
-                                  {new Date(dateStr).getDate()}
-                                </span>
-                              </div>
-                              <div>
-                                <span
-                                  className="font-medium font-[titleFont] block"
-                                  style={{ color: '#2A1803' }}
-                                >
-                                  {formatDateDisplay(dateStr)}
-                                </span>
-                                <span
-                                  className="text-xs font-[titleFont] block mt-1"
-                                  style={{ color: '#9C4A15' }}
-                                >
-                                  {getDayName(new Date(dateStr).getDay())}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span
-                                className="text-sm font-[titleFont] font-medium block"
-                                style={{ color: '#9C4A15' }}
-                              >
-                                {selectedTime ? formatTimeForDisplay(selectedTime) : 'Select time'}
+                            <div className="flex-1">
+                              <span className="font-medium" style={{ color: '#2A1803' }}>
+                                {product.name}
                               </span>
-                              <span
-                                className="text-xs font-[titleFont] block mt-1"
-                                style={{ color: '#2A1803' }}
-                              >
-                                {getFinalQuantity()} pcs
+                              <span className="text-xs ml-2" style={{ color: '#9C4A15' }}>
+                                x{product.quantity}
                               </span>
                             </div>
+                            <span className="font-medium" style={{ color: '#9C4A15' }}>
+                              {formatCurrency(product.quantity * product.price)}
+                            </span>
                           </div>
                         ))}
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* Totals - Fixed at bottom */}
+                    <div className="shrink-0 mt-4">
+                      <div className="space-y-3 pt-4 border-t border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm" style={{ color: '#2A1803' }}>
+                            Total Items
+                          </span>
+                          <span className="font-bold" style={{ color: '#9C4A15' }}>
+                            {getTotalItems()} pcs
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-base font-bold" style={{ color: '#2A1803' }}>
+                            Per Delivery
+                          </span>
+                          <span className="text-lg font-bold" style={{ color: '#9C4A15' }}>
+                            {formatCurrency(getTotalPricePerDelivery())}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Proceed Button - Same for both authenticated and guest users */}
+                      <div className="mt-6">
+                        <motion.button
+                          onClick={handleProceedToCheckout}
+                          disabled={selectedProducts.length === 0}
+                          className={`w-full py-4 rounded-full font-bold font-[titleFont] text-base transition-all duration-200 shadow-lg cursor-pointer ${
+                            selectedProducts.length === 0 ? 'opacity-70 cursor-not-allowed' : ''
+                          }`}
+                          style={{
+                            backgroundColor: '#9C4A15',
+                            color: '#F5EFE7',
+                          }}
+                          whileHover={selectedProducts.length > 0 ? { scale: 1.02 } : {}}
+                          whileTap={selectedProducts.length > 0 ? { scale: 0.98 } : {}}
+                        >
+                          Proceed to Checkout
+                        </motion.button>
+
+                        {/* Show user status message if authenticated */}
+                        {isAuthenticated && user && (
+                          <p
+                            className="text-center mt-3 font-[titleFont] text-sm"
+                            style={{ color: '#2A1803' }}
+                          >
+                            Ordering as:{' '}
+                            <span className="font-bold text-[#9C4A15]">
+                              {user.fullname || user.c_fullname}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Summary Note */}
+                      <p className="text-center text-xs mt-4" style={{ color: '#9C4A15' }}>
+                        You'll select delivery dates and times in checkout
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
-
-            {/* Order Configuration */}
-            <div className="flex flex-col space-y-8">
-              {/* Delivery Configuration */}
-              <motion.div className="flex flex-col" variants={faqItem} transition={{ delay: 0.1 }}>
-                <h2
-                  className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
-                  style={{ color: '#2A1803' }}
-                >
-                  Delivery Configuration
-                </h2>
-
-                <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1">
-                  {/* Schedule Selection */}
-                  <h3
-                    className="text-lg font-medium mb-4 font-[titleFont]"
-                    style={{ color: '#9C4A15' }}
-                  >
-                    Choose Delivery Schedule
-                  </h3>
-                  <div className="flex gap-4 mb-6">
-                    <button
-                      onClick={() => handleScheduleChange('morning')}
-                      className={`flex-1 py-4 rounded-lg border-2 transition-all duration-200 font-[titleFont] text-base cursor-pointer ${
-                        deliverySchedule === 'morning'
-                          ? 'border-[#9C4A15] bg-[#F5EFE7]'
-                          : 'border-gray-200 hover:border-[#9C4A15]'
-                      }`}
-                      style={{ color: '#2A1803' }}
-                    >
-                      <div className="font-medium">Morning</div>
-                      <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
-                        6:30 AM - 9:30 AM
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => handleScheduleChange('evening')}
-                      className={`flex-1 py-4 rounded-lg border-2 transition-all duration-200 font-[titleFont] text-base cursor-pointer ${
-                        deliverySchedule === 'evening'
-                          ? 'border-[#9C4A15] bg-[#F5EFE7]'
-                          : 'border-gray-200 hover:border-[#9C4A15]'
-                      }`}
-                      style={{ color: '#2A1803' }}
-                    >
-                      <div className="font-medium">Evening</div>
-                      <div className="text-sm mt-1" style={{ color: '#9C4A15' }}>
-                        3:00 PM - 6:30 PM
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Time Selection */}
-                  <h3
-                    className="text-lg font-medium mb-4 font-[titleFont]"
-                    style={{ color: '#9C4A15' }}
-                  >
-                    Select Delivery Time
-                  </h3>
-                  <div className="grid grid-cols-4 gap-2 mb-6">
-                    {currentTimeOptions.map((time) => (
-                      <button
-                        key={time}
-                        onClick={() => handleTimeSelect(time)}
-                        className={`py-3 rounded-lg transition-all duration-200 font-[titleFont] text-sm cursor-pointer ${
-                          selectedTime === time
-                            ? 'bg-[#9C4A15] text-white'
-                            : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
-                        }`}
-                      >
-                        {formatTimeForDisplay(time)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Quantity Selection */}
-                  <h3
-                    className="text-lg font-medium mb-4 font-[titleFont]"
-                    style={{ color: '#9C4A15' }}
-                  >
-                    Quantity per Delivery
-                  </h3>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {[20, 40, 50].map((option) => (
-                      <button
-                        key={option}
-                        onClick={() => handleQuantityChange(option)}
-                        className={`py-3 rounded-lg transition-all duration-200 font-[titleFont] text-sm cursor-pointer ${
-                          quantity === option && quantity !== 'custom'
-                            ? 'bg-[#9C4A15] text-white'
-                            : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
-                        }`}
-                      >
-                        {option} pcs
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-3 mb-3">
-                    <button
-                      onClick={() => handleQuantityChange('custom')}
-                      className={`flex-1 py-3 rounded-lg transition-all duration-200 font-[titleFont] text-sm cursor-pointer ${
-                        quantity === 'custom'
-                          ? 'bg-[#9C4A15] text-white'
-                          : 'bg-[#F5EFE7] text-[#2A1803] hover:bg-[#e8dfd2]'
-                      }`}
-                    >
-                      Custom
-                    </button>
-                    {quantity === 'custom' && (
-                      <input
-                        type="number"
-                        value={customQuantity}
-                        onChange={(e) => setCustomQuantity(e.target.value.replace(/\D/g, ''))}
-                        placeholder="Enter quantity"
-                        min="20"
-                        className="flex-1 px-4 py-3 rounded-lg border-2 border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] font-[titleFont] text-sm"
-                        style={{ color: '#2A1803' }}
-                      />
-                    )}
-                  </div>
-                  <p className="text-sm font-[titleFont]" style={{ color: '#9C4A15' }}>
-                    Minimum: 20 pieces per delivery (₱{20 * PANDESAL_PRICE_PER_PIECE} minimum)
-                  </p>
-
-                  {/* Special Instructions */}
-                  <h3
-                    className="text-lg font-medium mb-4 mt-8 font-[titleFont]"
-                    style={{ color: '#9C4A15' }}
-                  >
-                    Special Instructions
-                  </h3>
-                  <textarea
-                    value={specialInstructions}
-                    onChange={(e) => setSpecialInstructions(e.target.value)}
-                    placeholder="Any special requests or notes for delivery..."
-                    className="w-full h-28 px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] font-[titleFont] text-sm resize-none"
-                    style={{ color: '#2A1803' }}
-                  />
-                </div>
-              </motion.div>
-
-              {/* Order Summary */}
-              <motion.div className="flex flex-col" variants={faqItem} transition={{ delay: 0.2 }}>
-                <h2
-                  className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
-                  style={{ color: '#2A1803' }}
-                >
-                  Order Summary
-                </h2>
-
-                <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1 flex flex-col">
-                  <div className="space-y-4 flex-1">
-                    <div className="flex justify-between items-center">
-                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
-                        Selected Days
-                      </span>
-                      <span
-                        className="font-bold font-[titleFont] text-lg"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        {selectedDates.length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
-                        Delivery Time
-                      </span>
-                      <span
-                        className="font-bold font-[titleFont] text-lg"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        {selectedTime ? formatTimeForDisplay(selectedTime) : 'Not selected'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
-                        Pieces per delivery
-                      </span>
-                      <span
-                        className="font-bold font-[titleFont] text-lg"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        {getFinalQuantity()} pcs
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-[titleFont] text-base" style={{ color: '#2A1803' }}>
-                        Price per piece
-                      </span>
-                      <span
-                        className="font-bold font-[titleFont] text-lg"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        {formatCurrency(PANDESAL_PRICE_PER_PIECE)}
-                      </span>
-                    </div>
-
-                    <div className="h-px" style={{ backgroundColor: '#F5EFE7' }}></div>
-
-                    <div className="flex justify-between items-center mb-2">
-                      <span
-                        className="font-bold font-[titleFont] text-lg"
-                        style={{ color: '#2A1803' }}
-                      >
-                        Total Pandesal
-                      </span>
-                      <span
-                        className="font-bold font-[titleFont] text-xl"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        {getTotalPandesal()} pcs
-                      </span>
-                    </div>
-
-                    {/* Total Price Section */}
-                    <div className="mt-4 pt-4 border-t" style={{ borderColor: '#F5EFE7' }}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span
-                          className="font-bold font-[titleFont] text-lg"
-                          style={{ color: '#2A1803' }}
-                        >
-                          Total Amount
-                        </span>
-                        <span
-                          className="font-bold font-[titleFont] text-2xl"
-                          style={{ color: '#9C4A15' }}
-                        >
-                          {formatCurrency(getTotalPrice())}
-                        </span>
-                      </div>
-                      <p
-                        className="text-sm font-[titleFont] text-right"
-                        style={{ color: '#9C4A15' }}
-                      >
-                        ({getTotalPandesal()} pcs × {formatCurrency(PANDESAL_PRICE_PER_PIECE)})
-                      </p>
-                    </div>
-
-                    {specialInstructions && (
-                      <div
-                        className="mt-4 p-3 rounded-lg font-[titleFont] text-sm"
-                        style={{ backgroundColor: '#F5EFE7', color: '#2A1803' }}
-                      >
-                        <span className="font-medium">Special Instructions:</span>{' '}
-                        {specialInstructions}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-6">
-                    <motion.button
-                      onClick={handleSubmitOrder}
-                      disabled={
-                        selectedDates.length === 0 ||
-                        !selectedTime ||
-                        (quantity === 'custom' &&
-                          (!customQuantity || parseInt(customQuantity) < 20)) ||
-                        !isAuthenticated
-                      }
-                      className={`w-full py-4 rounded-full font-bold font-[titleFont] text-base transition-all duration-200 shadow-lg cursor-pointer ${
-                        !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
-                      style={{
-                        backgroundColor: '#9C4A15',
-                        color: '#F5EFE7',
-                      }}
-                      whileHover={isAuthenticated ? { scale: 1.02 } : {}}
-                      whileTap={isAuthenticated ? { scale: 0.98 } : {}}
-                    >
-                      {!isAuthenticated
-                        ? 'Login to Place Order'
-                        : selectedDates.length === 0
-                          ? 'Select Delivery Dates'
-                          : !selectedTime
-                            ? 'Select Delivery Time'
-                            : `Proceed to Payment • ${formatCurrency(getTotalPrice())}`}
-                    </motion.button>
-
-                    {/* Show user status message */}
-                    {isAuthenticated && user && (
-                      <p
-                        className="text-center mt-3 font-[titleFont] text-sm"
-                        style={{ color: '#2A1803' }}
-                      >
-                        Ordering as:{' '}
-                        <span style={{ color: '#9C4A15', fontWeight: '600' }}>
-                          {user.fullname || user.c_fullname}
-                        </span>
-                      </p>
-                    )}
-
-                    <p
-                      className="text-center mt-3 font-[titleFont] text-sm"
-                      style={{ color: '#9C4A15' }}
-                    >
-                      Free delivery on all subscriptions
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
           </div>
         </motion.div>
 
@@ -1013,7 +882,7 @@ const Order = () => {
         </motion.div>
       </div>
 
-      {/* shown if user is NOT logged in */}
+      {/* Auth Modal */}
       <AuthChoiceModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}

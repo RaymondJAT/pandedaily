@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3080'
+const API_URL = 'http://192.168.40.101:3080'
 
 // Helper function for API calls
 const fetchApi = async (endpoint, options = {}) => {
@@ -29,6 +29,54 @@ const fetchApi = async (endpoint, options = {}) => {
     console.error(`API call failed for ${endpoint}:`, error)
     throw error
   }
+}
+
+// NEW: Geocoding function using OpenStreetMap Nominatim
+export const geocodeAddress = async (address) => {
+  try {
+    const encodedAddress = encodeURIComponent(address)
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1&accept-language=en`,
+      {
+        headers: {
+          'User-Agent': 'PandeDailyApp/1.0', // Required by Nominatim
+        },
+      },
+    )
+
+    if (!response.ok) {
+      throw new Error('Geocoding service error')
+    }
+
+    const data = await response.json()
+
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+        displayName: data[0].display_name,
+        success: true,
+      }
+    }
+
+    return {
+      success: false,
+      message: 'Address not found',
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error)
+    return {
+      success: false,
+      message: 'Error finding address coordinates',
+    }
+  }
+}
+
+// NEW: Batch geocoding with delay to respect rate limits
+export const geocodeAddressWithDelay = async (address, delayMs = 1000) => {
+  // Add delay to respect Nominatim's usage policy (max 1 request per second)
+  await new Promise((resolve) => setTimeout(resolve, delayMs))
+  return geocodeAddress(address)
 }
 
 // Auth API calls
@@ -113,11 +161,11 @@ export const getCustomerById = async (id) => {
 
 // Product API calls
 export const getProducts = async () => {
-  return fetchApi('/product')
+  return fetchApi('/auth/product')
 }
 
 export const getProductCategories = async () => {
-  return fetchApi('/product/category')
+  return fetchApi('/auth/product/category')
 }
 
 export const getProductById = async (id) => {
@@ -200,19 +248,6 @@ export const createOrder = async (orderData) => {
   })
 }
 
-// export const updateOrder = async (id, orderData) => {
-//   return fetchApi(`/orders/${id}`, {
-//     method: 'PUT',
-//     body: JSON.stringify(orderData),
-//   })
-// }
-
-// export const deleteOrder = async (id) => {
-//   return fetchApi(`/orders/${id}`, {
-//     method: 'DELETE',
-//   })
-// }
-
 // Delivery API calls
 export const getDeliveries = async () => {
   return fetchApi('/delivery')
@@ -257,10 +292,6 @@ export const assignRiderToDelivery = async (deliveryId, data) => {
     body: JSON.stringify(data),
   })
 }
-
-// export const getAvailableRiders = async () => {
-//   return fetchApi('/riders/available')
-// }
 
 // Rider API calls
 export const getRiders = async () => {

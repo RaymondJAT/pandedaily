@@ -1,11 +1,22 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useEffect, useState } from 'react'
 
-const ProtectedRoute = ({ children, allowedTypes = [] }) => {
+const ProtectedRoute = ({ children, allowedTypes = [], requireAuth = false }) => {
   const { user, loading } = useAuth()
   const location = useLocation()
+  const [hasGuestInfo, setHasGuestInfo] = useState(false)
+  const [checkingGuest, setCheckingGuest] = useState(true)
 
-  if (loading) {
+  useEffect(() => {
+    // Check for guest info in localStorage
+    const guestInfo = localStorage.getItem('guestInfo')
+    setHasGuestInfo(!!guestInfo)
+    setCheckingGuest(false)
+  }, [])
+
+  // Show loading state while checking auth or guest info
+  if (loading || checkingGuest) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -19,27 +30,71 @@ const ProtectedRoute = ({ children, allowedTypes = [] }) => {
     )
   }
 
-  if (!user) {
-    // Redirect to login if not authenticated
-    return <Navigate to="/login" replace state={{ from: location }} />
-  }
+  // Determine user type and access rights
+  const isAuthenticated = !!user
+  const userType = user?.user_type || (user?.c_id ? 'customer' : null)
 
-  if (allowedTypes.length > 0) {
-    const userType = user.user_type || (user.c_id ? 'customer' : 'guest')
+  // Case 1: Route requires authentication (like account settings)
+  if (requireAuth) {
+    if (!isAuthenticated) {
+      return (
+        <Navigate
+          to="/login"
+          replace
+          state={{ from: location, message: 'Please login to access this page' }}
+        />
+      )
+    }
 
-    if (!allowedTypes.includes(userType)) {
+    if (allowedTypes.length > 0 && !allowedTypes.includes(userType)) {
       // Redirect based on user type
       if (userType === 'admin') {
         return <Navigate to="/admin/dashboard" replace />
-      } else if (userType === 'customer') {
+      } else {
         return <Navigate to="/order" replace />
       }
-      // Default redirect
-      return <Navigate to="/" replace />
     }
+
+    return children
   }
 
-  return children
+  // Case 2: Route accessible by both guests and registered users (like checkout)
+  if (hasGuestInfo || isAuthenticated) {
+    // If user is authenticated but not in allowed types, still allow for checkout pages
+    if (allowedTypes.length > 0 && isAuthenticated && !allowedTypes.includes(userType)) {
+      // Check if this is a checkout-related route that should be accessible
+      const checkoutRoutes = ['/checkout', '/order/confirmation', '/order/payment']
+      const isCheckoutRoute = checkoutRoutes.some((route) => location.pathname.includes(route))
+
+      if (isCheckoutRoute) {
+        // Allow authenticated users to access checkout even if not in allowedTypes
+        return children
+      }
+
+      // Redirect non-customer authenticated users
+      if (userType === 'admin') {
+        return <Navigate to="/admin/dashboard" replace />
+      }
+      return <Navigate to="/order" replace />
+    }
+
+    return children
+  }
+
+  // Case 3: No access - redirect based on route
+  const isCheckoutRoute = ['/checkout', '/order/confirmation', '/order/payment'].some((route) =>
+    location.pathname.includes(route),
+  )
+
+  if (isCheckoutRoute) {
+    // For checkout routes, redirect to guest info first
+    return (
+      <Navigate to="/guest-info" replace state={{ from: location, returnTo: location.pathname }} />
+    )
+  }
+
+  // Default redirect to login
+  return <Navigate to="/login" replace state={{ from: location }} />
 }
 
 export default ProtectedRoute

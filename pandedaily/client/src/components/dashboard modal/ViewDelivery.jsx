@@ -28,7 +28,7 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
 
   const scheduleStatusConfig = {
     PENDING: { color: 'default', label: 'Pending' },
-    ASSIGNED: { color: 'blue', label: 'Assigned' },
+    'FOR-PICK-UP': { color: 'blue', label: 'For Pick-up' },
     'OUT-FOR-DELIVERY': { color: 'orange', label: 'Out for Delivery' },
     COMPLETE: { color: 'green', label: 'Complete' },
   }
@@ -36,7 +36,7 @@ const ViewDelivery = ({ deliveryId, isOpen, onClose, onRefresh }) => {
   const orderStatusConfig = {
     PENDING: { color: 'default', label: 'Pending' },
     APPROVED: { color: 'blue', label: 'Approved' },
-    PAID: { color: 'green', label: 'Paid' },
+    'FOR-PICK-UP': { color: 'green', label: 'For Pick-up' },
     'OUT-FOR-DELIVERY': { color: 'orange', label: 'Out for Delivery' },
     COMPLETE: { color: 'green', label: 'Complete' },
     CANCELLED: { color: 'red', label: 'Cancelled' },

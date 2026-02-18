@@ -1,7 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react' // Add useEffect
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FaUser, FaPhone, FaEnvelope, FaMapMarkerAlt, FaArrowLeft, FaCheck } from 'react-icons/fa'
+import {
+  FaUser,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
+  FaArrowLeft,
+  FaCheck,
+  FaCrosshairs,
+} from 'react-icons/fa'
+import LocationMap from './LocationMap'
+import AddressAutocomplete from './AddressAutocomplete'
 
 const GuestInformation = () => {
   const navigate = useNavigate()
@@ -11,35 +21,48 @@ const GuestInformation = () => {
     email: '',
     address: '',
   })
+  const [selectedLocation, setSelectedLocation] = useState({
+    lat: null,
+    lng: null,
+    address: '',
+  })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [locationValid, setLocationValid] = useState(false)
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }))
+  // Check if there's an existing order when component mounts
+  useEffect(() => {
+    const savedOrder = localStorage.getItem('pendingOrder')
+    if (!savedOrder) {
+      const selectedProducts = localStorage.getItem('selectedProducts')
+      if (!selectedProducts) {
+        // No products selected, redirect to order page
+        navigate('/order')
+      }
     }
-  }
+  }, [navigate])
 
+  // Validation
   const validateForm = () => {
     const newErrors = {}
 
     if (!formData.fullname.trim()) {
       newErrors.fullname = 'Full name is required'
+    } else if (formData.fullname.length < 2) {
+      newErrors.fullname = 'Full name must be at least 2 characters'
+    } else if (formData.fullname.length > 100) {
+      newErrors.fullname = 'Full name is too long'
     }
 
     if (!formData.contactNumber.trim()) {
       newErrors.contactNumber = 'Contact number is required'
-    } else if (!/^[0-9+\-\s()]{10,15}$/.test(formData.contactNumber.replace(/\s/g, ''))) {
-      newErrors.contactNumber = 'Please enter a valid contact number'
+    } else {
+      const digits = formData.contactNumber.replace(/\D/g, '')
+      if (!/^(09|\+639)\d{9}$/.test(digits)) {
+        newErrors.contactNumber =
+          'Please enter a valid Philippine mobile number (e.g., 09123456789)'
+      }
     }
 
     if (!formData.email.trim()) {
@@ -48,16 +71,138 @@ const GuestInformation = () => {
       newErrors.email = 'Please enter a valid email address'
     }
 
-    if (!formData.address.trim()) {
-      newErrors.address = 'Address is required'
-    } else if (formData.address.trim().length < 10) {
-      newErrors.address = 'Address is too short (minimum 10 characters)'
+    // Location validation - must have coordinates from map
+    if (!selectedLocation.lat || !selectedLocation.lng) {
+      newErrors.location = 'Please select your delivery location on the map'
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
+  // Handle input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+
+    // Format phone number
+    let formattedValue = value
+    if (name === 'contactNumber') {
+      const digits = value.replace(/\D/g, '').slice(0, 11)
+      if (digits.length > 7) {
+        formattedValue = `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`
+      } else if (digits.length > 4) {
+        formattedValue = `${digits.slice(0, 4)}-${digits.slice(4)}`
+      } else {
+        formattedValue = digits
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: formattedValue,
+    }))
+
+    // Clear error for this field
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Handle location selection from map
+  const handleLocationSelect = (location) => {
+    setSelectedLocation({
+      lat: location.lat,
+      lng: location.lng,
+      address: location.address || formData.address,
+    })
+
+    // Update address field if we got address from reverse geocoding
+    if (location.address) {
+      setFormData((prev) => ({
+        ...prev,
+        address: location.address,
+      }))
+    }
+
+    setLocationValid(true)
+
+    if (errors.location) {
+      setErrors((prev) => ({ ...prev, location: '' }))
+    }
+  }
+
+  // Get user's current location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser')
+      return
+    }
+
+    setIsGettingLocation(true)
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+
+        try {
+          // Using a CORS proxy or your backend endpoint would be better
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            {
+              headers: {
+                'User-Agent': 'PandeDailyApp/1.0',
+                Accept: 'application/json',
+              },
+            },
+          )
+
+          if (response.ok) {
+            const data = await response.json()
+            handleLocationSelect({
+              lat: latitude,
+              lng: longitude,
+              address: data.display_name,
+            })
+          } else {
+            handleLocationSelect({
+              lat: latitude,
+              lng: longitude,
+              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+            })
+          }
+        } catch (error) {
+          console.error('Error getting address:', error)
+          handleLocationSelect({
+            lat: latitude,
+            lng: longitude,
+            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          })
+        } finally {
+          setIsGettingLocation(false)
+        }
+      },
+      (error) => {
+        console.error('Error getting location:', error)
+        let errorMessage = 'Unable to get your location. '
+        if (error.code === 1) {
+          errorMessage += 'Please enable location access in your browser.'
+        } else if (error.code === 2) {
+          errorMessage += 'Location unavailable. Please try again.'
+        } else if (error.code === 3) {
+          errorMessage += 'Location request timed out. Please try again.'
+        }
+        alert(errorMessage)
+        setIsGettingLocation(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    )
+  }
+
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -66,17 +211,62 @@ const GuestInformation = () => {
     setIsSubmitting(true)
 
     try {
-      // Save guest information to localStorage or context
-      const guestInfo = {
-        ...formData,
+      const cleanedContact = formData.contactNumber.replace(/\D/g, '')
+
+      // Get saved order from localStorage
+      const savedOrder = localStorage.getItem('pendingOrder')
+      let orderDetails = savedOrder ? JSON.parse(savedOrder) : null
+
+      if (!orderDetails) {
+        const selectedProducts = localStorage.getItem('selectedProducts')
+        if (selectedProducts) {
+          const products = JSON.parse(selectedProducts)
+          const totalItems = products.reduce((sum, p) => sum + (p.quantity || 1), 0)
+          const totalPrice = products.reduce(
+            (sum, p) => sum + (p.quantity || 1) * (p.price || 0),
+            0,
+          )
+
+          orderDetails = {
+            products,
+            totalPieces: totalItems,
+            totalPricePerDelivery: totalPrice,
+          }
+
+          // Save as pending order
+          localStorage.setItem('pendingOrder', JSON.stringify(orderDetails))
+        } else {
+          // No products found, redirect to order page
+          navigate('/order')
+          return
+        }
+      }
+
+      // Prepare guest customer data with coordinates
+      const guestData = {
+        fullname: formData.fullname.trim(),
+        contact: cleanedContact,
+        email: formData.email.trim().toLowerCase(),
+        address: selectedLocation.address || formData.address.trim(),
+        latitude: selectedLocation.lat,
+        longitude: selectedLocation.lng,
         isGuest: true,
         timestamp: new Date().toISOString(),
       }
 
-      localStorage.setItem('guestInfo', JSON.stringify(guestInfo))
+      // Save guest info
+      localStorage.setItem('guestInfo', JSON.stringify(guestData))
 
-      // Navigate to checkout or menu page
-      navigate('/checkout')
+      // Clear selected products as they're now in pendingOrder
+      localStorage.removeItem('selectedProducts')
+
+      // Navigate to checkout
+      navigate('/checkout', {
+        state: {
+          orderDetails,
+          guestInfo: guestData,
+        },
+      })
     } catch (error) {
       console.error('Error saving guest information:', error)
       setErrors({ submit: 'Failed to save information. Please try again.' })
@@ -89,216 +279,287 @@ const GuestInformation = () => {
     navigate(-1)
   }
 
-  return (
-    <div className="max-h-screen bg-linear-to-b from-[#F5EFE7] to-white">
-      {/* Header - Fixed */}
-      <div className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1 sm:gap-2 text-[#9C4A15] hover:text-[#8a3f12] transition-colors p-1 sm:p-0"
-            >
-              <FaArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium text-sm sm:text-base">Back</span>
-            </button>
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#2A1803] font-[titleFont] text-center">
-              Guest Information
-            </h1>
-            <div className="w-6 sm:w-10"></div> {/* Spacer for alignment */}
-          </div>
-        </div>
-      </div>
+  // Animation variants
+  const pageVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.3 } },
+  }
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-2xl mx-auto"
-        >
+  const formVariants = {
+    hidden: { opacity: 0, x: -20 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  }
+
+  const mapVariants = {
+    hidden: { opacity: 0, x: 20 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: 'easeOut', delay: 0.1 } },
+  }
+
+  return (
+    <motion.div
+      className="min-h-screen flex flex-col md:flex-row font-[titleFont]"
+      style={{ backgroundColor: '#F5EFE7' }}
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Back Button - Mobile Only */}
+      <button
+        onClick={handleBack}
+        className="absolute top-4 left-4 md:hidden z-10 flex items-center gap-2 p-2 rounded-lg hover:bg-white/50 transition-colors"
+        style={{ color: '#2A1803' }}
+      >
+        <FaArrowLeft className="w-4 h-4" />
+        <span className="text-sm font-[titleFont]">Back</span>
+      </button>
+
+      {/* Left Column - Form */}
+      <motion.div
+        className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-8 lg:p-12 overflow-y-auto"
+        style={{ maxHeight: '100vh' }}
+        variants={formVariants}
+      >
+        <div className="w-full max-w-lg">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1
+              className="text-3xl md:text-4xl font-light mb-2 font-[titleFont]"
+              style={{ color: '#2A1803' }}
+            >
+              Guest Checkout
+            </h1>
+            <p className="text-base md:text-lg font-[titleFont]" style={{ color: '#9C4A15' }}>
+              Enter your details and select delivery location
+            </p>
+          </div>
+
           {/* Info Card */}
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 border border-[#9C4A15]/20">
-            <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full bg-[#F5EFE7] flex items-center justify-center shrink-0">
-                <FaUser className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-[#9C4A15]" />
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-[#9C4A15]/20">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#F5EFE7] flex items-center justify-center shrink-0">
+                <FaUser className="w-5 h-5 text-[#9C4A15]" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#2A1803] font-[titleFont]">
-                  Enter Your Details
-                </h2>
-                <p className="text-[#9C4A15] text-xs sm:text-sm md:text-base mt-0.5 sm:mt-1">
-                  We need your information to process your order
-                </p>
+                <h2 className="text-lg font-bold text-[#2A1803]">Quick & Easy</h2>
+                <p className="text-[#9C4A15] text-sm">No account needed to place your order</p>
               </div>
             </div>
-            <div className="space-y-1 sm:space-y-2">
-              <div className="flex items-start sm:items-center text-xs sm:text-sm text-gray-600">
-                <FaCheck className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 mr-1.5 sm:mr-2 mt-0.5 sm:mt-0 shrink-0" />
-                <span>Your information is only used for order processing</span>
+            <div className="space-y-2">
+              <div className="flex items-start text-sm text-gray-600">
+                <FaCheck className="w-4 h-4 text-green-500 mr-2 mt-0.5 shrink-0" />
+                <span>Type your address or click on the map to set exact location</span>
               </div>
-              <div className="flex items-start sm:items-center text-xs sm:text-sm text-gray-600">
-                <FaCheck className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 mr-1.5 sm:mr-2 mt-0.5 sm:mt-0 shrink-0" />
-                <span>We won't use your email for marketing without permission</span>
+              <div className="flex items-start text-sm text-gray-600">
+                <FaCheck className="w-4 h-4 text-green-500 mr-2 mt-0.5 shrink-0" />
+                <span>Your information is secure and only used for this order</span>
               </div>
             </div>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 md:space-y-6">
-            {/* Full Name */}
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-[#2A1803] mb-1 sm:mb-2">
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <FaUser className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
-                  <span>Full Name *</span>
-                </div>
-              </label>
-              <input
-                type="text"
-                name="fullname"
-                value={formData.fullname}
-                onChange={handleInputChange}
-                placeholder="Enter your full name"
-                className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
-                  errors.fullname ? 'border-red-500' : 'border-[#9C4A15]/30'
-                }`}
-                disabled={isSubmitting}
-              />
-              {errors.fullname && (
-                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.fullname}</p>
-              )}
-            </div>
-
-            {/* Contact Number and Email - Responsive Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-              {/* Contact Number */}
+          <div className="bg-white rounded-xl shadow-xl p-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Full Name */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-[#2A1803] mb-1 sm:mb-2">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <FaPhone className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
-                    <span>Contact Number *</span>
+                <label className="block text-sm font-medium text-[#2A1803] mb-2">
+                  <div className="flex items-center gap-2">
+                    <FaUser className="w-4 h-4 text-[#9C4A15]" />
+                    <span>Full Name *</span>
                   </div>
                 </label>
                 <input
-                  type="tel"
-                  name="contactNumber"
-                  value={formData.contactNumber}
+                  type="text"
+                  name="fullname"
+                  value={formData.fullname}
                   onChange={handleInputChange}
-                  placeholder="09123456789"
-                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
-                    errors.contactNumber ? 'border-red-500' : 'border-[#9C4A15]/30'
+                  placeholder="Enter your full name"
+                  className={`w-full px-4 py-3 text-base rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
+                    errors.fullname ? 'border-red-500' : 'border-[#9C4A15]'
                   }`}
                   disabled={isSubmitting}
                 />
-                {errors.contactNumber && (
-                  <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.contactNumber}</p>
-                )}
+                {errors.fullname && <p className="mt-1 text-sm text-red-600">{errors.fullname}</p>}
               </div>
 
-              {/* Email */}
+              {/* Contact Number and Email */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-[#2A1803] mb-2">
+                    <div className="flex items-center gap-2">
+                      <FaPhone className="w-4 h-4 text-[#9C4A15]" />
+                      <span>Contact Number *</span>
+                    </div>
+                  </label>
+                  <input
+                    type="tel"
+                    name="contactNumber"
+                    value={formData.contactNumber}
+                    onChange={handleInputChange}
+                    placeholder="0912-345-6789"
+                    maxLength="13"
+                    className={`w-full px-4 py-3 text-base rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
+                      errors.contactNumber ? 'border-red-500' : 'border-[#9C4A15]'
+                    }`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.contactNumber && (
+                    <p className="mt-1 text-sm text-red-600">{errors.contactNumber}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#2A1803] mb-2">
+                    <div className="flex items-center gap-2">
+                      <FaEnvelope className="w-4 h-4 text-[#9C4A15]" />
+                      <span>Email Address *</span>
+                    </div>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="your.email@example.com"
+                    className={`w-full px-4 py-3 text-base rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
+                      errors.email ? 'border-red-500' : 'border-[#9C4A15]'
+                    }`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                </div>
+              </div>
+
+              {/* Address with Autocomplete */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-[#2A1803] mb-1 sm:mb-2">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <FaEnvelope className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
-                    <span>Email Address *</span>
+                <label className="block text-sm font-medium text-[#2A1803] mb-2">
+                  <div className="flex items-center gap-2">
+                    <FaMapMarkerAlt className="w-4 h-4 text-[#9C4A15]" />
+                    <span>Delivery Address *</span>
                   </div>
                 </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
+
+                <AddressAutocomplete
+                  value={formData.address}
                   onChange={handleInputChange}
-                  placeholder="your.email@example.com"
-                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
-                    errors.email ? 'border-red-500' : 'border-[#9C4A15]/30'
-                  }`}
+                  onLocationSelect={handleLocationSelect}
                   disabled={isSubmitting}
                 />
-                {errors.email && (
-                  <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.email}</p>
+
+                {/* Coordinates display */}
+                {selectedLocation.lat && selectedLocation.lng && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 p-3 bg-[#F5EFE7] rounded-lg"
+                  >
+                    <div className="flex flex-wrap gap-4">
+                      <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
+                        <span className="font-medium">Latitude:</span>{' '}
+                        <span className="font-bold" style={{ color: '#9C4A15' }}>
+                          {selectedLocation.lat.toFixed(6)}
+                        </span>
+                      </p>
+                      <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
+                        <span className="font-medium">Longitude:</span>{' '}
+                        <span className="font-bold" style={{ color: '#9C4A15' }}>
+                          {selectedLocation.lng.toFixed(6)}
+                        </span>
+                      </p>
+                    </div>
+                  </motion.div>
                 )}
-                <p className="mt-1 text-xs sm:text-sm text-gray-600">
-                  We'll send your order confirmation to this email
-                </p>
-              </div>
-            </div>
 
-            {/* Address */}
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-[#2A1803] mb-1 sm:mb-2">
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <FaMapMarkerAlt className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
-                  <span>Delivery Address *</span>
-                </div>
-              </label>
-              <textarea
-                name="address"
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder="Enter your complete address including street, barangay, city, and landmark"
-                rows={2}
-                className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all ${
-                  errors.address ? 'border-red-500' : 'border-[#9C4A15]/30'
-                }`}
-                disabled={isSubmitting}
-              />
-              {errors.address && (
-                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.address}</p>
+                {errors.location && <p className="mt-1 text-sm text-red-600">{errors.location}</p>}
+              </div>
+
+              {/* Submit Error */}
+              {errors.submit && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="p-3 bg-red-50 border border-red-200 rounded-lg"
+                >
+                  <p className="text-red-600 text-sm">{errors.submit}</p>
+                </motion.div>
               )}
-              <p className="mt-1 text-xs sm:text-sm text-gray-600">
-                Please provide detailed address for accurate delivery
-              </p>
-            </div>
 
-            {/* Submit Error */}
-            {errors.submit && (
-              <div className="p-2 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-xs sm:text-sm">{errors.submit}</p>
-              </div>
-            )}
-
-            {/* Action Buttons - Stacked on mobile, side by side on tablet+ */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 pt-4 sm:pt-6">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="w-full sm:flex-1 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 border border-[#9C4A15] sm:border-2 text-[#9C4A15] rounded-lg hover:bg-[#F5EFE7] transition-colors font-medium text-sm md:text-base"
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
+              {/* Submit Button */}
+              <motion.button
                 type="submit"
-                className="w-full sm:flex-1 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 bg-[#9C4A15] text-white rounded-lg hover:bg-[#8a3f12] transition-colors font-medium flex items-center justify-center gap-1.5 sm:gap-2 text-sm md:text-base"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !selectedLocation.lat || !selectedLocation.lng}
+                className={`w-full py-4 rounded-lg font-medium text-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9C4A15] ${
+                  isSubmitting || !selectedLocation.lat || !selectedLocation.lng
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'cursor-pointer hover:opacity-90'
+                }`}
+                style={{
+                  backgroundColor: '#9C4A15',
+                  color: '#F5EFE7',
+                }}
+                whileHover={
+                  !isSubmitting && selectedLocation.lat && selectedLocation.lng
+                    ? { scale: 1.02 }
+                    : {}
+                }
+                whileTap={
+                  !isSubmitting && selectedLocation.lat && selectedLocation.lng
+                    ? { scale: 0.98 }
+                    : {}
+                }
               >
                 {isSubmitting ? (
-                  <>
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
-                  </>
+                  <span className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                    Processing...
+                  </span>
                 ) : (
-                  <>
-                    <FaCheck className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
-                    <span>Continue to Order</span>
-                  </>
+                  'Proceed to Checkout'
                 )}
-              </button>
-            </div>
-          </form>
-
-          {/* Privacy Note */}
-          <div className="mt-4 sm:mt-6 p-2.5 sm:p-3 md:p-4 bg-[#F5EFE7] rounded-lg border border-[#9C4A15]/20">
-            <p className="text-xs sm:text-sm text-[#2A1803] text-center">
-              <span className="font-semibold">Privacy Note:</span> Your information is securely
-              stored and only used for processing your current order. We value your privacy.
-            </p>
+              </motion.button>
+            </form>
           </div>
-        </motion.div>
+        </div>
+      </motion.div>
+
+      {/* Right Column - Clickable Map */}
+      <motion.div className="hidden md:block md:w-1/2 h-screen sticky top-0" variants={mapVariants}>
+        <div className="h-full relative">
+          {/* Current Location Button */}
+          <button
+            onClick={getCurrentLocation}
+            disabled={isGettingLocation}
+            className="absolute top-6 right-6 z-10 bg-white p-4 rounded-full shadow-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            style={{ color: '#9C4A15' }}
+            title="Use my current location"
+          >
+            <FaCrosshairs className={`w-6 h-6 ${isGettingLocation ? 'animate-spin' : ''}`} />
+          </button>
+
+          <LocationMap
+            onLocationSelect={handleLocationSelect}
+            selectedLocation={selectedLocation}
+          />
+        </div>
+      </motion.div>
+
+      {/* Mobile Map Preview */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-72 z-10">
+        <div className="h-full relative">
+          <button
+            onClick={getCurrentLocation}
+            disabled={isGettingLocation}
+            className="absolute top-4 right-4 z-20 bg-white p-3 rounded-full shadow-lg"
+            style={{ color: '#9C4A15' }}
+          >
+            <FaCrosshairs className={`w-5 h-5 ${isGettingLocation ? 'animate-spin' : ''}`} />
+          </button>
+          <LocationMap
+            onLocationSelect={handleLocationSelect}
+            selectedLocation={selectedLocation}
+          />
+        </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
