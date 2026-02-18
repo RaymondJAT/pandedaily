@@ -1,7 +1,9 @@
+const { Product } = require('../database/model/Product')
 const { Query } = require('../database/utility/queries.util')
 const { EncryptString, DecryptString } = require('../utils/cryptography.util')
 require('dotenv').config()
 const jwt = require('jsonwebtoken')
+const https = require('https')
 
 /**
  * Login user account.
@@ -192,23 +194,13 @@ const Logout = async (req, res) => {
 
 // CUSTOMER
 const registerCustomer = async (req, res) => {
-  const { fullname, contact, email, address, latitude, longitude, username, password } = req.body
+  const { fullname, contact, email, address, username, password } = req.body
 
   try {
     // Validate required fields
-    if (
-      !fullname ||
-      !contact ||
-      !email ||
-      !address ||
-      !latitude ||
-      !longitude ||
-      !username ||
-      !password
-    ) {
+    if (!fullname || !contact || !email || !address || !username || !password) {
       return res.status(400).json({
-        message:
-          'Fullname, contact, email, address, latitude, longitude, username and password are required.',
+        message: 'Fullname, contact, email, address, username and password are required.',
       })
     }
 
@@ -226,15 +218,6 @@ const registerCustomer = async (req, res) => {
     if (!phoneRegex.test(cleanedContact)) {
       return res.status(400).json({
         message: 'Invalid phone number format. Use 09XXXXXXXXX or +639XXXXXXXXX',
-      })
-    }
-
-    // Validate numeric values
-    const lat = parseFloat(latitude)
-    const lng = parseFloat(longitude)
-    if (isNaN(lat) || isNaN(lng)) {
-      return res.status(400).json({
-        message: 'Latitude and longitude must be valid numbers.',
       })
     }
 
@@ -281,6 +264,83 @@ const registerCustomer = async (req, res) => {
       })
     }
 
+    // Get coordinates from address using OpenStreetMap Nominatim API (with native https)
+    let latitude = null
+    let longitude = null
+
+    try {
+      // Add delay to respect Nominatim's usage policy (max 1 request per second)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Encode the address for URL
+      const encodedAddress = encodeURIComponent(address)
+
+      // Create a promise-based HTTPS request
+      const geocodeResult = await new Promise((resolve, reject) => {
+        const options = {
+          hostname: 'nominatim.openstreetmap.org',
+          path: `/search?q=${encodedAddress}&format=json&limit=1&accept-language=en`,
+          method: 'GET',
+          headers: {
+            'User-Agent': 'PandeDailyApp/1.0', // Required: Identify your application
+          },
+        }
+
+        const req = https.get(options, (response) => {
+          let data = ''
+
+          // A chunk of data has been received
+          response.on('data', (chunk) => {
+            data += chunk
+          })
+
+          // The whole response has been received
+          response.on('end', () => {
+            try {
+              const parsedData = JSON.parse(data)
+              resolve(parsedData)
+            } catch (e) {
+              reject(new Error('Failed to parse geocoding response'))
+            }
+          })
+        })
+
+        req.on('error', (error) => {
+          reject(error)
+        })
+
+        req.end()
+      })
+
+      if (geocodeResult && geocodeResult.length > 0) {
+        latitude = parseFloat(geocodeResult[0].lat)
+        longitude = parseFloat(geocodeResult[0].lon)
+
+        // Optional: Get the formatted address from the response
+        const formattedAddress = geocodeResult[0].display_name
+        console.log('Geocoded address:', formattedAddress)
+      } else {
+        console.log('RESULT', geocodeResult)
+        return res.status(400).json({
+          message:
+            'Could not find coordinates for the provided address. Please provide a more specific address (e.g., include city/barangay).',
+        })
+      }
+    } catch (geocodeError) {
+      console.error('Geocoding error:', geocodeError)
+
+      return res.status(400).json({
+        message: 'Error processing address. Please check your address or try again later.',
+      })
+    }
+
+    // Validate numeric values
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({
+        message: 'Could not determine coordinates from the provided address.',
+      })
+    }
+
     // Insert customer with is_registered = 1
     const statement = `INSERT INTO customer(c_fullname, c_contact, c_email, c_address, c_latitude, c_longitude, c_username, c_password, c_is_registered) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`
     const data = await Query(statement, [
@@ -288,8 +348,8 @@ const registerCustomer = async (req, res) => {
       cleanedContact,
       email.toLowerCase().trim(),
       address.trim(),
-      lat,
-      lng,
+      latitude,
+      longitude,
       username.trim(),
       EncryptString(password),
       1,
@@ -302,6 +362,8 @@ const registerCustomer = async (req, res) => {
       contact: cleanedContact,
       email: email.toLowerCase().trim(),
       address: address.trim(),
+      latitude: latitude,
+      longitude: longitude,
       username: username.trim(),
       is_registered: true,
       created_at: new Date().toISOString(),
@@ -314,9 +376,6 @@ const registerCustomer = async (req, res) => {
     })
   } catch (error) {
     console.error('Error registering customer:', error)
-
-    // Don't log sensitive data
-    console.error('Error SQL:', error.sql)
 
     // Handle specific database errors
     if (error.code === 'ER_DUP_ENTRY') {
@@ -433,10 +492,50 @@ const editRegisteredCustomer = async (req, res) => {
   }
 }
 
+// PRODUCT
+const getProduct = async (req, res) => {
+  try {
+    const statement = `SELECT 
+      p.p_id AS id, 
+      p.p_name AS name, 
+      p.p_category_id AS category_id,  
+      pc.pc_name AS category_name, 
+      p.p_price AS price, 
+      p.p_cost AS cost, 
+      p.p_status AS status, 
+      pi.pi_image AS image 
+    FROM product p
+    INNER JOIN product_category pc ON p.p_category_id = pc.pc_id
+    LEFT JOIN product_image pi ON p.p_id = pi.pi_product_id`
+
+    const data = await Query(statement, [], Product.product.prefix_)
+    res.status(200).json({ message: 'Product data retrieved.', data })
+  } catch (error) {
+    console.error('Error retrieving product data:', error)
+    res.status(500).json({
+      message: 'Error retrieving product data.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    })
+  }
+}
+
+const getProductCategory = async (req, res) => {
+  try {
+    const statement = `SELECT * FROM product_category`
+
+    const data = await Query(statement, [], Product.product_category.prefix_)
+    res.status(200).json({ message: 'Product category data retrieved.', data })
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving product category data.' })
+  }
+}
+
 module.exports = {
   Login,
   CheckSession,
   Logout,
   registerCustomer,
   editRegisteredCustomer,
+  getProduct,
+  getProductCategory,
 }

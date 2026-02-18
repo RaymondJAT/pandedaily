@@ -37,7 +37,7 @@ const getOrders = async (req, res) => {
   }
 }
 
-// GET ORDER ITEMS WITH CUSTOMER NAME
+// GET ORDER ITEMS
 const getOrderItem = async (req, res) => {
   const { id } = req.params
   const customerId = req.context.id
@@ -222,7 +222,7 @@ const addOrder = async (req, res) => {
       inventoryMap[item.product_id] = row
     }
 
-    // Insert order and get ID using Query function
+    // Insert order and get ID
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
     const orderResult = await Query(
@@ -359,10 +359,7 @@ const approvalOrder = async (req, res) => {
     return res.status(400).json({ message: 'Status is required.' })
   }
 
-  // Normalize status to uppercase and validate against exact ENUM values
   const normalizedStatus = String(status).toUpperCase().trim()
-
-  // Must exactly match ENUM values: 'APPROVED', 'REJECTED'
   const validStatuses = ['APPROVED', 'REJECTED']
 
   if (!validStatuses.includes(normalizedStatus)) {
@@ -394,7 +391,7 @@ const approvalOrder = async (req, res) => {
       })
     }
 
-    // Don't allow updating if order is already OUT-FOR-DELIVERY or COMPLETE
+    // Don't allow updating if order is OUT-FOR-DELIVERY or COMPLETE
     if (['OUT-FOR-DELIVERY', 'COMPLETE'].includes(previousStatus)) {
       return res.status(400).json({
         message: `Cannot update order that is already ${previousStatus}.`,
@@ -404,7 +401,7 @@ const approvalOrder = async (req, res) => {
     // Start transaction
     const queries = []
 
-    // Update order status - use normalized uppercase value
+    // Update order status 
     queries.push({
       sql: `
         UPDATE orders
@@ -414,7 +411,7 @@ const approvalOrder = async (req, res) => {
       values: [normalizedStatus, id],
     })
 
-    // If APPROVED, automatically create deliveries for all schedules
+    // If approved create deliveries for all schedules
     if (normalizedStatus === 'APPROVED') {
       // Get all delivery schedules for this order
       const schedules = await Query(

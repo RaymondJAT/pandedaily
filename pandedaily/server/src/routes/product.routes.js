@@ -1,7 +1,5 @@
 const express = require('express')
 const {
-  getProductCategory,
-  getProduct,
   getProductById,
   addProductCategory,
   addProduct,
@@ -10,10 +8,6 @@ const {
 } = require('../controller/product.controller')
 
 const productRouter = express.Router()
-
-// GET
-productRouter.get('/category', getProductCategory)
-productRouter.get('/', getProduct)
 
 // GET BY ID
 productRouter.get('/:id', getProductById)

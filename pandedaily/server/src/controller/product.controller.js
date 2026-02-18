@@ -1,44 +1,6 @@
 const { Product } = require('../database/model/Product')
 const { Query } = require('../database/utility/queries.util')
 
-// GET ALL
-const getProductCategory = async (req, res) => {
-  try {
-    const statement = `SELECT * FROM product_category`
-
-    const data = await Query(statement, [], Product.product_category.prefix_)
-    res.status(200).json({ message: 'Product category data retrieved.', data })
-  } catch (error) {
-    res.status(500).json({ message: 'Error retrieving product category data.' })
-  }
-}
-
-const getProduct = async (req, res) => {
-  try {
-    const statement = `SELECT 
-      p.p_id AS id, 
-      p.p_name AS name, 
-      p.p_category_id AS category_id,  
-      pc.pc_name AS category_name, 
-      p.p_price AS price, 
-      p.p_cost AS cost, 
-      p.p_status AS status, 
-      pi.pi_image AS image 
-    FROM product p
-    INNER JOIN product_category pc ON p.p_category_id = pc.pc_id
-    LEFT JOIN product_image pi ON p.p_id = pi.pi_product_id`
-
-    const data = await Query(statement, [], Product.product.prefix_)
-    res.status(200).json({ message: 'Product data retrieved.', data })
-  } catch (error) {
-    console.error('Error retrieving product data:', error)
-    res.status(500).json({
-      message: 'Error retrieving product data.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-    })
-  }
-}
-
 // GET BY ID
 const getProductById = async (req, res) => {
   const { id } = req.params
@@ -363,8 +325,6 @@ const updateProduct = async (req, res) => {
 }
 
 module.exports = {
-  getProductCategory,
-  getProduct,
   getProductById,
   addProductCategory,
   addProduct,

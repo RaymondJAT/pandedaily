@@ -28,21 +28,21 @@ module.exports = {
         allowNull: false,
       },
       c_latitude: {
-        type: Sequelize.DECIMAL(10, 8),
+        type: Sequelize.DOUBLE,
         allowNull: false,
       },
       c_longitude: {
-        type: Sequelize.DECIMAL(10, 8),
+        type: Sequelize.DOUBLE,
         allowNull: false,
       },
       c_username: {
         type: Sequelize.STRING(100),
-        allowNull: false,
+        allowNull: true,
         unique: true,
       },
       c_password: {
         type: Sequelize.TEXT,
-        allowNull: false,
+        allowNull: true,
       },
       c_is_registered: {
         type: Sequelize.BOOLEAN,
