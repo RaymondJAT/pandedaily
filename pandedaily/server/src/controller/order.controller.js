@@ -115,6 +115,7 @@ const getOrderItem = async (req, res) => {
 const addOrder = async (req, res) => {
   const {
     customer_id,
+    customer_info,
     payment_type,
     payment_reference,
     details,
@@ -132,11 +133,77 @@ const addOrder = async (req, res) => {
     'COMPLETE',
   ]
 
-  // Basic validation
+  let finalCustomerId = customer_id
+  let isGuest = false
+
+  // If no customer_id, this is a guest order
   if (!customer_id) {
-    return res.status(400).json({ message: 'Customer ID is required.' })
+    isGuest = true
+
+    // Validate guest info
+    if (
+      !customer_info ||
+      !customer_info.fullname ||
+      !customer_info.email ||
+      !customer_info.contact
+    ) {
+      return res.status(400).json({
+        message: 'For guest orders, customer_info with fullname, email, and contact is required.',
+      })
+    }
+
+    // Check if guest already exists in customer table
+    const existingCustomer = await Query('SELECT c_id FROM customer WHERE c_email = ?', [
+      customer_info.email,
+    ])
+
+    if (existingCustomer.length > 0) {
+      // Use existing customer record
+      finalCustomerId = existingCustomer[0].c_id
+      console.log('Using existing customer ID for guest:', finalCustomerId)
+
+      // Optionally update their latest coordinates
+      if (customer_info.latitude && customer_info.longitude) {
+        await Query(
+          `UPDATE customer 
+       SET c_latitude = ?, c_longitude = ?, c_address = ?
+       WHERE c_id = ?`,
+          [customer_info.latitude, customer_info.longitude, customer_info.address, finalCustomerId],
+        )
+      }
+    } else {
+      // Create new guest customer record with coordinates from the frontend
+      const insertResult = await Query(
+        `INSERT INTO customer 
+     (c_fullname, c_email, c_contact, c_address, c_latitude, c_longitude, c_is_registered) 
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          customer_info.fullname,
+          customer_info.email,
+          customer_info.contact,
+          customer_info.address || '',
+          customer_info.latitude || 0, // Use the latitude from frontend
+          customer_info.longitude || 0, // Use the longitude from frontend
+          0, // 0 for guest/unregistered
+        ],
+      )
+      finalCustomerId = insertResult.insertId
+      console.log(
+        'Created new guest customer with ID:',
+        finalCustomerId,
+        'and coordinates:',
+        customer_info.latitude,
+        customer_info.longitude,
+      )
+    }
   }
 
+  // Now validate that we have a customer_id (either from registered user or newly created guest)
+  if (!finalCustomerId) {
+    return res.status(400).json({ message: 'Unable to determine customer ID.' })
+  }
+
+  // Rest of your validation...
   if (!validStatuses.includes(status)) {
     return res.status(400).json({
       message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
@@ -232,7 +299,7 @@ const addOrder = async (req, res) => {
        or_payment_reference, or_details, or_status, or_createddate)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      [customer_id, total, payment_type, payment_reference, details, status, now],
+      [finalCustomerId, total, payment_type, payment_reference, details, status, now],
     )
 
     const orderId = orderResult.insertId
@@ -323,6 +390,7 @@ const addOrder = async (req, res) => {
       delivery_schedules_count: delivery_schedules.length,
       delivery_schedules: createdSchedules,
       status,
+      is_guest: isGuest, // Optionally return whether this was a guest order
     })
   } catch (error) {
     console.error('Order transaction failed:', error)
@@ -401,7 +469,7 @@ const approvalOrder = async (req, res) => {
     // Start transaction
     const queries = []
 
-    // Update order status 
+    // Update order status
     queries.push({
       sql: `
         UPDATE orders

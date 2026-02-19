@@ -11,6 +11,7 @@ const { inventoryRouter } = require('../routes/inventory.routes')
 const { orderRouter } = require('../routes/order.routes')
 const { riderRouter } = require('../routes/rider.routes')
 const { deliveryRouter } = require('../routes/delivery.routes')
+const { geocodeRouter } = require('../routes/geocode.routes')
 const { auth } = require('../middleware/auth.middleware')
 
 const file = fs.readFileSync('./src/docs/swagger.docs.yaml', 'utf8')
@@ -20,6 +21,8 @@ const initRoutes = async (app) => {
   app.use('/api-docs', serve, setup(swaggerDocs))
 
   app.use('/auth', authRouter)
+  app.use('/api/geocode', geocodeRouter)
+  app.use('/orders/guest', orderRouter)
 
   app.use(auth)
   app.use('/access', accessRouter)
