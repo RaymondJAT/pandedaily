@@ -26,13 +26,6 @@ const Order = () => {
   const { user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    console.log('Order page - User object:', user)
-    if (user) {
-      console.log('User properties in Order page:', Object.keys(user))
-    }
-  }, [user])
-
   // Fetch products and categories on component mount
   useEffect(() => {
     fetchProducts()

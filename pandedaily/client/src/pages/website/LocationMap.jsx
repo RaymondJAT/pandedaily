@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { reverseGeocode } from '../../services/api'
 
-// Fix for default markers in Leaflet
+// Fix default Leaflet markers
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -14,146 +15,132 @@ const LocationMap = ({ onLocationSelect, selectedLocation }) => {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markerRef = useRef(null)
+  const isInitializedRef = useRef(false)
 
-  // Default center (Philippines)
-  const defaultCenter = [14.5995, 120.9842] // Manila
-  const defaultZoom = 6
+  const defaultCenter = [14.5995, 120.9842]
+  const defaultZoom = 13
 
-  useEffect(() => {
-    // Initialize map only once
-    if (!mapInstanceRef.current && mapRef.current) {
-      console.log('Initializing map...')
-      mapInstanceRef.current = L.map(mapRef.current).setView(defaultCenter, defaultZoom)
-
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(mapInstanceRef.current)
-
-      // Add click event to map
-      mapInstanceRef.current.on('click', onMapClick)
-    }
-
-    // Cleanup
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove()
-        mapInstanceRef.current = null
-      }
-    }
-  }, [])
-
-  // Handle map click
-  const onMapClick = (e) => {
-    const { lat, lng } = e.latlng
-    console.log('Map clicked:', lat, lng)
-
-    // Update marker position
-    if (markerRef.current) {
-      markerRef.current.setLatLng([lat, lng])
-    } else {
-      markerRef.current = L.marker([lat, lng]).addTo(mapInstanceRef.current)
-    }
-
-    // ZOOM IN - Set view with zoom level 18
-    mapInstanceRef.current.setView([lat, lng], 18, { animate: true })
-
-    // Get address from coordinates (reverse geocoding)
-    fetchAddressFromCoordinates(lat, lng)
+  const isValidCoordinate = (lat, lng) => {
+    const nLat = Number(lat)
+    const nLng = Number(lng)
+    return (
+      !isNaN(nLat) &&
+      !isNaN(nLng) &&
+      isFinite(nLat) &&
+      isFinite(nLng) &&
+      nLat >= -90 &&
+      nLat <= 90 &&
+      nLng >= -180 &&
+      nLng <= 180
+    )
   }
 
-  // Reverse geocoding using Nominatim (free)
+  const updateMapLocation = useCallback((lat, lng) => {
+    if (!mapInstanceRef.current || !isValidCoordinate(lat, lng)) return
+
+    const numLat = Number(lat)
+    const numLng = Number(lng)
+
+    // Update or create marker
+    if (markerRef.current) {
+      markerRef.current.setLatLng([numLat, numLng])
+    } else {
+      markerRef.current = L.marker([numLat, numLng]).addTo(mapInstanceRef.current)
+    }
+
+    // Update map view
+    mapInstanceRef.current.setView([numLat, numLng], 18, { animate: true })
+  }, [])
+
   const fetchAddressFromCoordinates = async (lat, lng) => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'PandeDailyApp/1.0',
-          },
-        },
-      )
-
-      if (!response.ok) throw new Error('Failed to fetch address')
-
-      const data = await response.json()
-
-      if (data.display_name && onLocationSelect) {
-        onLocationSelect({
-          lat,
-          lng,
-          address: data.display_name,
-          placeId: data.place_id,
-        })
-      } else {
-        // Fallback if no address found
-        onLocationSelect({
-          lat,
-          lng,
-          address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-        })
-      }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error)
-      // Fallback with coordinates only
-      onLocationSelect({
-        lat,
-        lng,
-        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      const result = await reverseGeocode(lat, lng)
+      onLocationSelect?.({
+        lat: Number(result.lat),
+        lng: Number(result.lng),
+        address: result.address,
+        placeId: result.placeId,
+      })
+    } catch (err) {
+      console.error('Reverse geocoding error:', err)
+      onLocationSelect?.({
+        lat: Number(lat),
+        lng: Number(lng),
+        address: `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`,
       })
     }
   }
 
-  // Update marker when selectedLocation changes from parent (e.g., from autocomplete)
-  useEffect(() => {
-    if (selectedLocation?.lat && selectedLocation?.lng && mapInstanceRef.current) {
-      const { lat, lng } = selectedLocation
-      console.log('Selected location changed:', lat, lng)
-
-      // Update or create marker
-      if (markerRef.current) {
-        markerRef.current.setLatLng([lat, lng])
-      } else {
-        markerRef.current = L.marker([lat, lng]).addTo(mapInstanceRef.current)
+  const handleLocationUpdate = useCallback(
+    (lat, lng) => {
+      if (!isValidCoordinate(lat, lng)) {
+        console.error('Invalid coordinates:', { lat, lng })
+        return
       }
 
-      // ZOOM IN - Always zoom to level 18 when location is selected
-      mapInstanceRef.current.setView([lat, lng], 18, { animate: true })
+      const numLat = Number(lat)
+      const numLng = Number(lng)
 
-      // Optional: Add a small delay and then try flyTo for smoother animation
-      setTimeout(() => {
-        if (mapInstanceRef.current) {
-          // This will create a smooth animation after the initial zoom
-          mapInstanceRef.current.flyTo([lat, lng], 18, {
-            animate: true,
-            duration: 1,
-          })
-        }
-      }, 100)
+      // Update map immediately
+      updateMapLocation(numLat, numLng)
+
+      // Fetch address (this will trigger parent state update)
+      fetchAddressFromCoordinates(numLat, numLng)
+    },
+    [updateMapLocation],
+  )
+
+  // Initialize map
+  useEffect(() => {
+    if (isInitializedRef.current) return
+    if (!mapRef.current) return
+
+    const map = L.map(mapRef.current).setView(defaultCenter, defaultZoom)
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map)
+
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng
+      handleLocationUpdate(lat, lng)
+    })
+
+    mapInstanceRef.current = map
+    isInitializedRef.current = true
+
+    return () => {
+      map.remove()
+      mapInstanceRef.current = null
+      isInitializedRef.current = false
     }
-  }, [selectedLocation])
+  }, [handleLocationUpdate])
+
+  // Sync external changes
+  useEffect(() => {
+    if (!selectedLocation || !mapInstanceRef.current) return
+
+    const { lat, lng } = selectedLocation
+    if (isValidCoordinate(lat, lng)) {
+      updateMapLocation(lat, lng)
+    }
+  }, [selectedLocation, updateMapLocation])
 
   return (
     <div className="h-full w-full relative">
-      <div ref={mapRef} className="h-full w-full" style={{ minHeight: '400px' }} />
+      <div ref={mapRef} className="h-full w-full" style={{ minHeight: '400px', zIndex: 1 }} />
 
-      {/* Instructions overlay */}
-      <div className="absolute top-4 left-4 right-4 bg-white bg-opacity-90 p-3 rounded-lg shadow-md z-1000 text-sm">
+      <div className="absolute top-4 left-4 right-4 bg-white/90 p-3 rounded-lg shadow-md z-1000 text-sm pointer-events-none">
         <p className="font-medium" style={{ color: '#2A1803' }}>
-          Click anywhere on the map to set your delivery location
+          Click to set delivery location
         </p>
-        {selectedLocation?.lat && selectedLocation?.lng && (
+        {selectedLocation && isValidCoordinate(selectedLocation.lat, selectedLocation.lng) && (
           <p className="text-xs mt-1" style={{ color: '#9C4A15' }}>
-            Selected: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
+            Selected: {Number(selectedLocation.lat).toFixed(6)},{' '}
+            {Number(selectedLocation.lng).toFixed(6)}
           </p>
         )}
-      </div>
-
-      {/* Attribution */}
-      <div className="absolute bottom-2 right-2 bg-white bg-opacity-90 px-2 py-1 rounded text-xs shadow-md z-1000">
-        © OpenStreetMap contributors
       </div>
     </div>
   )

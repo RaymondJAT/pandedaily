@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Modal, Table, Tag, Descriptions, Card, message } from 'antd'
 import { FiPackage, FiCreditCard, FiCalendar, FiCheckCircle, FiXCircle } from 'react-icons/fi'
-import { getOrderItem } from '../../services/api'
+import { getOrderItem, updateOrder } from '../../services/api'
 
 const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
   const [loading, setLoading] = useState(true)
@@ -94,35 +94,13 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     return null
   }
 
-  // API call for approval/rejection
-  const updateOrderStatus = async (orderId, status) => {
-    const API_URL = 'http://192.168.40.101:3080'
-    const token = localStorage.getItem('token')
-
-    const response = await fetch(`${API_URL}/orders/${orderId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-      body: JSON.stringify({ status }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.message || `Failed to update order status`)
-    }
-
-    return data
-  }
-
   const handleApprove = async () => {
     try {
       setActionLoading(true)
       const actualOrderId = extractOrderId(orderId)
 
-      const response = await updateOrderStatus(actualOrderId, 'APPROVED')
+      // ✅ Use the imported updateOrder function
+      const response = await updateOrder(actualOrderId, { status: 'APPROVED' })
 
       message.success(response.message || 'Order approved successfully')
 
@@ -146,7 +124,8 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
       setActionLoading(true)
       const actualOrderId = extractOrderId(orderId)
 
-      const response = await updateOrderStatus(actualOrderId, 'REJECTED')
+      // ✅ Use the imported updateOrder function
+      const response = await updateOrder(actualOrderId, { status: 'REJECTED' })
 
       message.success(response.message || 'Order rejected successfully')
 
@@ -307,6 +286,7 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
           Close
         </button>,
       ].filter(Boolean)}
+      styles={{ maxHeight: '70vh', overflowY: 'auto' }}
     >
       {loading ? (
         <div className="flex justify-center py-10">
@@ -364,8 +344,16 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
             </Descriptions>
           </Card>
 
-          {/* Order Items */}
-          <Card title={`Order Items (${items.length})`} size="small">
+          {/* Order Items - Now with scrollable table */}
+          <Card
+            title={`Order Items (${items.length})`}
+            size="small"
+            styles={{
+              maxHeight: '300px',
+              overflowY: 'auto',
+              padding: '12px',
+            }}
+          >
             {items.length === 0 ? (
               <div className="text-center py-8">
                 <FiPackage className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -378,6 +366,7 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
                   dataSource={items.map((item, index) => ({ ...item, key: item.id || index }))}
                   pagination={false}
                   size="small"
+                  scroll={{ y: 200 }}
                   summary={() => (
                     <Table.Summary.Row>
                       <Table.Summary.Cell index={0} colSpan={3}>

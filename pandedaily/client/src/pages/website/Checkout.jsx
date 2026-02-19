@@ -32,8 +32,9 @@ const Checkout = () => {
   // Order details from previous page
   const [orderDetails, setOrderDetails] = useState(null)
 
-  // Customer info
+  // Customer info (can be from auth or guest)
   const [customerInfo, setCustomerInfo] = useState(null)
+  const [isGuest, setIsGuest] = useState(false)
 
   // Maximum days selection
   const MAX_DAYS = 10
@@ -75,7 +76,7 @@ const Checkout = () => {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  // Animation variants - exactly matching Order page
+  // Animation variants
   const fadeInUp = {
     initial: { opacity: 0, y: 30 },
     animate: { opacity: 1, y: 0 },
@@ -104,10 +105,15 @@ const Checkout = () => {
     transition: { duration: 0.5, ease: 'easeOut' },
   }
 
-  // Load order details from navigation state or localStorage
+  // Load order details and customer info from navigation state or localStorage
   useEffect(() => {
-    const orderFromState = location.state?.orderDetails
+    console.log('Location state:', location.state)
 
+    // Try to get data from navigation state first
+    const orderFromState = location.state?.orderDetails
+    const guestFromState = location.state?.guestInfo
+
+    // Set order details
     if (orderFromState) {
       console.log('Order details from state:', orderFromState)
       setOrderDetails(orderFromState)
@@ -119,9 +125,58 @@ const Checkout = () => {
         setOrderDetails(JSON.parse(savedOrder))
       } else {
         navigate('/order')
+        return
       }
     }
-  }, [location.state, navigate])
+
+    // Set customer info (guest or authenticated user)
+    if (guestFromState) {
+      console.log('Guest info from state:', guestFromState)
+      setCustomerInfo({
+        fullname: guestFromState.fullname,
+        contact: guestFromState.contact,
+        email: guestFromState.email,
+        address: guestFromState.address,
+        isGuest: true,
+      })
+      setIsGuest(true)
+    } else if (user) {
+      console.log('User from auth:', user)
+
+      // Find the customer ID - it could be in different formats
+      const customerId = user.c_id || user.id || user.customer_id || user.userId || user._id || null
+
+      console.log('Found customer ID:', customerId)
+
+      const customerData = {
+        fullname: user.fullname || user.c_fullname || user.name || user.username || 'Not provided',
+        contact: user.contact || user.c_contact || user.phone || user.phoneNumber || 'Not provided',
+        email: user.email || user.c_email || 'Not provided',
+        address: user.address || user.c_address || user.delivery_address || 'Not provided',
+        c_id: customerId, // ✅ Add the ID here with the field name your backend expects
+        id: customerId, // ✅ Add as backup
+        isGuest: false,
+      }
+
+      console.log('Customer data with ID:', customerData)
+      setCustomerInfo(customerData)
+      setIsGuest(false)
+    } else {
+      // Try to get guest info from localStorage
+      const savedGuest = localStorage.getItem('guestInfo')
+      if (savedGuest) {
+        const guestData = JSON.parse(savedGuest)
+        setCustomerInfo({
+          fullname: guestData.fullname,
+          contact: guestData.contact,
+          email: guestData.email,
+          address: guestData.address,
+          isGuest: true,
+        })
+        setIsGuest(true)
+      }
+    }
+  }, [location.state, user, navigate])
 
   // Calendar functions
   useEffect(() => {
@@ -182,7 +237,6 @@ const Checkout = () => {
   }
 
   const handleDateClick = (date) => {
-    // Don't allow selecting past dates
     if (date < today) {
       alert('Cannot select past dates')
       return
@@ -192,10 +246,8 @@ const Checkout = () => {
     let newSelectedDates
 
     if (selectedDates.includes(dateString)) {
-      // Remove date if already selected
       newSelectedDates = selectedDates.filter((d) => d !== dateString)
     } else {
-      // Check if maximum days reached
       if (selectedDates.length >= MAX_DAYS) {
         alert(`You can only select up to ${MAX_DAYS} delivery dates`)
         return
@@ -208,7 +260,6 @@ const Checkout = () => {
 
   const handlePrevMonth = () => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-    // Don't allow going to months before current month
     if (newDate.getMonth() < today.getMonth() && newDate.getFullYear() <= today.getFullYear()) {
       return
     }
@@ -227,7 +278,6 @@ const Checkout = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day)
-      // Only add future dates
       if (date >= today) {
         const dayOfWeek = date.getDay()
         if (dayOfWeek >= 1 && dayOfWeek <= 5) {
@@ -252,7 +302,6 @@ const Checkout = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day)
-      // Only add future dates
       if (date >= today) {
         const dayOfWeek = date.getDay()
         if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -307,28 +356,6 @@ const Checkout = () => {
     return 'bg-white hover:bg-[#F5EFE7] text-[#2A1803] hover:text-[#9C4A15]'
   }
 
-  // Extract customer information from user object
-  useEffect(() => {
-    if (user) {
-      const customerData = {
-        c_fullname:
-          user.c_fullname || user.fullname || user.name || user.username || 'Not provided',
-        c_contact:
-          user.c_contact ||
-          user.contact ||
-          user.phone ||
-          user.phoneNumber ||
-          user.mobile ||
-          'Not provided',
-        c_email: user.c_email || user.email || 'Not provided',
-        c_address: user.c_address || user.address || user.delivery_address || 'Not provided',
-        c_id: user.c_id || user.id || user._id || user.user_id || null,
-        rawUser: user,
-      }
-      setCustomerInfo(customerData)
-    }
-  }, [user])
-
   // Format date for display
   const formatDateDisplay = (dateStr) => {
     const date = new Date(dateStr)
@@ -344,7 +371,6 @@ const Checkout = () => {
   const getTotalPricePerDelivery = () => {
     if (!orderDetails?.products) return 0
     return orderDetails.products.reduce((sum, product) => {
-      // Ensure price is treated as a number
       const price = typeof product.price === 'string' ? parseFloat(product.price) : product.price
       return sum + product.quantity * price
     }, 0)
@@ -363,14 +389,12 @@ const Checkout = () => {
     }).format(amount)
   }
 
-  // Helper function to format price display
   const formatPrice = (price) => {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price
     return numPrice.toFixed(2)
   }
 
   const handleProceedToPayment = () => {
-    // Validation
     if (selectedDates.length === 0) {
       alert('Please select at least one delivery date')
       return
@@ -381,7 +405,6 @@ const Checkout = () => {
       return
     }
 
-    // Prepare checkout details to pass to payment page
     const checkoutDetails = {
       products: orderDetails.products,
       dates: selectedDates,
@@ -392,12 +415,13 @@ const Checkout = () => {
       totalPricePerDelivery: getTotalPricePerDelivery(),
       totalPrice: getTotalPrice(),
       customerInfo: customerInfo,
+      isGuest: isGuest,
     }
 
-    // Store in localStorage as backup
+    console.log('🚀 Proceeding to payment with:', checkoutDetails) // Add this log
+
     localStorage.setItem('checkoutDetails', JSON.stringify(checkoutDetails))
 
-    // Navigate to payment page
     navigate('/order/payment', {
       state: {
         checkoutDetails: checkoutDetails,
@@ -416,7 +440,7 @@ const Checkout = () => {
   const currentTimeOptions = deliverySchedule === 'morning' ? morningTimes : eveningTimes
 
   // Show loading state
-  if (!orderDetails || !user) {
+  if (!orderDetails) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -430,27 +454,13 @@ const Checkout = () => {
     )
   }
 
-  if (!customerInfo) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: '#F5EFE7' }}
-      >
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#9C4A15] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p style={{ color: '#2A1803' }}>Preparing customer information...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <section
       className="min-h-screen py-8 md:py-12 font-[titleFont]"
       style={{ backgroundColor: '#F5EFE7' }}
     >
       <div className="container mx-auto px-4">
-        {/* Header Section - exactly like Order page */}
+        {/* Header Section */}
         <motion.div
           className="text-center mb-8 md:mb-12"
           initial="initial"
@@ -485,7 +495,6 @@ const Checkout = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
             {/* LEFT COLUMN - Calendar Section */}
             <div className="flex flex-col">
-              {/* Calendar Section with fixed height */}
               <motion.div
                 className="flex flex-col h-full"
                 variants={faqItem}
@@ -502,7 +511,7 @@ const Checkout = () => {
                 </h2>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex-1 flex flex-col h-full">
-                  {/* Month Navigation with modern style */}
+                  {/* Month Navigation */}
                   <div className="flex items-center justify-between mb-8 shrink-0">
                     <button
                       onClick={handlePrevMonth}
@@ -530,7 +539,7 @@ const Checkout = () => {
                     </button>
                   </div>
 
-                  {/* Day headers with modern style */}
+                  {/* Day headers */}
                   <div className="grid grid-cols-7 gap-2 mb-4 shrink-0">
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
                       <div
@@ -543,7 +552,7 @@ const Checkout = () => {
                     ))}
                   </div>
 
-                  {/* Calendar Grid - Modern style */}
+                  {/* Calendar Grid */}
                   <div className="grid grid-cols-7 gap-2 mb-6 shrink-0">
                     {currentMonth.map((dayData, index) => {
                       if (!dayData) {
@@ -559,13 +568,13 @@ const Checkout = () => {
                           onClick={() => !isPast && handleDateClick(date)}
                           disabled={isPast}
                           className={`
-                aspect-square flex flex-col items-center justify-center rounded-xl 
-                transition-all duration-200 cursor-pointer font-[titleFont]
-                ${isPast ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : ''}
-                ${!isPast && !isSelected ? 'hover:bg-[#F5EFE7] hover:text-[#9C4A15]' : ''}
-                ${isSelected ? 'bg-[#9C4A15] text-white shadow-md' : 'bg-white text-[#2A1803]'}
-                ${isToday && !isSelected ? 'ring-2 ring-[#9C4A15] ring-offset-2' : ''}
-              `}
+                            aspect-square flex flex-col items-center justify-center rounded-xl 
+                            transition-all duration-200 cursor-pointer font-[titleFont]
+                            ${isPast ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : ''}
+                            ${!isPast && !isSelected ? 'hover:bg-[#F5EFE7] hover:text-[#9C4A15]' : ''}
+                            ${isSelected ? 'bg-[#9C4A15] text-white shadow-md' : 'bg-white text-[#2A1803]'}
+                            ${isToday && !isSelected ? 'ring-2 ring-[#9C4A15] ring-offset-2' : ''}
+                          `}
                         >
                           <span className="text-base font-medium">{date.getDate()}</span>
                           {isSelected && (
@@ -576,7 +585,7 @@ const Checkout = () => {
                     })}
                   </div>
 
-                  {/* Quick Actions - Modern pill style */}
+                  {/* Quick Actions */}
                   <div className="flex flex-wrap gap-3 mb-6 shrink-0">
                     <button
                       onClick={handleSelectAllWeekdays}
@@ -610,7 +619,7 @@ const Checkout = () => {
                     </button>
                   </div>
 
-                  {/* Selected Dates Preview - Scrollable with fixed height */}
+                  {/* Selected Dates Preview */}
                   <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     <div
                       className="mt-4 pt-6 border-t-2 shrink-0"
@@ -824,7 +833,7 @@ const Checkout = () => {
                 </div>
               </motion.div>
 
-              {/* Selected Products Section - with fixed height and scrollable */}
+              {/* Selected Products Section */}
               <motion.div className="flex flex-col" variants={faqItem} transition={{ delay: 0.2 }}>
                 <h2
                   className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
@@ -837,12 +846,11 @@ const Checkout = () => {
                 </h2>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 md:p-7 flex flex-col h-100">
-                  {/* Products List - Scrollable */}
+                  {/* Products List */}
                   {orderDetails.products.length > 0 && (
                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                       <div className="space-y-4">
                         {orderDetails.products.map((product) => {
-                          // Ensure price is a number for display
                           const price =
                             typeof product.price === 'string'
                               ? parseFloat(product.price)
@@ -890,7 +898,7 @@ const Checkout = () => {
                     </div>
                   )}
 
-                  {/* Subtotal - Fixed at bottom */}
+                  {/* Subtotal */}
                   <div className="mt-4 pt-4 border-t shrink-0" style={{ borderColor: '#F5EFE7' }}>
                     <div className="flex justify-between items-center">
                       <span
@@ -919,7 +927,7 @@ const Checkout = () => {
           </div>
         </motion.div>
 
-        {/* Action Button - Moved outside the grid for better placement */}
+        {/* Action Button */}
         <motion.div className="mt-8" variants={faqItem} transition={{ delay: 0.25 }}>
           <div className="flex justify-end">
             <motion.button
@@ -942,16 +950,6 @@ const Checkout = () => {
                   : `Proceed to Payment`}
             </motion.button>
           </div>
-
-          {/* Show user status message */}
-          {isAuthenticated && user && (
-            <p className="text-center mt-3 font-[titleFont] text-sm" style={{ color: '#2A1803' }}>
-              Ordering as:{' '}
-              <span style={{ color: '#9C4A15', fontWeight: '600' }}>
-                {user.fullname || user.c_fullname}
-              </span>
-            </p>
-          )}
 
           <p className="text-center mt-3 font-[titleFont] text-sm" style={{ color: '#9C4A15' }}>
             Free delivery on all subscriptions
@@ -978,7 +976,7 @@ const Checkout = () => {
       </div>
 
       {/* Add custom scrollbar styles */}
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }

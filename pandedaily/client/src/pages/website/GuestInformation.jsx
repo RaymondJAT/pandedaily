@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react' // Add useEffect
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fa'
 import LocationMap from './LocationMap'
 import AddressAutocomplete from './AddressAutocomplete'
+import { reverseGeocode } from '../../services/api'
 
 const GuestInformation = () => {
   const navigate = useNavigate()
@@ -21,11 +22,7 @@ const GuestInformation = () => {
     email: '',
     address: '',
   })
-  const [selectedLocation, setSelectedLocation] = useState({
-    lat: null,
-    lng: null,
-    address: '',
-  })
+  const [selectedLocation, setSelectedLocation] = useState(null)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [locationValid, setLocationValid] = useState(false)
@@ -72,7 +69,7 @@ const GuestInformation = () => {
     }
 
     // Location validation - must have coordinates from map
-    if (!selectedLocation.lat || !selectedLocation.lng) {
+    if (!selectedLocation || !selectedLocation.lat || !selectedLocation.lng) {
       newErrors.location = 'Please select your delivery location on the map'
     }
 
@@ -110,9 +107,20 @@ const GuestInformation = () => {
 
   // Handle location selection from map
   const handleLocationSelect = (location) => {
+    // Ensure coordinates are valid numbers
+    const lat = Number(location.lat)
+    const lng = Number(location.lng)
+
+    if (isNaN(lat) || isNaN(lng)) {
+      console.error('Invalid coordinates received:', location)
+      return
+    }
+
+    console.log('Location selected:', { lat, lng, address: location.address })
+
     setSelectedLocation({
-      lat: location.lat,
-      lng: location.lng,
+      lat: lat,
+      lng: lng,
       address: location.address || formData.address,
     })
 
@@ -144,34 +152,19 @@ const GuestInformation = () => {
       async (position) => {
         const { latitude, longitude } = position.coords
 
-        try {
-          // Using a CORS proxy or your backend endpoint would be better
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-            {
-              headers: {
-                'User-Agent': 'PandeDailyApp/1.0',
-                Accept: 'application/json',
-              },
-            },
-          )
+        console.log('Got current position:', { latitude, longitude })
 
-          if (response.ok) {
-            const data = await response.json()
-            handleLocationSelect({
-              lat: latitude,
-              lng: longitude,
-              address: data.display_name,
-            })
-          } else {
-            handleLocationSelect({
-              lat: latitude,
-              lng: longitude,
-              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-            })
-          }
+        try {
+          const result = await reverseGeocode(latitude, longitude)
+
+          handleLocationSelect({
+            lat: latitude,
+            lng: longitude,
+            address: result.address,
+          })
         } catch (error) {
           console.error('Error getting address:', error)
+          // Fallback with coordinates only
           handleLocationSelect({
             lat: latitude,
             lng: longitude,
@@ -248,11 +241,14 @@ const GuestInformation = () => {
         contact: cleanedContact,
         email: formData.email.trim().toLowerCase(),
         address: selectedLocation.address || formData.address.trim(),
-        latitude: selectedLocation.lat,
-        longitude: selectedLocation.lng,
+        latitude: Number(selectedLocation.lat),
+        longitude: Number(selectedLocation.lng),
         isGuest: true,
         timestamp: new Date().toISOString(),
       }
+
+      console.log('Guest data being saved:', guestData)
+      console.log('Order details being saved:', orderDetails)
 
       // Save guest info
       localStorage.setItem('guestInfo', JSON.stringify(guestData))
@@ -260,11 +256,11 @@ const GuestInformation = () => {
       // Clear selected products as they're now in pendingOrder
       localStorage.removeItem('selectedProducts')
 
-      // Navigate to checkout
+      // Navigate to checkout with both orderDetails AND guestInfo
       navigate('/checkout', {
         state: {
-          orderDetails,
-          guestInfo: guestData,
+          orderDetails: orderDetails,
+          guestInfo: guestData, // Make sure this is included
         },
       })
     } catch (error) {
@@ -445,8 +441,8 @@ const GuestInformation = () => {
                   disabled={isSubmitting}
                 />
 
-                {/* Coordinates display */}
-                {selectedLocation.lat && selectedLocation.lng && (
+                {/* Coordinates display - with safe navigation */}
+                {selectedLocation?.lat && selectedLocation?.lng && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -456,13 +452,13 @@ const GuestInformation = () => {
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
                         <span className="font-medium">Latitude:</span>{' '}
                         <span className="font-bold" style={{ color: '#9C4A15' }}>
-                          {selectedLocation.lat.toFixed(6)}
+                          {Number(selectedLocation.lat).toFixed(6)}
                         </span>
                       </p>
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
                         <span className="font-medium">Longitude:</span>{' '}
                         <span className="font-bold" style={{ color: '#9C4A15' }}>
-                          {selectedLocation.lng.toFixed(6)}
+                          {Number(selectedLocation.lng).toFixed(6)}
                         </span>
                       </p>
                     </div>
@@ -483,12 +479,12 @@ const GuestInformation = () => {
                 </motion.div>
               )}
 
-              {/* Submit Button */}
+              {/* Submit Button - with optional chaining */}
               <motion.button
                 type="submit"
-                disabled={isSubmitting || !selectedLocation.lat || !selectedLocation.lng}
+                disabled={isSubmitting || !selectedLocation?.lat || !selectedLocation?.lng}
                 className={`w-full py-4 rounded-lg font-medium text-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9C4A15] ${
-                  isSubmitting || !selectedLocation.lat || !selectedLocation.lng
+                  isSubmitting || !selectedLocation?.lat || !selectedLocation?.lng
                     ? 'opacity-50 cursor-not-allowed'
                     : 'cursor-pointer hover:opacity-90'
                 }`}
@@ -497,12 +493,12 @@ const GuestInformation = () => {
                   color: '#F5EFE7',
                 }}
                 whileHover={
-                  !isSubmitting && selectedLocation.lat && selectedLocation.lng
+                  !isSubmitting && selectedLocation?.lat && selectedLocation?.lng
                     ? { scale: 1.02 }
                     : {}
                 }
                 whileTap={
-                  !isSubmitting && selectedLocation.lat && selectedLocation.lng
+                  !isSubmitting && selectedLocation?.lat && selectedLocation?.lng
                     ? { scale: 0.98 }
                     : {}
                 }

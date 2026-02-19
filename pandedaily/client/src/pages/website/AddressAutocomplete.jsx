@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { FaMapMarkerAlt, FaSpinner } from 'react-icons/fa'
 import { motion, AnimatePresence } from 'framer-motion'
+import { geocodeAddress } from '../../services/api' // Import your geocoding function
 
 const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) => {
   const [query, setQuery] = useState(value || '')
@@ -29,7 +30,7 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch suggestions from Photon API
+  // Fetch suggestions from your backend geocoding service
   const fetchSuggestions = async (searchQuery) => {
     if (searchQuery.length < 3) {
       setSuggestions([])
@@ -38,42 +39,22 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
 
     setIsLoading(true)
     try {
-      // Photon API - free, no API key required
-      const response = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&limit=5&lang=en`,
-      )
+      // Use your backend geocoding service
+      const result = await geocodeAddress(searchQuery)
 
-      if (!response.ok) throw new Error('Failed to fetch suggestions')
-
-      const data = await response.json()
-
-      const formattedSuggestions = data.features
-        .map((feature) => {
-          const properties = feature.properties
-          const coordinates = feature.geometry.coordinates
-
-          // Build readable address
-          const parts = []
-          if (properties.name) parts.push(properties.name)
-          if (properties.street) parts.push(properties.street)
-          if (properties.city) parts.push(properties.city)
-          if (properties.county) parts.push(properties.county)
-          if (properties.state) parts.push(properties.state)
-          if (properties.country) parts.push(properties.country)
-
-          const fullAddress = parts.join(', ') || properties.display_name || ''
-
-          return {
-            id: properties.osm_id || `${coordinates[0]}-${coordinates[1]}`,
-            fullAddress,
-            lat: coordinates[1],
-            lng: coordinates[0],
-            name: properties.name || parts[0] || '',
-          }
-        })
-        .filter((s) => s.fullAddress)
-
-      setSuggestions(formattedSuggestions)
+      if (result.success) {
+        // Format the response to match your suggestions structure
+        const formattedSuggestion = {
+          id: `${result.lat}-${result.lng}`,
+          fullAddress: result.displayName,
+          lat: result.lat,
+          lng: result.lng,
+          name: result.displayName.split(',')[0] || result.displayName,
+        }
+        setSuggestions([formattedSuggestion])
+      } else {
+        setSuggestions([])
+      }
     } catch (error) {
       console.error('Error fetching suggestions:', error)
       setSuggestions([])
@@ -86,6 +67,8 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
   const handleInputChange = (e) => {
     const newValue = e.target.value
     setQuery(newValue)
+
+    // Call the parent onChange
     onChange(e)
 
     if (timeoutRef.current) {
@@ -100,7 +83,7 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
         setSuggestions([])
         setShowSuggestions(false)
       }
-    }, 300)
+    }, 500) // Increased to 500ms to reduce API calls
   }
 
   // Handle suggestion selection
@@ -157,7 +140,10 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length >= 3 && setShowSuggestions(true)}
-          className="w-full px-4 py-3 rounded-lg border-2 border-[#9C4A15] focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all font-[titleFont]"
+          className={`w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-[#9C4A15] transition-all font-[titleFont] ${
+            disabled ? 'bg-gray-100' : 'bg-white'
+          }`}
+          style={{ borderColor: '#9C4A15' }}
           placeholder="Type your address..."
           disabled={disabled}
           autoComplete="off"

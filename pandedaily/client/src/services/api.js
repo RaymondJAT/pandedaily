@@ -3,11 +3,17 @@ const API_URL = 'http://192.168.40.101:3080'
 // Helper function for API calls
 const fetchApi = async (endpoint, options = {}) => {
   try {
+    // Check if this endpoint should skip authentication
+    const skipAuth = options.skipAuth || false
+
     const token = localStorage.getItem('token')
 
     const defaultHeaders = {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+    }
+
+    if (token && !skipAuth) {
+      defaultHeaders.Authorization = `Bearer ${token}`
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
@@ -31,21 +37,19 @@ const fetchApi = async (endpoint, options = {}) => {
   }
 }
 
-// NEW: Geocoding function using OpenStreetMap Nominatim
+// Geocoding: Address -> Coordinates (using your backend)
 export const geocodeAddress = async (address) => {
   try {
     const encodedAddress = encodeURIComponent(address)
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1&accept-language=en`,
-      {
-        headers: {
-          'User-Agent': 'PandeDailyApp/1.0', // Required by Nominatim
-        },
+    const response = await fetch(`${API_URL}/api/geocode/search?q=${encodedAddress}`, {
+      headers: {
+        'Content-Type': 'application/json',
       },
-    )
+    })
 
     if (!response.ok) {
-      throw new Error('Geocoding service error')
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Geocoding service error')
     }
 
     const data = await response.json()
@@ -55,6 +59,7 @@ export const geocodeAddress = async (address) => {
         lat: parseFloat(data[0].lat),
         lng: parseFloat(data[0].lon),
         displayName: data[0].display_name,
+        address: data[0].display_name,
         success: true,
       }
     }
@@ -67,14 +72,47 @@ export const geocodeAddress = async (address) => {
     console.error('Geocoding error:', error)
     return {
       success: false,
-      message: 'Error finding address coordinates',
+      message: error.message || 'Error finding address coordinates',
     }
   }
 }
 
-// NEW: Batch geocoding with delay to respect rate limits
+// Reverse geocoding: Coordinates -> Address (using your backend)
+export const reverseGeocode = async (lat, lng) => {
+  try {
+    const response = await fetch(`${API_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch address')
+    }
+
+    const data = await response.json()
+
+    return {
+      lat: Number(lat), // Ensure numbers
+      lng: Number(lng),
+      address: data.display_name || `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`,
+      placeId: data.place_id,
+      success: true,
+    }
+  } catch (error) {
+    console.error('Reverse geocoding error:', error)
+    return {
+      lat: Number(lat),
+      lng: Number(lng),
+      address: `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`,
+      success: false,
+      error: error.message,
+    }
+  }
+}
+
+// Batch geocoding with delay (kept for rate limiting)
 export const geocodeAddressWithDelay = async (address, delayMs = 1000) => {
-  // Add delay to respect Nominatim's usage policy (max 1 request per second)
   await new Promise((resolve) => setTimeout(resolve, delayMs))
   return geocodeAddress(address)
 }
@@ -244,6 +282,22 @@ export const getOrderItem = async (orderId) => {
 export const createOrder = async (orderData) => {
   return fetchApi('/orders', {
     method: 'POST',
+    body: JSON.stringify(orderData),
+  })
+}
+
+export const createGuestOrder = async (orderData) => {
+  return fetchApi('/orders/guest', {
+    method: 'POST',
+    body: JSON.stringify(orderData),
+    skipAuth: true,
+  })
+}
+
+export const updateOrder = async (orderId, orderData) => {
+  const id = typeof orderId === 'object' ? orderId?.or_id || orderId?.id || orderId : orderId
+  return fetchApi(`/orders/${id}`, {
+    method: 'PUT',
     body: JSON.stringify(orderData),
   })
 }

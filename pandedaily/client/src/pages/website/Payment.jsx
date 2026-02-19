@@ -3,24 +3,16 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiUser,
-  FiPhone,
-  FiMail,
-  FiMapPin,
-  FiCalendar,
-  FiPackage,
-  FiClock,
   FiEdit2,
-  FiCheckCircle,
   FiCreditCard,
   FiArrowLeft,
   FiSmartphone,
   FiCreditCard as FiCard,
   FiShield,
-  FiLock,
   FiShoppingBag,
 } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
-import { createOrder } from '../../services/api'
+import { createOrder, createGuestOrder } from '../../services/api'
 
 const Payment = () => {
   const navigate = useNavigate()
@@ -33,6 +25,8 @@ const Payment = () => {
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState(null)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [customerInfo, setCustomerInfo] = useState(null)
+  const [isGuest, setIsGuest] = useState(false)
 
   // Animation variants - matching Order page
   const fadeInUp = {
@@ -148,12 +142,84 @@ const Payment = () => {
     if (detailsFromState) {
       console.log('Checkout details from state:', detailsFromState)
       setCheckoutDetails(detailsFromState)
+
+      // Extract customer info based on whether it's guest or registered user
+      if (detailsFromState.customerInfo) {
+        console.log('📦 Customer info from state:', detailsFromState.customerInfo)
+
+        const customerData = {
+          fullname:
+            detailsFromState.customerInfo.fullname ||
+            detailsFromState.customerInfo.c_fullname ||
+            detailsFromState.customerInfo.name ||
+            'Customer',
+          contact:
+            detailsFromState.customerInfo.contact ||
+            detailsFromState.customerInfo.c_contact ||
+            detailsFromState.customerInfo.phone ||
+            'Not provided',
+          email:
+            detailsFromState.customerInfo.email ||
+            detailsFromState.customerInfo.c_email ||
+            'Not provided',
+          address:
+            detailsFromState.customerInfo.address ||
+            detailsFromState.customerInfo.c_address ||
+            'Not provided',
+          // Add this
+          latitude:
+            detailsFromState.customerInfo.latitude || detailsFromState.customerInfo.c_latitude || 0,
+          // Add this
+          longitude:
+            detailsFromState.customerInfo.longitude ||
+            detailsFromState.customerInfo.c_longitude ||
+            0,
+          c_id:
+            detailsFromState.customerInfo.c_id ||
+            detailsFromState.customerInfo.id ||
+            detailsFromState.customerInfo.customer_id ||
+            detailsFromState.customerInfo.userId ||
+            null,
+          isGuest: detailsFromState.isGuest || false,
+        }
+
+        console.log('📋 Processed customer data:', customerData)
+        setCustomerInfo(customerData)
+        setIsGuest(detailsFromState.isGuest || false)
+      }
+
       localStorage.setItem('checkoutDetails', JSON.stringify(detailsFromState))
     } else {
       const savedDetails = localStorage.getItem('checkoutDetails')
       if (savedDetails) {
-        console.log('Checkout details from localStorage:', JSON.parse(savedDetails))
-        setCheckoutDetails(JSON.parse(savedDetails))
+        const parsedDetails = JSON.parse(savedDetails)
+        console.log('Checkout details from localStorage:', parsedDetails)
+        setCheckoutDetails(parsedDetails)
+
+        // Extract customer info from saved details
+        if (parsedDetails.customerInfo) {
+          const customerData = {
+            fullname:
+              parsedDetails.customerInfo.fullname ||
+              parsedDetails.customerInfo.c_fullname ||
+              'Customer',
+            contact:
+              parsedDetails.customerInfo.contact ||
+              parsedDetails.customerInfo.c_contact ||
+              'Not provided',
+            email:
+              parsedDetails.customerInfo.email ||
+              parsedDetails.customerInfo.c_email ||
+              'Not provided',
+            address:
+              parsedDetails.customerInfo.address ||
+              parsedDetails.customerInfo.c_address ||
+              'Not provided',
+            isGuest: parsedDetails.isGuest || false,
+          }
+          setCustomerInfo(customerData)
+          setIsGuest(parsedDetails.isGuest || false)
+        }
       } else {
         navigate('/checkout')
       }
@@ -251,25 +317,64 @@ const Payment = () => {
         price: product.price,
       }))
 
-      const orderData = {
-        customer_id: checkoutDetails.customerInfo.c_id,
-        payment_type: paymentMethod.toUpperCase(),
-        payment_reference: '',
-        details: checkoutDetails.instructions || '',
-        status: 'PAID',
-        delivery_schedules: delivery_schedules,
-        items: items,
+      let response
+
+      if (isGuest) {
+        const guestOrderData = {
+          customer_id: null,
+          customer_info: {
+            fullname: customerInfo.fullname,
+            email: customerInfo.email,
+            contact: customerInfo.contact,
+            address: customerInfo.address,
+            latitude: customerInfo.latitude || checkoutDetails.customerInfo?.latitude || 0, // Add this
+            longitude: customerInfo.longitude || checkoutDetails.customerInfo?.longitude || 0, // Add this
+          },
+          payment_type: paymentMethod.toUpperCase(),
+          payment_reference: '',
+          details: checkoutDetails.instructions || '',
+          status: 'PAID',
+          delivery_schedules: delivery_schedules,
+          items: items,
+        }
+
+        console.log('📦 Submitting GUEST order with coordinates:', guestOrderData)
+        response = await createGuestOrder(guestOrderData)
+      } else {
+        // ✅ REGISTERED CUSTOMER: Use createOrder (requires customer_id)
+        console.log('🔍 Registered user - customerInfo state:', customerInfo)
+
+        // Use the ID from our processed customerInfo state
+        const customer_id = customerInfo?.c_id
+
+        if (!customer_id) {
+          console.error('❌ No customer ID found in customerInfo:', customerInfo)
+          throw new Error('Customer ID is required for registered users')
+        }
+
+        console.log('✅ Found customer ID:', customer_id)
+
+        const orderData = {
+          customer_id: customer_id,
+          payment_type: paymentMethod.toUpperCase(),
+          payment_reference: '',
+          details: checkoutDetails.instructions || '',
+          status: 'PAID',
+          delivery_schedules: delivery_schedules,
+          items: items,
+        }
+
+        console.log('📦 Submitting REGISTERED order:', orderData)
+        response = await createOrder(orderData)
       }
 
-      console.log('Submitting order to API:', JSON.stringify(orderData, null, 2))
+      console.log('✅ Order created successfully:', response)
 
-      const response = await createOrder(orderData)
-      console.log('Order created successfully:', response)
-
+      // Save confirmation to localStorage
       const confirmedOrder = {
         order_id: response.order_id,
         order_number: `ORD-${response.order_id}`,
-        customer_info: checkoutDetails.customerInfo,
+        customer_info: customerInfo,
         order_details: {
           products: checkoutDetails.products,
           dates: checkoutDetails.dates,
@@ -285,24 +390,31 @@ const Payment = () => {
           fee: selectedPaymentDetails.fee,
         },
         total_amount: calculateTotalWithFee(),
-        delivery_schedules: response.delivery_schedules,
+        delivery_schedules: response.delivery_schedules || delivery_schedules,
         created_at: new Date().toISOString(),
+        isGuest: isGuest,
       }
 
       localStorage.setItem('confirmedOrder', JSON.stringify(confirmedOrder))
+
+      // Cleanup localStorage
       localStorage.removeItem('checkoutDetails')
       localStorage.removeItem('pendingOrder')
       localStorage.removeItem('currentOrder')
+      if (isGuest) {
+        localStorage.removeItem('guestInfo')
+      }
 
+      // Navigate to confirmation page
       navigate('/order/confirmation', {
         state: {
           orderId: response.order_id,
+          isGuest: isGuest,
         },
       })
     } catch (error) {
-      console.error('Error creating order:', error)
+      console.error('❌ Error creating order:', error)
       setApiError(error.message || 'Failed to create order. Please try again.')
-      alert(`Error: ${error.message || 'Failed to create order. Please try again.'}`)
     } finally {
       setIsProcessing(false)
     }
@@ -312,7 +424,7 @@ const Payment = () => {
     navigate(-1)
   }
 
-  if (!checkoutDetails || !user) {
+  if (!checkoutDetails || !customerInfo) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -379,22 +491,29 @@ const Payment = () => {
                 >
                   <div className="flex items-center gap-3">
                     <FiUser className="text-[#9C4A15]" />
-                    Customer
+                    {isGuest ? 'Guest Customer' : 'Customer'}
                   </div>
                 </h2>
 
                 <div className="bg-white rounded-xl shadow-lg p-6 md:p-7">
                   <div className="space-y-3">
                     <p className="text-lg font-[titleFont]" style={{ color: '#2A1803' }}>
-                      {checkoutDetails.customerInfo.c_fullname}
+                      {customerInfo.fullname}
                     </p>
                     <p className="text-sm" style={{ color: '#9C4A15' }}>
-                      {checkoutDetails.customerInfo.c_email} •{' '}
-                      {checkoutDetails.customerInfo.c_contact}
+                      {customerInfo.email} • {customerInfo.contact}
                     </p>
                     <p className="text-sm" style={{ color: '#2A1803' }}>
-                      📍 {checkoutDetails.customerInfo.c_address}
+                      📍 {customerInfo.address}
                     </p>
+                    {isGuest && (
+                      <span
+                        className="inline-block px-3 py-1 text-xs rounded-full"
+                        style={{ backgroundColor: '#F5EFE7', color: '#9C4A15' }}
+                      >
+                        Guest Checkout
+                      </span>
+                    )}
                   </div>
                 </div>
               </motion.div>

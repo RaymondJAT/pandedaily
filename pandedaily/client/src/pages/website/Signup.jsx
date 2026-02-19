@@ -10,8 +10,6 @@ import {
   FaEye,
   FaEyeSlash,
   FaArrowLeft,
-  FaMapMarkerAlt,
-  FaCheckCircle,
   FaCrosshairs,
 } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
@@ -19,6 +17,7 @@ import { useAuth } from '../../context/AuthContext'
 import { signupUser } from '../../services/api'
 import LocationMap from './LocationMap'
 import AddressAutocomplete from './AddressAutocomplete'
+import { reverseGeocode } from '../../services/api'
 
 const Signup = () => {
   const navigate = useNavigate()
@@ -34,11 +33,7 @@ const Signup = () => {
     password: '',
     confirmPassword: '',
   })
-  const [selectedLocation, setSelectedLocation] = useState({
-    lat: null,
-    lng: null,
-    address: '',
-  })
+  const [selectedLocation, setSelectedLocation] = useState(null)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
@@ -77,7 +72,7 @@ const Signup = () => {
     }
 
     // Location validation - must have coordinates from map click
-    if (!selectedLocation.lat || !selectedLocation.lng) {
+    if (!selectedLocation || !selectedLocation.lat || !selectedLocation.lng) {
       newErrors.location = 'Please click on the map to select your delivery location'
     }
 
@@ -129,9 +124,20 @@ const Signup = () => {
 
   // Handle location selection from map click
   const handleLocationSelect = (location) => {
+    // Ensure coordinates are valid numbers
+    const lat = parseFloat(location.lat)
+    const lng = parseFloat(location.lng)
+
+    if (isNaN(lat) || isNaN(lng)) {
+      console.error('Invalid coordinates received:', location)
+      return
+    }
+
+    console.log('Location selected:', { lat, lng, address: location.address })
+
     setSelectedLocation({
-      lat: location.lat,
-      lng: location.lng,
+      lat: lat,
+      lng: lng,
       address: location.address || formData.address,
     })
 
@@ -164,40 +170,27 @@ const Signup = () => {
       async (position) => {
         const { latitude, longitude } = position.coords
 
-        // Get address from coordinates
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-            {
-              headers: {
-                'User-Agent': 'PandeDailyApp/1.0',
-              },
-            },
-          )
+        console.log('Got current position:', { latitude, longitude })
 
-          if (response.ok) {
-            const data = await response.json()
-            handleLocationSelect({
-              lat: latitude,
-              lng: longitude,
-              address: data.display_name,
-            })
-          } else {
-            handleLocationSelect({
-              lat: latitude,
-              lng: longitude,
-              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-            })
-          }
+        try {
+          const result = await reverseGeocode(latitude, longitude)
+
+          handleLocationSelect({
+            lat: latitude,
+            lng: longitude,
+            address: result.address,
+          })
         } catch (error) {
+          console.error('Error getting address for current location:', error)
+          // Fallback with coordinates only
           handleLocationSelect({
             lat: latitude,
             lng: longitude,
             address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
           })
+        } finally {
+          setIsGettingLocation(false)
         }
-
-        setIsGettingLocation(false)
       },
       (error) => {
         console.error('Error getting location:', error)
@@ -216,6 +209,13 @@ const Signup = () => {
     if (validateForm()) {
       try {
         const cleanedPhone = formData.phone.replace(/\D/g, '')
+
+        // Add a safety check here
+        if (!selectedLocation) {
+          setApiError('Please select a location on the map')
+          setIsSubmitting(false)
+          return
+        }
 
         const userData = {
           fullname: formData.fullName,
@@ -470,7 +470,7 @@ const Signup = () => {
                 />
 
                 {/* Coordinates display - expanded */}
-                {selectedLocation.lat && selectedLocation.lng && (
+                {selectedLocation?.lat && selectedLocation?.lng && (
                   <div className="mt-3 p-3 bg-[#F5EFE7] rounded-lg">
                     <div className="flex flex-wrap gap-4">
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
@@ -582,9 +582,9 @@ const Signup = () => {
               {/* Submit Button */}
               <motion.button
                 type="submit"
-                disabled={isSubmitting || !selectedLocation.lat || !selectedLocation.lng}
+                disabled={isSubmitting || !selectedLocation?.lat || !selectedLocation?.lng}
                 className={`w-full py-4 rounded-lg font-medium font-[titleFont] text-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9C4A15] ${
-                  isSubmitting || !selectedLocation.lat || !selectedLocation.lng
+                  isSubmitting || !selectedLocation?.lat || !selectedLocation?.lng
                     ? 'opacity-50 cursor-not-allowed'
                     : 'cursor-pointer hover:opacity-90'
                 }`}
@@ -593,12 +593,12 @@ const Signup = () => {
                   color: '#F5EFE7',
                 }}
                 whileHover={
-                  !isSubmitting && selectedLocation.lat && selectedLocation.lng
+                  !isSubmitting && selectedLocation?.lat && selectedLocation?.lng
                     ? { scale: 1.02 }
                     : {}
                 }
                 whileTap={
-                  !isSubmitting && selectedLocation.lat && selectedLocation.lng
+                  !isSubmitting && selectedLocation?.lat && selectedLocation?.lng
                     ? { scale: 0.98 }
                     : {}
                 }
