@@ -90,14 +90,19 @@ const Customer = () => {
         case 'address':
           return {
             ...baseColumn,
-            render: (value) => (
-              <div className="flex justify-center items-center gap-2">
-                <FiMapPin className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-700 truncate" title={value}>
-                  {value || 'N/A'}
-                </span>
-              </div>
-            ),
+            width: '250px',
+            render: (value) => {
+              if (!value) return <span className="text-gray-400">N/A</span>
+
+              const truncatedAddress = value.length > 50 ? value.substring(0, 47) + '...' : value
+
+              return (
+                <div className="flex items-center gap-2 px-2" title={value}>
+                  <FiMapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span className="text-gray-700 text-sm truncate">{truncatedAddress}</span>
+                </div>
+              )
+            },
           }
 
         case 'is_registered':

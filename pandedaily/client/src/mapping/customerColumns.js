@@ -40,6 +40,7 @@ export const customerColumns = [
     sortable: true,
     width: '250px',
     align: 'center',
+    ellipsis: true,
   },
   {
     key: 'is_registered',

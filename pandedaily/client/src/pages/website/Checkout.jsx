@@ -1,19 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  FiUser,
-  FiPhone,
-  FiMail,
-  FiMapPin,
-  FiCalendar,
-  FiPackage,
-  FiClock,
-  FiEdit2,
-  FiCheckCircle,
-  FiArrowLeft,
-  FiShoppingBag,
-} from 'react-icons/fi'
+import { FiCalendar, FiClock, FiArrowLeft, FiShoppingBag } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 
 const Checkout = () => {
@@ -105,9 +93,27 @@ const Checkout = () => {
     transition: { duration: 0.5, ease: 'easeOut' },
   }
 
+  // Clear all order-related data from localStorage
+  const clearOrderData = () => {
+    localStorage.removeItem('selectedProducts')
+    localStorage.removeItem('pendingOrder')
+    localStorage.removeItem('currentOrder')
+    localStorage.removeItem('checkoutDetails')
+    localStorage.removeItem('guestInfo')
+    console.log('🧹 Cleared all order data from localStorage')
+  }
+
   // Load order details and customer info from navigation state or localStorage
   useEffect(() => {
     console.log('Location state:', location.state)
+
+    // Check if this is a new session by looking at navigation state
+    const isNewSession = location.state?.newSession || false
+
+    if (isNewSession) {
+      // If it's a new session, clear old data first
+      clearOrderData()
+    }
 
     // Try to get data from navigation state first
     const orderFromState = location.state?.orderDetails
@@ -124,6 +130,7 @@ const Checkout = () => {
         console.log('Order details from localStorage:', JSON.parse(savedOrder))
         setOrderDetails(JSON.parse(savedOrder))
       } else {
+        // No order details found, redirect to order page
         navigate('/order')
         return
       }
@@ -153,8 +160,8 @@ const Checkout = () => {
         contact: user.contact || user.c_contact || user.phone || user.phoneNumber || 'Not provided',
         email: user.email || user.c_email || 'Not provided',
         address: user.address || user.c_address || user.delivery_address || 'Not provided',
-        c_id: customerId, // ✅ Add the ID here with the field name your backend expects
-        id: customerId, // ✅ Add as backup
+        c_id: customerId,
+        id: customerId,
         isGuest: false,
       }
 
@@ -162,7 +169,6 @@ const Checkout = () => {
       setCustomerInfo(customerData)
       setIsGuest(false)
     } else {
-      // Try to get guest info from localStorage
       const savedGuest = localStorage.getItem('guestInfo')
       if (savedGuest) {
         const guestData = JSON.parse(savedGuest)
@@ -176,7 +182,44 @@ const Checkout = () => {
         setIsGuest(true)
       }
     }
+
+    // Clean up function to run when component unmounts
+    return () => {
+      // Only clear if we're not navigating to payment
+      const isNavigatingToPayment = sessionStorage.getItem('navigatingToPayment')
+      if (!isNavigatingToPayment) {
+        // Don't clear immediately, but set a flag to check on next mount
+        sessionStorage.setItem('checkoutExited', 'true')
+      }
+    }
   }, [location.state, user, navigate])
+
+  // Handle component unmount and navigation
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Clear session flag on page unload
+      sessionStorage.removeItem('checkoutExited')
+      sessionStorage.removeItem('navigatingToPayment')
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+
+      // Check if we should clear data on unmount
+      const isNavigatingToPayment = sessionStorage.getItem('navigatingToPayment')
+      const checkoutExited = sessionStorage.getItem('checkoutExited')
+
+      if (!isNavigatingToPayment && checkoutExited) {
+        // User exited checkout without completing payment
+        console.log('User exited checkout, clearing data')
+        clearOrderData()
+      }
+
+      sessionStorage.removeItem('checkoutExited')
+    }
+  }, [])
 
   // Calendar functions
   useEffect(() => {
@@ -335,32 +378,13 @@ const Checkout = () => {
     return selectedDates.includes(date.toDateString())
   }
 
-  const getDateStyle = (date, isToday, isPast) => {
-    const isSelected = isDateSelected(date)
-
-    if (isPast) {
-      return 'bg-gray-100 text-gray-400 cursor-not-allowed'
-    }
-
-    if (isSelected) {
-      if (isToday) {
-        return 'bg-gradient-to-br from-[#9C4A15] to-[#7a3a12] text-white shadow-sm'
-      }
-      return 'bg-gradient-to-br from-[#F5EFE7] to-[#e8dfd2] text-[#2A1803] border border-[#9C4A15]'
-    }
-
-    if (isToday) {
-      return 'bg-[#F5EFE7] text-[#2A1803] border border-[#9C4A15]'
-    }
-
-    return 'bg-white hover:bg-[#F5EFE7] text-[#2A1803] hover:text-[#9C4A15]'
-  }
-
   // Format date for display
   const formatDateDisplay = (dateStr) => {
     const date = new Date(dateStr)
     return `${getDayName(date.getDay())}, ${getMonthName(date.getMonth())} ${date.getDate()}`
   }
+
+  const currentTimeOptions = deliverySchedule === 'morning' ? morningTimes : eveningTimes
 
   // Calculate totals
   const getTotalItems = () => {
@@ -405,6 +429,9 @@ const Checkout = () => {
       return
     }
 
+    // Set flag that we're navigating to payment
+    sessionStorage.setItem('navigatingToPayment', 'true')
+
     const checkoutDetails = {
       products: orderDetails.products,
       dates: selectedDates,
@@ -418,7 +445,7 @@ const Checkout = () => {
       isGuest: isGuest,
     }
 
-    console.log('🚀 Proceeding to payment with:', checkoutDetails) // Add this log
+    console.log('🚀 Proceeding to payment with:', checkoutDetails)
 
     localStorage.setItem('checkoutDetails', JSON.stringify(checkoutDetails))
 
@@ -430,14 +457,11 @@ const Checkout = () => {
   }
 
   const handleBack = () => {
-    navigate(-1)
-  }
-
-  const handleEditProducts = () => {
+    // Clear the flag and data when going back
+    sessionStorage.removeItem('navigatingToPayment')
+    clearOrderData()
     navigate('/order')
   }
-
-  const currentTimeOptions = deliverySchedule === 'morning' ? morningTimes : eveningTimes
 
   // Show loading state
   if (!orderDetails) {
@@ -493,7 +517,7 @@ const Checkout = () => {
           variants={staggerContainer}
         >
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
-            {/* LEFT COLUMN - Calendar Section */}
+            {/* Calendar Section */}
             <div className="flex flex-col">
               <motion.div
                 className="flex flex-col h-full"
@@ -740,7 +764,7 @@ const Checkout = () => {
               </motion.div>
             </div>
 
-            {/* RIGHT COLUMN - Delivery Configuration and Selected Products */}
+            {/* Delivery Configuration and Selected Products */}
             <div className="flex flex-col space-y-8">
               {/* Delivery Configuration */}
               <motion.div className="flex flex-col" variants={faqItem} transition={{ delay: 0.1 }}>
@@ -974,27 +998,6 @@ const Checkout = () => {
           </p>
         </motion.div>
       </div>
-
-      {/* Add custom scrollbar styles */}
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f5efe7;
-          border-radius: 10px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #9c4a15;
-          border-radius: 10px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #7a3a12;
-        }
-      `}</style>
     </section>
   )
 }

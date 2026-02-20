@@ -4,10 +4,9 @@ import AuthChoiceModal from '../../components/website modal/AuthChoiceModal'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { getProducts, getProductCategories } from '../../services/api'
-import { FiPackage, FiCoffee, FiBattery } from 'react-icons/fi'
+import { FiPackage, FiCoffee, FiBattery, FiTrash2 } from 'react-icons/fi'
 
 const Order = () => {
-  // Product state only
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [selectedProducts, setSelectedProducts] = useState([])
@@ -17,10 +16,9 @@ const Order = () => {
   const [categoryError, setCategoryError] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [showAuthModal, setShowAuthModal] = useState(false)
-
-  // For products with "desal" in name (Pandesal and similar)
   const [desalCustomQuantities, setDesalCustomQuantities] = useState({})
-  const [desalQuantityTypes, setDesalQuantityTypes] = useState({}) // '20', '40', or 'custom'
+  const [desalQuantityTypes, setDesalQuantityTypes] = useState({})
+  const [validationError, setValidationError] = useState('')
 
   // Get user authentication status
   const { user, isAuthenticated } = useAuth()
@@ -53,7 +51,6 @@ const Order = () => {
 
           validProducts.forEach((product) => {
             if (isDesalProduct(product)) {
-              // Determine quantity type based on quantity value
               if (product.quantity === 20) desalTypes[product.id] = '20'
               else if (product.quantity === 40) desalTypes[product.id] = '40'
               else {
@@ -110,7 +107,6 @@ const Order = () => {
     } catch (error) {
       console.error('Error fetching categories:', error)
       setCategoryError('Failed to load categories')
-      // Fallback to default categories if API fails
       setCategories([
         { id: 'all', name: 'All Products', icon: FiPackage },
         { id: 'pandesal', name: 'Pandesal', icon: FiPackage },
@@ -123,7 +119,6 @@ const Order = () => {
     }
   }
 
-  // Helper function to get icon based on category name
   const getCategoryIcon = (categoryName) => {
     const name = categoryName?.toLowerCase() || ''
     if (name.includes('pandesal') || name.includes('bread')) return FiPackage
@@ -161,9 +156,11 @@ const Order = () => {
     transition: { duration: 0.5, ease: 'easeOut' },
   }
 
-  // Check if product name contains "desal" (case insensitive)
   const isDesalProduct = (product) => {
-    return product.name?.toLowerCase().includes('desal')
+    return (
+      product.name?.toLowerCase().includes('desal') ||
+      product.name?.toLowerCase().includes('pandesal')
+    )
   }
 
   // Get product category
@@ -184,35 +181,24 @@ const Order = () => {
     return 'other'
   }
 
-  // Get display category for a product
-  const getProductDisplayCategory = (product) => {
-    if (isDesalProduct(product)) return 'pandesal'
-
-    // Try to find matching category from API data
-    if (product.category_id || product.product_category_id) {
-      const categoryId = product.category_id?.toString() || product.product_category_id?.toString()
-      const matchingCategory = categories.find((c) => c.id === categoryId)
-      if (matchingCategory) return matchingCategory.id
-    }
-
-    // Fallback to name-based
-    if (
-      product.category_name?.toLowerCase().includes('bread') ||
-      product.category?.toLowerCase().includes('bread')
-    )
-      return 'bread'
-    if (
-      product.category_name?.toLowerCase().includes('drink') ||
-      product.category?.toLowerCase().includes('drink')
-    )
-      return 'drink'
-
-    return 'other'
-  }
-
   // Save selected products to localStorage
   const saveSelectedProducts = (products) => {
     localStorage.setItem('selectedProducts', JSON.stringify(products))
+  }
+
+  // Validate all selected products meet minimum quantity requirements
+  const validateSelectedProducts = () => {
+    for (const product of selectedProducts) {
+      if (isDesalProduct(product)) {
+        if (product.quantity < 20) {
+          return {
+            isValid: false,
+            message: `"${product.name}" requires a minimum quantity of 20 pieces. Current quantity: ${product.quantity}`,
+          }
+        }
+      }
+    }
+    return { isValid: true, message: '' }
   }
 
   // Product handlers
@@ -228,7 +214,6 @@ const Order = () => {
         let initialQuantity = 1
 
         if (isDesalProduct(product)) {
-          // For desal products, use the saved quantity type or default to 20
           const productType = desalQuantityTypes[product.id] || '20'
           if (productType === 'custom') {
             initialQuantity = parseInt(desalCustomQuantities[product.id]) || 20
@@ -253,6 +238,8 @@ const Order = () => {
       }
 
       saveSelectedProducts(newSelected)
+      // Clear any validation error when products change
+      setValidationError('')
       return newSelected
     })
   }
@@ -261,7 +248,7 @@ const Order = () => {
     setSelectedProducts((prev) => {
       const newSelected = prev.map((p) => {
         if (p.id === productId) {
-          const minQty = isDesalProduct(p) || getProductCategory(p) === 'bread' ? 20 : 1
+          const minQty = isDesalProduct(p) ? 20 : 1
           return {
             ...p,
             quantity: Math.max(minQty, parseInt(quantity) || minQty),
@@ -271,6 +258,8 @@ const Order = () => {
       })
 
       saveSelectedProducts(newSelected)
+      // Clear any validation error when quantities change
+      setValidationError('')
       return newSelected
     })
   }
@@ -297,6 +286,8 @@ const Order = () => {
       })
 
       saveSelectedProducts(newSelected)
+      // Clear any validation error when quantities change
+      setValidationError('')
       return newSelected
     })
   }
@@ -307,7 +298,6 @@ const Order = () => {
       [productId]: value,
     }))
 
-    // Update selected product quantity if custom is selected
     if (desalQuantityTypes[productId] === 'custom') {
       setSelectedProducts((prev) => {
         const newSelected = prev.map((p) => {
@@ -318,20 +308,42 @@ const Order = () => {
         })
 
         saveSelectedProducts(newSelected)
+        // Clear any validation error when quantities change
+        setValidationError('')
         return newSelected
       })
     }
   }
 
-  // Clear all selections
   const handleClearAll = () => {
     setSelectedProducts([])
     setDesalCustomQuantities({})
     setDesalQuantityTypes({})
+    setValidationError('')
     localStorage.removeItem('selectedProducts')
   }
 
-  // Calculation functions
+  const handleRemoveProduct = (productId) => {
+    setSelectedProducts((prev) => {
+      const newSelected = prev.filter((p) => p.id !== productId)
+
+      if (desalQuantityTypes[productId]) {
+        const newDesalTypes = { ...desalQuantityTypes }
+        delete newDesalTypes[productId]
+        setDesalQuantityTypes(newDesalTypes)
+      }
+
+      if (desalCustomQuantities[productId]) {
+        const newDesalCustom = { ...desalCustomQuantities }
+        delete newDesalCustom[productId]
+        setDesalCustomQuantities(newDesalCustom)
+      }
+
+      saveSelectedProducts(newSelected)
+      return newSelected
+    })
+  }
+
   const getTotalItems = () => {
     return selectedProducts.reduce((sum, product) => sum + product.quantity, 0)
   }
@@ -350,15 +362,28 @@ const Order = () => {
   }
 
   const handleProceedToCheckout = () => {
-    // Validation
     if (selectedProducts.length === 0) {
       alert('Please select at least one product')
       return
     }
 
+    // Validate minimum quantities for desal/pandesal products
+    const validation = validateSelectedProducts()
+    if (!validation.isValid) {
+      setValidationError(validation.message)
+      // Scroll to the validation error
+      const errorElement = document.getElementById('validation-error')
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      return
+    }
+
+    // Clear any previous validation error
+    setValidationError('')
+
     // Check if user is already logged in
     if (isAuthenticated && user) {
-      // User is logged in, prepare order details and go to checkout
       console.log('User is logged in, preparing order details...')
 
       // Prepare order details to pass to checkout page
@@ -403,7 +428,6 @@ const Order = () => {
     localStorage.setItem('selectedProducts', JSON.stringify(selectedProducts))
     setShowAuthModal(false)
 
-    // Redirect to login page
     navigate('/login', {
       state: {
         fromOrder: true,
@@ -417,7 +441,6 @@ const Order = () => {
     if (categoryId === 'all') return products
 
     return products.filter((product) => {
-      // Check if product belongs to this category using API data
       if (
         product.category_id?.toString() === categoryId ||
         product.product_category_id?.toString() === categoryId
@@ -425,12 +448,10 @@ const Order = () => {
         return true
       }
 
-      // Special handling for Pandesal
       if (categoryId === 'pandesal' && isDesalProduct(product)) {
         return true
       }
 
-      // Fallback to name-based for other categories
       if (
         categoryId === 'bread' &&
         (product.category_name?.toLowerCase().includes('bread') ||
@@ -506,7 +527,7 @@ const Order = () => {
           variants={staggerContainer}
         >
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* LEFT COLUMN - Products Grid (8 columns) */}
+            {/* LEFT COLUMN */}
             <motion.div className="lg:col-span-8" variants={faqItem}>
               <h2
                 className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
@@ -526,7 +547,7 @@ const Order = () => {
                   </div>
                 ) : (
                   <>
-                    {/* Category Tabs - Fixed at top */}
+                    {/* Category Tabs */}
                     <div className="flex overflow-x-auto pb-4 mb-4 gap-2 scrollbar-hide shrink-0">
                       {categories.map((category) => {
                         const Icon = category.icon
@@ -557,7 +578,7 @@ const Order = () => {
                       })}
                     </div>
 
-                    {/* Products Grid - Scrollable area with fixed height */}
+                    {/* Products Grid */}
                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         {displayedProducts.map((product) => {
@@ -616,11 +637,6 @@ const Order = () => {
                                   {/* Category Badge */}
                                   <div className="mb-2">
                                     {isDesal && (
-                                      <span className="inline-block text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
-                                        Min 20
-                                      </span>
-                                    )}
-                                    {!isDesal && isBread && (
                                       <span className="inline-block text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
                                         Min 20
                                       </span>
@@ -705,8 +721,8 @@ const Order = () => {
                                       </span>
                                       <input
                                         type="number"
-                                        min={isBread ? 20 : 1}
-                                        value={selectedProduct?.quantity || (isBread ? 20 : 1)}
+                                        min={1}
+                                        value={selectedProduct?.quantity || 1}
                                         onChange={(e) =>
                                           handleProductQuantityChange(product.id, e.target.value)
                                         }
@@ -734,7 +750,7 @@ const Order = () => {
               </div>
             </motion.div>
 
-            {/* RIGHT COLUMN - Order Summary (4 columns) */}
+            {/* RIGHT COLUMN */}
             <motion.div className="lg:col-span-4" variants={faqItem} transition={{ delay: 0.1 }}>
               <h2
                 className="text-xl md:text-2xl font-light mb-6 font-[titleFont]"
@@ -756,7 +772,17 @@ const Order = () => {
                   </div>
                 ) : (
                   <>
-                    {/* Selected Products List - Scrollable */}
+                    {/* Validation Error Message */}
+                    {validationError && (
+                      <div
+                        id="validation-error"
+                        className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+                      >
+                        <p className="text-red-600 text-sm font-medium">{validationError}</p>
+                      </div>
+                    )}
+
+                    {/* Selected Products List */}
                     <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                       <div className="flex justify-between items-center mb-3 shrink-0">
                         <h3 className="font-medium text-sm" style={{ color: '#9C4A15' }}>
@@ -770,28 +796,64 @@ const Order = () => {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                        {selectedProducts.map((product) => (
-                          <div
-                            key={product.id}
-                            className="flex justify-between items-center text-sm py-2 border-b border-gray-100"
-                          >
-                            <div className="flex-1">
-                              <span className="font-medium" style={{ color: '#2A1803' }}>
-                                {product.name}
-                              </span>
-                              <span className="text-xs ml-2" style={{ color: '#9C4A15' }}>
-                                x{product.quantity}
-                              </span>
+                        {selectedProducts.map((product) => {
+                          const isDesal = isDesalProduct(product)
+                          const isValidQuantity = !isDesal || product.quantity >= 20
+
+                          return (
+                            <div
+                              key={product.id}
+                              className={`flex justify-between items-center text-sm py-3 px-3 rounded-lg border border-gray-200 hover:border-[#9C4A15] transition-colors ${
+                                !isValidQuantity ? 'bg-red-50' : 'bg-white'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="font-medium truncate"
+                                    style={{ color: '#2A1803' }}
+                                  >
+                                    {product.name}
+                                  </span>
+                                  <span
+                                    className={`text-xs whitespace-nowrap ${
+                                      !isValidQuantity ? 'text-red-600 font-bold' : ''
+                                    }`}
+                                    style={isValidQuantity ? { color: '#9C4A15' } : {}}
+                                  >
+                                    x{product.quantity}
+                                    {!isValidQuantity && (
+                                      <span className="ml-1 text-red-600">(Min 20)</span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 shrink-0">
+                                <span className="font-medium text-sm" style={{ color: '#9C4A15' }}>
+                                  {formatCurrency(product.quantity * product.price)}
+                                </span>
+
+                                {/* Remove button - always visible */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRemoveProduct(product.id)
+                                  }}
+                                  className="p-2 rounded-full hover:bg-red-100 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                                  title="Remove item"
+                                  aria-label="Remove item"
+                                >
+                                  <FiTrash2 className="w-4 h-4 text-red-500" />
+                                </button>
+                              </div>
                             </div>
-                            <span className="font-medium" style={{ color: '#9C4A15' }}>
-                              {formatCurrency(product.quantity * product.price)}
-                            </span>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
 
-                    {/* Totals - Fixed at bottom */}
+                    {/* Totals */}
                     <div className="shrink-0 mt-4">
                       <div className="space-y-3 pt-4 border-t border-gray-200">
                         <div className="flex justify-between items-center">
@@ -812,7 +874,7 @@ const Order = () => {
                         </div>
                       </div>
 
-                      {/* Proceed Button - Same for both authenticated and guest users */}
+                      {/* Proceed Button */}
                       <div className="mt-6">
                         <motion.button
                           onClick={handleProceedToCheckout}
