@@ -182,9 +182,9 @@ const addOrder = async (req, res) => {
           customer_info.email,
           customer_info.contact,
           customer_info.address || '',
-          customer_info.latitude || 0, // Use the latitude from frontend
-          customer_info.longitude || 0, // Use the longitude from frontend
-          0, // 0 for guest/unregistered
+          customer_info.latitude || 0,
+          customer_info.longitude || 0,
+          0,
         ],
       )
       finalCustomerId = insertResult.insertId
