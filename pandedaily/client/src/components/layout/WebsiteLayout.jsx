@@ -10,6 +10,7 @@ import Footer from './Footer'
 import About from '../../pages/website/About'
 import Faq from '../../pages/website/Faq'
 import Order from '../../pages/website/Order'
+import MyOrder from '../../pages/website/MyOrder'
 import Login from '../../pages/website/Login'
 import Signup from '../../pages/website/Signup'
 import ScrollToHash from '../../components/ScrollToHash'
@@ -112,23 +113,14 @@ const WebsiteLayout = () => {
           />
 
           {/* Protected Routes */}
-          {/* <Route
-            path="/account"
+          <Route
+            path="/my-order"
             element={
               <ProtectedRoute requireAuth allowedTypes={['customer']}>
-                <div>Account Settings (Placeholder)</div>
+                <MyOrder />
               </ProtectedRoute>
             }
           />
-
-          <Route
-            path="/order-history"
-            element={
-              <ProtectedRoute requireAuth allowedTypes={['customer']}>
-                <div>Order History (Placeholder)</div>
-              </ProtectedRoute>
-            }
-          /> */}
 
           {/* 404 Page */}
           <Route

@@ -73,16 +73,9 @@ const NavigationBar = () => {
     navigate(WebsiteRoutes.home)
   }
 
-  // Handle customer dashboard
-  const handleDashboard = () => {
-    navigate('/customer/dashboard')
-    setIsMenuOpen(false)
-    setIsDropdownOpen(false)
-  }
-
   // Handle orders
   const handleOrders = () => {
-    navigate('/customer/orders')
+    navigate('/my-order')
     setIsMenuOpen(false)
     setIsDropdownOpen(false)
   }
@@ -336,15 +329,6 @@ const NavigationBar = () => {
                   </div>
 
                   {/* Mobile Menu Items */}
-                  <button
-                    onClick={handleDashboard}
-                    className="flex items-center justify-center space-x-2 py-4 hover:opacity-80 text-xl focus:outline-none cursor-pointer"
-                    style={{ color: '#F5EFE7' }}
-                  >
-                    <FiUserIcon />
-                    <span>Dashboard</span>
-                  </button>
-
                   <button
                     onClick={handleOrders}
                     className="flex items-center justify-center space-x-2 py-4 hover:opacity-80 text-xl focus:outline-none cursor-pointer"
