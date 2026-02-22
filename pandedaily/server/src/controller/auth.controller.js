@@ -194,7 +194,7 @@ const Logout = async (req, res) => {
 
 // CUSTOMER
 const registerCustomer = async (req, res) => {
-  const { fullname, contact, email, address, username, password } = req.body
+  const { fullname, contact, email, address, username, password, latitude, longitude } = req.body
 
   try {
     // Validate required fields
@@ -264,80 +264,85 @@ const registerCustomer = async (req, res) => {
       })
     }
 
-    // Get coordinates from address using OpenStreetMap Nominatim API (with native https)
-    let latitude = null
-    let longitude = null
+    let finalLatitude = latitude
+    let finalLongitude = longitude
 
-    try {
-      // Add delay to respect Nominatim's usage policy (max 1 request per second)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+    const hasValidCoordinates =
+      finalLatitude &&
+      finalLongitude &&
+      !isNaN(parseFloat(finalLatitude)) &&
+      !isNaN(parseFloat(finalLongitude)) &&
+      parseFloat(finalLatitude) !== 0 &&
+      parseFloat(finalLongitude) !== 0
 
-      // Encode the address for URL
-      const encodedAddress = encodeURIComponent(address)
+    if (!hasValidCoordinates) {
+      // Fallback
+      console.log('⚠️ No valid coordinates from frontend, geocoding address...')
 
-      // Create a promise-based HTTPS request
-      const geocodeResult = await new Promise((resolve, reject) => {
-        const options = {
-          hostname: 'nominatim.openstreetmap.org',
-          path: `/search?q=${encodedAddress}&format=json&limit=1&accept-language=en`,
-          method: 'GET',
-          headers: {
-            'User-Agent': 'PandeDailyApp/1.0', // Required: Identify your application
-          },
+      try {
+        // Add delay to respect Nominatim's usage policy
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
+        // Encode the address for URL
+        const encodedAddress = encodeURIComponent(address)
+
+        // Create a promise-based HTTPS request
+        const geocodeResult = await new Promise((resolve, reject) => {
+          const options = {
+            hostname: 'nominatim.openstreetmap.org',
+            path: `/search?q=${encodedAddress}&format=json&limit=1&accept-language=en`,
+            method: 'GET',
+            headers: {
+              'User-Agent': 'PandeDailyApp/1.0',
+            },
+          }
+
+          const req = https.get(options, (response) => {
+            let data = ''
+            response.on('data', (chunk) => {
+              data += chunk
+            })
+            response.on('end', () => {
+              try {
+                const parsedData = JSON.parse(data)
+                resolve(parsedData)
+              } catch (e) {
+                reject(new Error('Failed to parse geocoding response'))
+              }
+            })
+          })
+
+          req.on('error', (error) => reject(error))
+          req.end()
+        })
+
+        if (geocodeResult && geocodeResult.length > 0) {
+          finalLatitude = parseFloat(geocodeResult[0].lat)
+          finalLongitude = parseFloat(geocodeResult[0].lon)
+          console.log('📍 Geocoded address:', geocodeResult[0].display_name)
+        } else {
+          return res.status(400).json({
+            message:
+              'Could not find coordinates for the provided address. Please provide a more specific address.',
+          })
         }
-
-        const req = https.get(options, (response) => {
-          let data = ''
-
-          // A chunk of data has been received
-          response.on('data', (chunk) => {
-            data += chunk
-          })
-
-          // The whole response has been received
-          response.on('end', () => {
-            try {
-              const parsedData = JSON.parse(data)
-              resolve(parsedData)
-            } catch (e) {
-              reject(new Error('Failed to parse geocoding response'))
-            }
-          })
-        })
-
-        req.on('error', (error) => {
-          reject(error)
-        })
-
-        req.end()
-      })
-
-      if (geocodeResult && geocodeResult.length > 0) {
-        latitude = parseFloat(geocodeResult[0].lat)
-        longitude = parseFloat(geocodeResult[0].lon)
-
-        // Optional: Get the formatted address from the response
-        const formattedAddress = geocodeResult[0].display_name
-        console.log('Geocoded address:', formattedAddress)
-      } else {
-        console.log('RESULT', geocodeResult)
+      } catch (geocodeError) {
+        console.error('❌ Geocoding error:', geocodeError)
         return res.status(400).json({
-          message:
-            'Could not find coordinates for the provided address. Please provide a more specific address (e.g., include city/barangay).',
+          message: 'Error processing address. Please check your address or try again later.',
         })
       }
-    } catch (geocodeError) {
-      console.error('Geocoding error:', geocodeError)
-
-      return res.status(400).json({
-        message: 'Error processing address. Please check your address or try again later.',
+    } else {
+      console.log('✅ Using coordinates from map click:', {
+        lat: finalLatitude,
+        lng: finalLongitude,
       })
     }
 
-    // Validate numeric values
-    if (isNaN(latitude) || isNaN(longitude)) {
+    // Validate final coordinates
+    if (isNaN(parseFloat(finalLatitude)) || isNaN(parseFloat(finalLongitude))) {
       return res.status(400).json({
-        message: 'Could not determine coordinates from the provided address.',
+        message: 'Could not determine coordinates from the provided information.',
       })
     }
 
@@ -348,8 +353,8 @@ const registerCustomer = async (req, res) => {
       cleanedContact,
       email.toLowerCase().trim(),
       address.trim(),
-      latitude,
-      longitude,
+      parseFloat(finalLatitude), // ✅ Store the coordinates (from map click or fallback)
+      parseFloat(finalLongitude), // ✅
       username.trim(),
       EncryptString(password),
       1,
@@ -362,8 +367,8 @@ const registerCustomer = async (req, res) => {
       contact: cleanedContact,
       email: email.toLowerCase().trim(),
       address: address.trim(),
-      latitude: latitude,
-      longitude: longitude,
+      latitude: parseFloat(finalLatitude),
+      longitude: parseFloat(finalLongitude),
       username: username.trim(),
       is_registered: true,
       created_at: new Date().toISOString(),
@@ -377,7 +382,6 @@ const registerCustomer = async (req, res) => {
   } catch (error) {
     console.error('Error registering customer:', error)
 
-    // Handle specific database errors
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
         success: false,
