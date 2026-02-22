@@ -1,4 +1,3 @@
-// Signup.jsx
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import {
@@ -476,13 +475,13 @@ const Signup = () => {
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
                         <span className="font-medium">Latitude:</span>{' '}
                         <span className="font-bold" style={{ color: '#9C4A15' }}>
-                          {selectedLocation.lat.toFixed(6)}
+                          {selectedLocation.lat} {/* Removed .toFixed(6) */}
                         </span>
                       </p>
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
                         <span className="font-medium">Longitude:</span>{' '}
                         <span className="font-bold" style={{ color: '#9C4A15' }}>
-                          {selectedLocation.lng.toFixed(6)}
+                          {selectedLocation.lng} {/* Removed .toFixed(6) */}
                         </span>
                       </p>
                     </div>

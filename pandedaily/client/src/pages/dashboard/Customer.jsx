@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiUser, FiMail, FiPhone, FiMapPin, FiCalendar } from 'react-icons/fi'
+import { FiUser, FiMail, FiPhone, FiMapPin, FiCalendar, FiExternalLink } from 'react-icons/fi'
 import { customerColumns } from '../../mapping/customerColumns'
 import { getCustomers } from '../../services/api'
 
@@ -15,7 +15,38 @@ const Customer = () => {
   const [selectedRows, setSelectedRows] = useState([])
   const [selectAll, setSelectAll] = useState(false)
 
+  // Function to open Google Maps with coordinates
+  const openGoogleMaps = (latitude, longitude, address, customerId, customerName) => {
+    console.log('📍 Opening Google Maps for:', {
+      customerId,
+      customerName,
+      latitude,
+      longitude,
+      address,
+      latitudeType: typeof latitude,
+      longitudeType: typeof longitude,
+      latitudeValue: latitude,
+      longitudeValue: longitude,
+      hasValidCoordinates:
+        latitude && longitude && parseFloat(latitude) !== 0 && parseFloat(longitude) !== 0,
+    })
+
+    if (!latitude || !longitude || parseFloat(latitude) === 0 || parseFloat(longitude) === 0) {
+      console.warn('⚠️ Invalid coordinates:', { latitude, longitude })
+      alert('No valid coordinates available for this customer')
+      return
+    }
+
+    const lat = parseFloat(latitude)
+    const lng = parseFloat(longitude)
+
+    console.log('✅ Opening maps with coordinates:', { lat, lng })
+    window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank')
+  }
+
   const columnsWithRender = useMemo(() => {
+    console.log('🏗️ Building columns with customer data available')
+
     return customerColumns.map((col) => {
       // Base column with centered alignment
       const baseColumn = {
@@ -28,7 +59,8 @@ const Customer = () => {
         case 'id':
           return {
             ...baseColumn,
-            render: (value) => {
+            render: (value, row) => {
+              console.log(`📝 Rendering ID for customer ${row?.fullname || 'unknown'}:`, value)
               if (value === undefined || value === null) {
                 return <span className="font-mono font-semibold text-gray-400">N/A</span>
               }
@@ -45,7 +77,7 @@ const Customer = () => {
         case 'fullname':
           return {
             ...baseColumn,
-            render: (value) => (
+            render: (value, row) => (
               <div className="flex justify-center items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
                   <FiUser className="w-4 h-4 text-[#9C4A15]" />
@@ -91,15 +123,124 @@ const Customer = () => {
           return {
             ...baseColumn,
             width: '250px',
-            render: (value) => {
-              if (!value) return <span className="text-gray-400">N/A</span>
+            render: (value, row) => {
+              // Log the raw row data for debugging
+              console.log(`📍 Address data for ${row?.fullname || 'unknown'}:`, {
+                id: row?.id,
+                name: row?.fullname,
+                address: value,
+                latitude: row?.latitude,
+                longitude: row?.longitude,
+                latitudeType: typeof row?.latitude,
+                longitudeType: typeof row?.longitude,
+                latitudeRaw: row?.latitude,
+                longitudeRaw: row?.longitude,
+                hasLatitude: !!row?.latitude,
+                hasLongitude: !!row?.longitude,
+                latitudeValue: row?.latitude ? parseFloat(row.latitude) : null,
+                longitudeValue: row?.longitude ? parseFloat(row.longitude) : null,
+                isValidLat: row?.latitude && parseFloat(row.latitude) !== 0,
+                isValidLng: row?.longitude && parseFloat(row.longitude) !== 0,
+              })
+
+              // Check if we have valid coordinates
+              const hasValidCoordinates =
+                row?.latitude &&
+                row?.longitude &&
+                parseFloat(row.latitude) !== 0 &&
+                parseFloat(row.longitude) !== 0
+
+              console.log(`✅ Has valid coordinates for ${row?.fullname}:`, hasValidCoordinates)
+
+              if (!value || value === 'N/A') {
+                return <span className="text-gray-400">N/A</span>
+              }
 
               const truncatedAddress = value.length > 50 ? value.substring(0, 47) + '...' : value
 
               return (
-                <div className="flex items-center gap-2 px-2" title={value}>
-                  <FiMapPin className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="text-gray-700 text-sm truncate">{truncatedAddress}</span>
+                <div
+                  onClick={() =>
+                    hasValidCoordinates
+                      ? openGoogleMaps(row.latitude, row.longitude, value, row.id, row.fullname)
+                      : null
+                  }
+                  className={`flex items-center gap-2 px-2 ${
+                    hasValidCoordinates
+                      ? 'cursor-pointer hover:bg-blue-50 rounded-lg transition-all duration-200 group'
+                      : 'cursor-default'
+                  }`}
+                  title={
+                    hasValidCoordinates
+                      ? `Click to open in Google Maps\nLat: ${row.latitude}, Lng: ${row.longitude}`
+                      : value
+                  }
+                >
+                  <FiMapPin
+                    className={`w-4 h-4 shrink-0 ${
+                      hasValidCoordinates
+                        ? 'text-blue-500 group-hover:text-blue-600'
+                        : 'text-gray-400'
+                    }`}
+                  />
+                  <span
+                    className={`text-sm truncate ${
+                      hasValidCoordinates
+                        ? 'text-blue-600 group-hover:text-blue-700 group-hover:underline'
+                        : 'text-gray-700'
+                    }`}
+                  >
+                    {truncatedAddress}
+                  </span>
+                  {hasValidCoordinates && (
+                    <FiExternalLink className="w-3 h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              )
+            },
+          }
+
+        case 'latitude':
+          return {
+            ...baseColumn,
+            render: (value, row) => {
+              console.log(`🌐 Latitude for ${row?.fullname || 'unknown'}:`, {
+                raw: value,
+                parsed: value ? parseFloat(value) : null,
+                isValid: value && parseFloat(value) !== 0,
+              })
+
+              if (!value || parseFloat(value) === 0) {
+                return <span className="text-gray-400">N/A</span>
+              }
+              return (
+                <div className="flex justify-center">
+                  <span className="text-sm font-mono text-gray-600">
+                    {parseFloat(value).toFixed(6)}
+                  </span>
+                </div>
+              )
+            },
+          }
+
+        case 'longitude':
+          return {
+            ...baseColumn,
+            render: (value, row) => {
+              console.log(`🌐 Longitude for ${row?.fullname || 'unknown'}:`, {
+                raw: value,
+                parsed: value ? parseFloat(value) : null,
+                isValid: value && parseFloat(value) !== 0,
+              })
+
+              if (!value || parseFloat(value) === 0) {
+                return <span className="text-gray-400">N/A</span>
+              }
+              return (
+                <div className="flex justify-center">
+                  <span className="text-sm font-mono text-gray-600">
+                    {parseFloat(value).toFixed(6)}
+                  </span>
                 </div>
               )
             },
@@ -178,34 +319,61 @@ const Customer = () => {
     setLoading(true)
     setError(null)
     try {
+      console.log('📡 Fetching customers...')
       const response = await getCustomers()
+      console.log('📡 API Response:', response)
 
       const data = response.data || response
+      console.log('📊 Raw customer data:', data)
 
       if (Array.isArray(data)) {
-        const transformedData = data.map((customer) => ({
-          id: customer.id || 0,
-          fullname: customer.fullname || 'Unknown',
-          username: customer.username || 'N/A',
-          email: customer.email || '',
-          contact: customer.contact || customer.phone || 'N/A',
-          address: customer.address || 'N/A',
-          latitude: customer.latitude || '',
-          longitude: customer.longitude || '',
-          password: customer.password || '',
-          is_registered: customer.is_registered || 0,
-          createddate: customer.createddate || customer.created_date || customer.createdDate || '',
-          ...customer,
-        }))
+        const transformedData = data.map((customer) => {
+          console.log(`🔄 Transforming customer ${customer.id || 'new'}:`, {
+            original: customer,
+            latitude: customer.latitude,
+            longitude: customer.longitude,
+          })
+
+          return {
+            id: customer.id || 0,
+            fullname: customer.fullname || 'Unknown',
+            username: customer.username || 'N/A',
+            email: customer.email || '',
+            contact: customer.contact || customer.phone || 'N/A',
+            address: customer.address || 'N/A',
+            latitude: customer.latitude || 0,
+            longitude: customer.longitude || 0,
+            password: customer.password || '',
+            is_registered: customer.is_registered || 0,
+            createddate:
+              customer.createddate || customer.created_date || customer.createdDate || '',
+            ...customer,
+          }
+        })
+
+        console.log(
+          '✅ Transformed customers with coordinates:',
+          transformedData.map((c) => ({
+            id: c.id,
+            name: c.fullname,
+            lat: c.latitude,
+            lng: c.longitude,
+            hasValidCoords:
+              c.latitude &&
+              c.longitude &&
+              parseFloat(c.latitude) !== 0 &&
+              parseFloat(c.longitude) !== 0,
+          })),
+        )
 
         setCustomers(transformedData)
       } else {
-        console.error('Invalid data format:', data)
+        console.error('❌ Invalid data format:', data)
         setError('Invalid data format received from server. Expected an array.')
         setCustomers([])
       }
     } catch (err) {
-      console.error('Error fetching customers:', err)
+      console.error('❌ Error fetching customers:', err)
       setError(err.message || 'Failed to fetch customers. Please try again.')
       setCustomers([])
     } finally {

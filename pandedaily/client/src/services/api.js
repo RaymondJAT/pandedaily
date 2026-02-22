@@ -1,4 +1,5 @@
-const API_URL = 'http://192.168.40.101:3080'
+// const API_URL = 'http://192.168.40.101:3080' // office
+const API_URL = 'http://192.168.1.15:3080' // house
 
 // Helper function for API calls
 const fetchApi = async (endpoint, options = {}) => {

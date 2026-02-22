@@ -442,27 +442,24 @@ const GuestInformation = () => {
                 />
 
                 {/* Coordinates display - with safe navigation */}
+                {/* Coordinates display - expanded */}
                 {selectedLocation?.lat && selectedLocation?.lng && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-3 p-3 bg-[#F5EFE7] rounded-lg"
-                  >
+                  <div className="mt-3 p-3 bg-[#F5EFE7] rounded-lg">
                     <div className="flex flex-wrap gap-4">
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
                         <span className="font-medium">Latitude:</span>{' '}
                         <span className="font-bold" style={{ color: '#9C4A15' }}>
-                          {Number(selectedLocation.lat).toFixed(6)}
+                          {selectedLocation.lat} {/* Removed .toFixed(6) */}
                         </span>
                       </p>
                       <p className="text-sm font-mono" style={{ color: '#2A1803' }}>
                         <span className="font-medium">Longitude:</span>{' '}
                         <span className="font-bold" style={{ color: '#9C4A15' }}>
-                          {Number(selectedLocation.lng).toFixed(6)}
+                          {selectedLocation.lng} {/* Removed .toFixed(6) */}
                         </span>
                       </p>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {errors.location && <p className="mt-1 text-sm text-red-600">{errors.location}</p>}
