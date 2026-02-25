@@ -1,5 +1,6 @@
 const { Rider } = require('../database/model/Rider')
 const { Query } = require('../database/utility/queries.util')
+const { EncryptString } = require('../utils/cryptography.util')
 
 // GET ALL
 const getRiders = async (req, res) => {
@@ -199,12 +200,14 @@ const createRider = async (req, res) => {
       })
     }
 
+    const encryptedPassword = EncryptString(r_password)
+
     const statement = `
       INSERT INTO rider (r_fullname, r_contact, r_username, r_password, r_status) 
       VALUES (?, ?, ?, ?, 'ACTIVE')
     `
 
-    const result = await Query(statement, [r_fullname, r_contact, r_username, r_password])
+    const result = await Query(statement, [r_fullname, r_contact, r_username, encryptedPassword])
 
     res.status(201).json({
       message: 'Rider created successfully.',

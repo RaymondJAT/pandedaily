@@ -53,8 +53,6 @@ const Login = async (req, res) => {
         expiresIn: '30d',
       })
 
-      console.log('RESULT:', jwtToken)
-
       return res.status(200).json({
         message: 'Login successful',
         token: jwtToken,
@@ -103,6 +101,44 @@ const Login = async (req, res) => {
       })
     }
 
+    // Check in rider table
+    const [rider] = await Query(
+      `SELECT 
+        r_id AS id,
+        r_fullname AS fullname,
+        r_username AS username,
+        r_contact AS contact,
+        r_status AS status,
+        'rider' AS user_type
+       FROM rider 
+       WHERE r_username = ? 
+         AND r_password = ?
+         AND r_status = 'ACTIVE'`,
+      [username, EncryptString(password)],
+    )
+
+    if (rider) {
+      const jwtPayload = {
+        id: rider.id,
+        fullname: rider.fullname,
+        username: rider.username,
+        contact: rider.contact,
+        status: rider.status,
+        user_type: 'rider',
+      }
+
+      const jwtToken = jwt.sign(jwtPayload, process.env._SECRET_KEY, {
+        expiresIn: '30d',
+      })
+
+      return res.status(200).json({
+        message: 'Login successful',
+        token: jwtToken,
+        user: jwtPayload,
+      })
+    }
+
+    // If no user found in any table
     return res.status(401).json({
       message: 'Invalid username or password',
     })

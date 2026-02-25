@@ -17,6 +17,8 @@ const getRoute = async (req, res) => {
 const addRoute = async (req, res) => {
   const { access_id, route_name, status = 1 } = req.body
 
+  console.log('Received create route request:', { access_id, route_name, status })
+
   if (!access_id || !route_name) {
     return res.status(400).json({
       message: 'Access ID and route name are required.',
@@ -24,11 +26,25 @@ const addRoute = async (req, res) => {
   }
 
   try {
+    // Check if access exists
     const checkAccess = await Query(`SELECT ma_id FROM master_access WHERE ma_id = ?`, [access_id])
+    console.log('Access check result:', checkAccess)
 
     if (checkAccess.length === 0) {
       return res.status(404).json({
         message: 'Access not found.',
+      })
+    }
+
+    // Check for duplicate
+    const checkDuplicate = await Query(
+      `SELECT mr_id FROM master_route WHERE mr_access_id = ? AND mr_route_name = ?`,
+      [access_id, route_name],
+    )
+
+    if (checkDuplicate.length > 0) {
+      return res.status(409).json({
+        message: 'Route with this name already exists for this access.',
       })
     }
 
@@ -37,6 +53,7 @@ const addRoute = async (req, res) => {
       VALUES (?, ?, ?)
     `
     const data = await Query(statement, [access_id, route_name, status])
+    console.log('Insert result:', data)
 
     res.status(200).json({
       message: 'Route data added successfully.',
@@ -47,13 +64,6 @@ const addRoute = async (req, res) => {
     console.error('Error adding route data:', error)
     console.error('Error SQL:', error.sql)
     console.error('Error parameters:', [access_id, route_name, status])
-
-    // Check for duplicate entry
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({
-        message: 'Route with this name already exists for this access.',
-      })
-    }
 
     res.status(500).json({
       message: 'Error adding route data.',
