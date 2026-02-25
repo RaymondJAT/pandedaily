@@ -19,6 +19,8 @@ import GuestInformation from '../../pages/website/GuestInformation'
 import Checkout from '../../pages/website/Checkout'
 import OrderConfirmation from '../../pages/website/OrderConfirmation'
 import Payment from '../../pages/website/Payment'
+import PaymentSuccess from '../../pages/website/PaymentSuccess'
+import PaymentCancel from '../../pages/website/PaymentCancel'
 import ProtectedRoute from '../../routes/ProtectedRoute'
 
 const WebsiteLayout = () => {
@@ -111,6 +113,10 @@ const WebsiteLayout = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Paymongo routes */}
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/cancel" element={<PaymentCancel />} />
 
           {/* Protected Routes */}
           <Route

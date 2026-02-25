@@ -16,7 +16,7 @@ const ProductGrid = ({
     return (
       <div className="col-span-4 text-center py-8">
         <FiPackage className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-500">No products in this category</p>
+        <p className="text-gray-500">No available products in this category</p>
       </div>
     )
   }

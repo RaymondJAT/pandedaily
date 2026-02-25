@@ -13,18 +13,20 @@ import DeliveryCalendar from '../../components/checkout/DeliveryCalendar'
 import DeliveryConfiguration from '../../components/checkout/DeliveryConfiguration'
 import SelectedProductsSummary from '../../components/checkout/SelectedProductsSummary'
 import CheckoutActions from '../../components/checkout/CheckoutActions'
+import { createPaymongoCheckoutSession } from '../../services/api'
 
 const Checkout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
 
-  // Custom hooks
   const calendar = useDeliveryCalendar(10)
   const time = useDeliveryTime()
   const checkoutData = useCheckoutData(user)
 
   const [specialInstructions, setSpecialInstructions] = useState('')
+  const [processing, setProcessing] = useState(false)
+  const [error, setError] = useState('')
 
   // Load order data on mount
   useEffect(() => {
@@ -32,7 +34,7 @@ const Checkout = () => {
     if (!success) return
   }, [location.state, checkoutData.loadOrderData])
 
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = async () => {
     if (calendar.selectedDates.length === 0) {
       alert('Please select at least one delivery date')
       return
@@ -43,38 +45,101 @@ const Checkout = () => {
       return
     }
 
-    // Set flag that we're navigating to payment
-    sessionStorage.setItem('navigatingToPayment', 'true')
+    setProcessing(true)
+    setError('')
 
-    const checkoutDetails = {
-      products: checkoutData.orderDetails?.products,
-      dates: calendar.selectedDates,
-      schedule: time.deliverySchedule,
-      selectedTime: time.selectedTime,
-      instructions: specialInstructions,
-      totalPieces: getTotalItems(),
-      totalPricePerDelivery: getTotalPricePerDelivery(),
-      totalPrice: getTotalPrice(),
-      customerInfo: checkoutData.customerInfo,
-      isGuest: checkoutData.isGuest,
-      ...(checkoutData.isGuest &&
-        checkoutData.customerInfo?.latitude &&
-        checkoutData.customerInfo?.longitude && {
-          guestLocation: {
-            latitude: checkoutData.customerInfo.latitude,
-            longitude: checkoutData.customerInfo.longitude,
-            address: checkoutData.customerInfo.address,
-          },
-        }),
+    try {
+      // Prepare line items for PayMongo
+      const lineItems = checkoutData.orderDetails.products.map((product) => ({
+        name: product.name,
+        amount: product.price,
+        quantity: product.quantity,
+        description: `${product.quantity} x ${product.name}`,
+      }))
+
+      // Add delivery fee as a line item
+      const deliveryFee = 1
+      lineItems.push({
+        name: 'Delivery Fee',
+        amount: deliveryFee,
+        quantity: calendar.selectedDates.length,
+        description: `Delivery fee for ${calendar.selectedDates.length} day(s)`,
+      })
+
+      // Create order reference
+      const orderReference = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+
+      // Prepare metadata
+      const metadata = {
+        order_reference: orderReference,
+        customer_id: user?.id || 'guest',
+        customer_name: checkoutData.customerInfo?.fullname || user?.fullname || 'Customer',
+        customer_email: checkoutData.customerInfo?.email || user?.email || '',
+        customer_contact: checkoutData.customerInfo?.contact || user?.contact || '',
+        total_items: getTotalItems().toString(),
+        total_amount: getTotalPrice().toString(),
+        delivery_dates: calendar.selectedDates.join(', '),
+        delivery_time: time.selectedTime,
+        delivery_schedule: time.deliverySchedule,
+        special_instructions: specialInstructions || '',
+        is_guest: checkoutData.isGuest ? 'true' : 'false',
+      }
+
+      // Create success and cancel URLs
+      const baseUrl = window.location.origin
+      const successUrl = `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`
+      const cancelUrl = `${baseUrl}/payment/cancel`
+
+      // Create checkout session using the API function
+      const response = await createPaymongoCheckoutSession(
+        lineItems,
+        successUrl,
+        cancelUrl,
+        metadata,
+      )
+
+      console.log('Checkout session created:', response)
+
+      if (!response) {
+        throw new Error('No response from server')
+      }
+
+      const checkoutSession = response
+
+      // Store checkout data for later use
+      const checkoutDetails = {
+        reference: orderReference,
+        customer_id: user?.id,
+        customer_info: checkoutData.customerInfo,
+        products: checkoutData.orderDetails.products,
+        delivery_schedules: calendar.selectedDates.map((date) => ({
+          date,
+          time: time.selectedTime,
+          schedule: time.deliverySchedule,
+        })),
+        total_amount: getTotalPrice(),
+        special_instructions: specialInstructions,
+        paymongo_session_id: checkoutSession.id,
+        paymongo_client_key: checkoutSession.attributes?.client_key,
+        payment_intent_id: checkoutSession.attributes?.payment_intent?.id,
+        status: 'PENDING_PAYMENT',
+      }
+
+      localStorage.setItem('checkoutDetails', JSON.stringify(checkoutDetails))
+
+      // Redirect to PayMongo checkout page
+      if (checkoutSession.attributes?.checkout_url) {
+        window.location.href = checkoutSession.attributes.checkout_url
+      } else {
+        throw new Error('No checkout URL received from PayMongo')
+      }
+    } catch (err) {
+      console.error('Checkout error:', err)
+      setError(err.message || 'Failed to process checkout')
+    } finally {
+      setProcessing(false)
     }
-
-    localStorage.setItem('checkoutDetails', JSON.stringify(checkoutDetails))
-
-    navigate('/order/payment', {
-      state: { checkoutDetails },
-    })
   }
-
   const handleBack = () => {
     sessionStorage.removeItem('navigatingToPayment')
     checkoutData.clearOrderData()
@@ -133,6 +198,13 @@ const Checkout = () => {
           accentColor="#9C4A15"
         />
 
+        {/* Display error message if any */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+
         <motion.div
           className="mx-auto"
           initial="initial"
@@ -178,6 +250,7 @@ const Checkout = () => {
           selectedDates={calendar.selectedDates}
           selectedTime={time.selectedTime}
           onProceedToPayment={handleProceedToPayment}
+          processing={processing}
           faqItem={faqItem}
         />
 

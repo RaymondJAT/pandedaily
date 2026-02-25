@@ -279,18 +279,12 @@ const Product = () => {
 
   // Handle edit product
   const handleEditProduct = (product) => {
-    console.log('=== EDIT PRODUCT DATA ===')
-    console.log('Full product object:', product)
-
     // Convert string prices to numbers for the form
     const processedProduct = {
       ...product,
       price: parseFloat(product.price) || 0,
       cost: parseFloat(product.cost) || 0,
     }
-
-    console.log('Processed product:', processedProduct)
-    console.log('=== END DATA ===')
 
     setEditingProduct(processedProduct)
     setShowEditModal(true)

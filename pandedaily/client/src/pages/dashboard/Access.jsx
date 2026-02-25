@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiPlus, FiRefreshCw, FiLock, FiCalendar } from 'react-icons/fi'
+import { FiPlus, FiRefreshCw, FiLock } from 'react-icons/fi'
 import { getAccess } from '../../services/api'
 import { accessColumns } from '../../mapping/accessColumns'
 import AddAccess from '../../components/dashboard modal/AddAccess'
 import EditAccess from '../../components/dashboard modal/EditAccess'
+import EditRoutes from '../../components/dashboard modal/EditRoutes'
 
 const Access = () => {
   const [accessData, setAccessData] = useState([])
@@ -20,7 +21,9 @@ const Access = () => {
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showRoutesModal, setShowRoutesModal] = useState(false)
   const [editingAccess, setEditingAccess] = useState(null)
+  const [configuringAccess, setConfiguringAccess] = useState(null)
 
   // Fetch access levels from API
   const fetchAccessData = useCallback(async () => {
@@ -72,10 +75,18 @@ const Access = () => {
   }
 
   const handleEditAccess = (row) => {
-    console.log('Editing access:', row)
     setEditingAccess(row)
     setShowEditModal(true)
   }
+
+  // Add handler for configure button
+  const handleConfigureRoutes = (row) => {
+    setConfiguringAccess(row)
+    setShowRoutesModal(true)
+  }
+
+  // Add handler for when routes are updated
+  const handleRoutesUpdated = () => {}
 
   const handleAccessUpdated = () => {
     fetchAccessData()
@@ -100,7 +111,7 @@ const Access = () => {
               return (
                 <div className="flex justify-center">
                   <span className="font-mono font-semibold text-blue-700">
-                    {value.toString().padStart(3, '0')}
+                    A{value.toString().padStart(3, '0')}
                   </span>
                 </div>
               )
@@ -396,9 +407,11 @@ const Access = () => {
                 selectAll={selectAll}
                 onSelectAll={handleSelectAll}
                 onEdit={handleEditAccess}
+                onConfigure={handleConfigureRoutes}
                 actionButtonProps={{
                   editLabel: 'Edit',
                   showEdit: true,
+                  showConfigure: true,
                 }}
               />
             )}
@@ -422,6 +435,17 @@ const Access = () => {
         }}
         accessData={editingAccess}
         onAccessUpdated={handleAccessUpdated}
+      />
+
+      {/* Add Routes Modal */}
+      <EditRoutes
+        isOpen={showRoutesModal}
+        onClose={() => {
+          setShowRoutesModal(false)
+          setConfiguringAccess(null)
+        }}
+        accessData={configuringAccess}
+        onRoutesUpdated={handleRoutesUpdated}
       />
     </div>
   )

@@ -13,7 +13,9 @@ import ProductGrid from '../../components/order/ProductGrid'
 import OrderSummary from '../../components/order/OrderSummary'
 
 const Order = () => {
-  const { products, categories, loading, error } = useProducts()
+  const { products, categories, loading, error, getAvailableProductsByCategory, isDesalProduct } =
+    useProducts()
+
   const { user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
@@ -25,7 +27,6 @@ const Order = () => {
     desalCustomQuantities,
     desalQuantityTypes,
     validationError,
-    isDesalProduct,
     validateSelectedProducts,
     addProduct,
     removeProduct,
@@ -37,44 +38,12 @@ const Order = () => {
     setValidationError,
   } = useOrderSelection(products)
 
-  const getProductsByCategory = (categoryId) => {
-    if (categoryId === 'all') return products
+  // Get available products for the current category
+  const displayedProducts = getAvailableProductsByCategory(activeCategory)
 
-    return products.filter((product) => {
-      // Check by category ID
-      if (
-        product.category_id?.toString() === categoryId ||
-        product.product_category_id?.toString() === categoryId
-      ) {
-        return true
-      }
-
-      // Special handling for pandesal
-      if (categoryId === 'pandesal' && isDesalProduct(product)) {
-        return true
-      }
-
-      // Check by category name
-      const categoryName = (product.category_name || product.category || '').toLowerCase()
-      if (categoryId === 'bread' && categoryName.includes('bread') && !isDesalProduct(product)) {
-        return true
-      }
-      if (categoryId === 'drink' && categoryName.includes('drink')) {
-        return true
-      }
-
-      // Other items
-      if (categoryId === 'other') {
-        return (
-          !product.category_id &&
-          !product.product_category_id &&
-          !product.category_name &&
-          !product.category
-        )
-      }
-
-      return false
-    })
+  // Function to get available product count for a category (for tabs)
+  const getAvailableProductCount = (categoryId) => {
+    return getAvailableProductsByCategory(categoryId).length
   }
 
   const handleProceedToCheckout = () => {
@@ -132,8 +101,6 @@ const Order = () => {
       },
     })
   }
-
-  const displayedProducts = getProductsByCategory(activeCategory)
 
   if (loading.products || loading.categories) {
     return (
@@ -196,7 +163,7 @@ const Order = () => {
                   categories={categories}
                   activeCategory={activeCategory}
                   onCategoryChange={setActiveCategory}
-                  getProductCount={(categoryId) => getProductsByCategory(categoryId).length}
+                  getProductCount={getAvailableProductCount}
                 />
 
                 <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">

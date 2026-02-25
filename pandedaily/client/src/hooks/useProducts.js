@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getProducts, getProductCategories } from '../services/api'
 import { FiPackage, FiCoffee, FiBattery } from 'react-icons/fi'
 
@@ -18,7 +18,21 @@ export const useProducts = () => {
     try {
       const response = await getProducts()
       const productsData = response.data || response
-      setProducts(Array.isArray(productsData) ? productsData : [])
+
+      const transformedProducts = (Array.isArray(productsData) ? productsData : []).map(
+        (product) => ({
+          id: product.id || product.p_id,
+          name: product.name || product.p_name,
+          price: parseFloat(product.price) || 0,
+          category_id: product.category_id || product.p_category_id,
+          category_name: product.category_name,
+          status: product.status || product.p_status || 'AVAILABLE',
+          image: product.image,
+          ...product,
+        }),
+      )
+
+      setProducts(transformedProducts)
     } catch (error) {
       console.error('Error fetching products:', error)
       setError((prev) => ({ ...prev, products: 'Failed to load products' }))
@@ -53,7 +67,69 @@ export const useProducts = () => {
     }
   }
 
-  return { products, categories, loading, error }
+  const getAvailableProductsByCategory = useCallback(
+    (categoryId) => {
+      if (categoryId === 'all') {
+        return products.filter((product) => product.status === 'AVAILABLE')
+      }
+
+      return products.filter((product) => {
+        if (product.status !== 'AVAILABLE') return false
+
+        // Check by category ID
+        if (
+          product.category_id?.toString() === categoryId ||
+          product.product_category_id?.toString() === categoryId
+        ) {
+          return true
+        }
+
+        // Special handling for pandesal
+        if (categoryId === 'pandesal' && isDesalProduct(product)) {
+          return true
+        }
+
+        // Check by category name
+        const categoryName = (product.category_name || product.category || '').toLowerCase()
+        if (categoryId === 'bread' && categoryName.includes('bread') && !isDesalProduct(product)) {
+          return true
+        }
+        if (categoryId === 'drink' && categoryName.includes('drink')) {
+          return true
+        }
+
+        // Other items
+        if (categoryId === 'other') {
+          return (
+            !product.category_id &&
+            !product.product_category_id &&
+            !product.category_name &&
+            !product.category
+          )
+        }
+
+        return false
+      })
+    },
+    [products],
+  )
+
+  // Helper function to check if product is pandesal
+  const isDesalProduct = useCallback((product) => {
+    const name = (product.name || product.p_name || '').toLowerCase()
+    const category = (product.category_name || product.category || '').toLowerCase()
+
+    return name.includes('pandesal') || category.includes('pandesal')
+  }, [])
+
+  return {
+    products,
+    categories,
+    loading,
+    error,
+    getAvailableProductsByCategory,
+    isDesalProduct,
+  }
 }
 
 const getCategoryIcon = (categoryName) => {

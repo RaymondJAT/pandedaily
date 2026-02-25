@@ -1,10 +1,9 @@
-// pages/Payment.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
 import { usePayment } from '../../hooks/usePayment'
-import { formatCurrency, formatTimeForDisplay, formatDateDisplay } from '../../utils/formatters' // Import all needed formatters
+import { formatCurrency, formatTimeForDisplay, formatDateDisplay } from '../../utils/formatters'
 import { fadeInUp, staggerContainer, faqItem } from '../../utils/animations'
 import PageHeader from '../../components/order/PageHeader'
 import PageFooter from '../../components/order/PageFooter'
@@ -37,6 +36,7 @@ const Payment = () => {
 
   // Load checkout details
   useEffect(() => {
+    // Try to get from location state first
     const detailsFromState = location.state?.checkoutDetails
 
     if (detailsFromState) {
@@ -62,18 +62,6 @@ const Payment = () => {
             detailsFromState.customerInfo.address ||
             detailsFromState.customerInfo.c_address ||
             'Not provided',
-          latitude:
-            detailsFromState.customerInfo.latitude || detailsFromState.customerInfo.c_latitude || 0,
-          longitude:
-            detailsFromState.customerInfo.longitude ||
-            detailsFromState.customerInfo.c_longitude ||
-            0,
-          c_id:
-            detailsFromState.customerInfo.c_id ||
-            detailsFromState.customerInfo.id ||
-            detailsFromState.customerInfo.customer_id ||
-            detailsFromState.customerInfo.userId ||
-            null,
           isGuest: detailsFromState.isGuest || false,
         }
 
@@ -83,6 +71,7 @@ const Payment = () => {
 
       localStorage.setItem('checkoutDetails', JSON.stringify(detailsFromState))
     } else {
+      // Try to get from localStorage
       const savedDetails = localStorage.getItem('checkoutDetails')
       if (savedDetails) {
         const parsedDetails = JSON.parse(savedDetails)
@@ -111,6 +100,7 @@ const Payment = () => {
           setIsGuest(parsedDetails.isGuest || false)
         }
       } else {
+        // No checkout details found, redirect to checkout
         navigate('/checkout')
       }
     }
@@ -126,14 +116,7 @@ const Payment = () => {
 
   const handleSubmit = async () => {
     const result = await handlePaymentSubmit()
-    if (result.success) {
-      navigate('/order/confirmation', {
-        state: {
-          orderId: result.orderId,
-          isGuest: isGuest,
-        },
-      })
-    }
+    // The actual redirect happens in usePayment hook
   }
 
   if (!checkoutDetails || !customerInfo) {

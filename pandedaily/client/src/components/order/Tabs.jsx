@@ -1,7 +1,11 @@
 const Tabs = ({ categories, activeCategory, onCategoryChange, getProductCount }) => {
+  const visibleCategories = categories.filter(
+    (category) => category.id === 'all' || getProductCount(category.id) > 0,
+  )
+
   return (
     <div className="flex overflow-x-auto pb-4 mb-4 gap-2 scrollbar-hide shrink-0">
-      {categories.map((category) => {
+      {visibleCategories.map((category) => {
         const Icon = category.icon
         const isActive = activeCategory === category.id
         const count = getProductCount(category.id)

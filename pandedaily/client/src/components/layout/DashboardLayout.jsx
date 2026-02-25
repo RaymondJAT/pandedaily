@@ -1,4 +1,3 @@
-// pages/dashboard/DashboardLayout.jsx
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Sidebar from './navigation/Sidebar'

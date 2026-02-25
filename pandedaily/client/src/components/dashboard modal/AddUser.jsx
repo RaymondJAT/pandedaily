@@ -71,7 +71,7 @@ const AddUser = ({ isOpen, onClose, onUserAdded }) => {
     if (!value) {
       return Promise.reject('Please input your password!')
     }
-    if (value.length < 6) {
+    if (value.length < 4) {
       return Promise.reject('Password must be at least 6 characters!')
     }
     return Promise.resolve()
@@ -141,7 +141,6 @@ const AddUser = ({ isOpen, onClose, onUserAdded }) => {
         size="large"
         autoComplete="off"
       >
-        {/* Row 1: Full Name | Username */}
         <Row gutter={[16, 16]}>
           <Col span={12}>
             <Form.Item
@@ -169,7 +168,6 @@ const AddUser = ({ isOpen, onClose, onUserAdded }) => {
           </Col>
         </Row>
 
-        {/* Row 2: Email (full width) */}
         <Row gutter={[16, 16]}>
           <Col span={24}>
             <Form.Item
@@ -185,7 +183,6 @@ const AddUser = ({ isOpen, onClose, onUserAdded }) => {
           </Col>
         </Row>
 
-        {/* Row 3: Password | Confirm Password */}
         <Row gutter={[16, 16]}>
           <Col span={12}>
             <Form.Item label="Password" name="password" rules={[{ validator: validatePassword }]}>
@@ -204,7 +201,6 @@ const AddUser = ({ isOpen, onClose, onUserAdded }) => {
           </Col>
         </Row>
 
-        {/* Row 4: Access Level | Status */}
         <Row gutter={[16, 16]}>
           <Col span={12}>
             <Form.Item

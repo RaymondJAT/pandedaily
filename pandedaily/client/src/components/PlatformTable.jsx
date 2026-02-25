@@ -1,23 +1,6 @@
 import { FiChevronUp, FiChevronDown } from 'react-icons/fi'
 import ActionButtons from './ActionButtons'
 
-// mock data generator
-export const createBudgetData = (count = 6) => {
-  return Array.from({ length: count }).map((_, i) => {
-    const allocated = 500_000 + i * 150_000
-    const spent = Math.floor(allocated * (0.4 + Math.random() * 0.7))
-
-    return {
-      id: i + 1,
-      department: `Department ${i + 1}`,
-      allocated,
-      spent,
-      remaining: allocated - spent,
-      utilization: Math.min(100, Math.round((spent / allocated) * 100)),
-    }
-  })
-}
-
 const PlatformTable = ({
   columns,
   data,
@@ -27,6 +10,7 @@ const PlatformTable = ({
   onView,
   onEdit,
   onDelete,
+  onConfigure,
   onRowClick,
   maxHeight = '400px',
   actionButtonProps = {},
@@ -256,6 +240,7 @@ const PlatformTable = ({
                       onView={onView}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onConfigure={onConfigure}
                       {...actionButtonProps}
                     />
                   </td>

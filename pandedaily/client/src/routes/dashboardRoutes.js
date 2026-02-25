@@ -16,6 +16,7 @@ export const sidebarOptions = [
     items: [
       { label: 'Users', path: '/dashboard/users' },
       { label: 'Access', path: '/dashboard/access' },
+      { label: 'Routes', path: '/dashboard/route' },
     ],
   },
   {

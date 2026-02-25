@@ -42,7 +42,7 @@ const Users = () => {
               return (
                 <div className="flex justify-center">
                   <span className="font-mono font-semibold text-blue-700">
-                    {value.toString().padStart(3, '0')}
+                    U{value.toString().padStart(3, '0')}
                   </span>
                 </div>
               )

@@ -1,12 +1,11 @@
-// const API_URL = 'http://192.168.40.101:3080' // office
-const API_URL = 'http://192.168.1.15:3080' // house
+// api.js
+
+const API_URL = '/api'
 
 // Helper function for API calls
 const fetchApi = async (endpoint, options = {}) => {
   try {
-    // Check if this endpoint should skip authentication
     const skipAuth = options.skipAuth || false
-
     const token = localStorage.getItem('token')
 
     const defaultHeaders = {
@@ -17,7 +16,11 @@ const fetchApi = async (endpoint, options = {}) => {
       defaultHeaders.Authorization = `Bearer ${token}`
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    // Remove any leading /api from endpoint to avoid duplication
+    const cleanEndpoint = endpoint.startsWith('/api') ? endpoint.substring(4) : endpoint
+    const fullUrl = `${API_URL}${cleanEndpoint}`
+
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         ...defaultHeaders,
@@ -38,15 +41,25 @@ const fetchApi = async (endpoint, options = {}) => {
   }
 }
 
-// Geocoding: Address -> Coordinates (using your backend)
+// Regular fetch for non-JSON responses (like geocoding)
+const fetchRaw = async (url, options = {}) => {
+  try {
+    const fullUrl = `${API_URL}${url}`
+
+    const response = await fetch(fullUrl, options)
+    return response
+  } catch (error) {
+    console.error(`Raw fetch failed for ${url}:`, error)
+    throw error
+  }
+}
+
+// Geocoding: Address -> Coordinates
 export const geocodeAddress = async (address) => {
   try {
     const encodedAddress = encodeURIComponent(address)
-    const response = await fetch(`${API_URL}/api/geocode/search?q=${encodedAddress}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    // Use /geocode/search (not /api/geocode/search) because API_URL adds /api
+    const response = await fetchRaw(`/geocode/search?q=${encodedAddress}`)
 
     if (!response.ok) {
       const errorData = await response.json()
@@ -78,14 +91,11 @@ export const geocodeAddress = async (address) => {
   }
 }
 
-// Reverse geocoding: Coordinates -> Address (using your backend)
+// Reverse geocoding: Coordinates -> Address
 export const reverseGeocode = async (lat, lng) => {
   try {
-    const response = await fetch(`${API_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    // Use /geocode/reverse (not /api/geocode/reverse)
+    const response = await fetchRaw(`/geocode/reverse?lat=${lat}&lng=${lng}`)
 
     if (!response.ok) {
       throw new Error('Failed to fetch address')
@@ -94,7 +104,7 @@ export const reverseGeocode = async (lat, lng) => {
     const data = await response.json()
 
     return {
-      lat: Number(lat), // Ensure numbers
+      lat: Number(lat),
       lng: Number(lng),
       address: data.display_name || `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`,
       placeId: data.place_id,
@@ -112,10 +122,55 @@ export const reverseGeocode = async (lat, lng) => {
   }
 }
 
-// Batch geocoding with delay (kept for rate limiting)
+// Batch geocoding with delay
 export const geocodeAddressWithDelay = async (address, delayMs = 1000) => {
   await new Promise((resolve) => setTimeout(resolve, delayMs))
   return geocodeAddress(address)
+}
+
+// PayMongo API calls
+export const createPaymongoCheckoutSession = async (lineItems, successUrl, cancelUrl, metadata) => {
+  try {
+    const response = await fetchApi('/paymongo/create-checkout-session', {
+      method: 'POST',
+      body: JSON.stringify({
+        lineItems,
+        successUrl,
+        cancelUrl,
+        metadata,
+      }),
+      skipAuth: true,
+    })
+
+    if (response.success && response.data) {
+      return response.data
+    } else {
+      throw new Error(response.message || 'Failed to create checkout session')
+    }
+  } catch (error) {
+    console.error('PayMongo API error:', error)
+    throw error
+  }
+}
+
+export const getPaymongoCheckoutSession = async (sessionId) => {
+  return fetchApi(`/paymongo/checkout-session/${sessionId}`, {
+    skipAuth: true,
+  })
+}
+
+export const getPaymongoPaymentIntent = async (paymentIntentId) => {
+  return fetchApi(`/paymongo/payment-intent/${paymentIntentId}`, {
+    skipAuth: true,
+  })
+}
+
+export const handlePaymongoWebhook = async (webhookData) => {
+  return fetchApi('/paymongo/webhook', {
+    method: 'POST',
+    body: JSON.stringify(webhookData),
+    skipAuth: true,
+  })
 }
 
 // Auth API calls
@@ -390,4 +445,59 @@ export const getAvailableRiders = async () => {
     }
   }
   return response
+}
+
+// Route management API calls
+export const getRoutes = async () => {
+  return fetchApi('/routes')
+}
+
+export const createRoute = async (routeData) => {
+  const dataToSend = {
+    access_id: routeData.access_id,
+    route_name: routeData.route_name,
+    status: routeData.status,
+  }
+
+  try {
+    const response = await fetchApi('/routes', {
+      method: 'POST',
+      body: JSON.stringify(dataToSend),
+    })
+
+    return response
+  } catch (error) {
+    console.error('Create route error:', error)
+    throw error
+  }
+}
+
+// For the EditRoutes modal
+export const getAllRoutes = async () => {
+  return fetchApi('/routes')
+}
+
+export const getRoutesByAccess = async (accessId) => {
+  const response = await fetchApi('/routes')
+  const allRoutes = response.data || response || []
+  return allRoutes.filter((route) => route.mr_access_id === accessId)
+}
+
+export const updateRoutePermission = async (routeId, data) => {
+  const dataToSend = {
+    access_id: data.access_id,
+    status: data.status,
+  }
+
+  try {
+    const response = await fetchApi(`/routes/${routeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(dataToSend),
+    })
+
+    return response
+  } catch (error) {
+    console.error('Update route error:', error)
+    throw error
+  }
 }

@@ -2,7 +2,7 @@ import { FiTrash2 } from 'react-icons/fi'
 import { formatCurrency } from '../../utils/formatters'
 
 const SelectedProductItem = ({ product, isDesal, onRemove }) => {
-  const isValidQuantity = !isDesal || product.quantity >= 20
+  const isValidQuantity = !isDesal || product.quantity >= 1
 
   return (
     <div

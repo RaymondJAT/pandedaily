@@ -9,6 +9,11 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
   const [order, setOrder] = useState(null)
   const [items, setItems] = useState([])
   const [actionLoading, setActionLoading] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const statusConfig = {
     PAID: {
@@ -54,7 +59,6 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     setItems([])
 
     try {
-      // Extract the actual ID from the orderId prop
       const actualOrderId = extractOrderId(orderId)
 
       if (!actualOrderId) {
@@ -65,7 +69,18 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
 
       if (response && response.order) {
         setOrder(response.order)
-        setItems(response.items?.data || [])
+
+        const itemsData = response.items?.data || []
+        const transformedItems = itemsData.map((item) => ({
+          id: item.id || item.oi_id,
+          product_name: item.product_name || 'Unknown Product',
+          category_name: item.category_name || 'Uncategorized',
+          quantity: item.quantity || item.oi_quantity || 0,
+          price: item.price || item.oi_price || 0,
+          ...item,
+        }))
+
+        setItems(transformedItems)
       } else {
         setError('No order data found')
       }
@@ -77,20 +92,14 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     }
   }
 
-  // Helper function to extract order ID
   const extractOrderId = (id) => {
     if (!id) return null
-
-    // If it's a number or string, use it directly
     if (typeof id === 'number' || typeof id === 'string') {
       return id
     }
-
-    // If it's an object, try to get or_id or id property
     if (typeof id === 'object') {
       return id.or_id || id.id || null
     }
-
     return null
   }
 
@@ -98,19 +107,10 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     try {
       setActionLoading(true)
       const actualOrderId = extractOrderId(orderId)
-
-      // ✅ Use the imported updateOrder function
       const response = await updateOrder(actualOrderId, { status: 'APPROVED' })
-
       message.success(response.message || 'Order approved successfully')
-
-      // Refresh data
       await fetchOrderDetails()
-
-      // Call parent refresh callback if provided
-      if (onRefresh) {
-        onRefresh()
-      }
+      if (onRefresh) onRefresh()
     } catch (err) {
       console.error('Error approving order:', err)
       message.error(err.message || 'Failed to approve order')
@@ -123,19 +123,10 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     try {
       setActionLoading(true)
       const actualOrderId = extractOrderId(orderId)
-
-      // ✅ Use the imported updateOrder function
       const response = await updateOrder(actualOrderId, { status: 'REJECTED' })
-
       message.success(response.message || 'Order rejected successfully')
-
-      // Refresh data
       await fetchOrderDetails()
-
-      // Call parent refresh callback if provided
-      if (onRefresh) {
-        onRefresh()
-      }
+      if (onRefresh) onRefresh()
     } catch (err) {
       console.error('Error rejecting order:', err)
       message.error(err.message || 'Failed to reject order')
@@ -146,6 +137,14 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
+
+    // For server-side rendering, return a simple format
+    if (!isClient) {
+      const date = new Date(dateString)
+      return date.toISOString().split('T')[0]
+    }
+
+    // Only use locale-specific formatting on the client
     try {
       const date = new Date(dateString)
       return date.toLocaleDateString('en-PH', {
@@ -162,6 +161,12 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
   }
 
   const formatCurrency = (amount) => {
+    // For server-side rendering, return a simple format
+    if (!isClient) {
+      return `₱${parseFloat(amount || 0).toFixed(2)}`
+    }
+
+    // Use locale-specific formatting on client
     return `₱${parseFloat(amount || 0).toLocaleString('en-PH', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -174,15 +179,12 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     return <Tag color={config.color}>{config.label}</Tag>
   }
 
-  // Check if order can be approved/rejected
   const canModifyStatus = () => {
     if (!order) return false
     const currentStatus = order.or_status?.toUpperCase()
-    // Can only modify if status is PAID and not already APPROVED/REJECTED/COMPLETE/OUT-FOR-DELIVERY
     return currentStatus === 'PAID'
   }
 
-  // Table columns for order items
   const itemColumns = [
     {
       title: 'Product',
@@ -205,20 +207,21 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
       title: 'Quantity',
       dataIndex: 'quantity',
       key: 'quantity',
-      render: (text) => (
-        <span className="font-medium">
-          {parseFloat(text || 0).toLocaleString('en-PH', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
-        </span>
-      ),
+      render: (text) => <span className="font-medium">{parseFloat(text || 0).toFixed(2)}</span>,
     },
     {
       title: 'Unit Price',
       dataIndex: 'price',
       key: 'price',
       render: (text) => <span className="font-medium">{formatCurrency(text)}</span>,
+    },
+    {
+      title: 'Subtotal',
+      key: 'subtotal',
+      render: (_, record) => {
+        const subtotal = parseFloat(record.price || 0) * parseFloat(record.quantity || 0)
+        return <span className="font-medium text-green-600">{formatCurrency(subtotal)}</span>
+      },
     },
   ]
 
@@ -243,14 +246,18 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
     </div>
   )
 
+  // Don't render modal content until after client-side hydration
+  if (!isClient) {
+    return null
+  }
+
   return (
     <Modal
       title={modalTitle}
       open={isOpen}
       onCancel={onClose}
-      width={800}
+      width={900}
       footer={[
-        // Action Buttons
         canModifyStatus() && (
           <button
             key="reject"
@@ -286,7 +293,6 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
           Close
         </button>,
       ].filter(Boolean)}
-      styles={{ maxHeight: '70vh', overflowY: 'auto' }}
     >
       {loading ? (
         <div className="flex justify-center py-10">
@@ -324,11 +330,13 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
               <Descriptions.Item label="Order Date">
                 <div className="flex items-center">
                   <FiCalendar className="mr-2 text-gray-400" />
-                  <span>{formatDate(order.or_createddate)}</span>
+                  <span suppressHydrationWarning>{formatDate(order.or_createddate)}</span>
                 </div>
               </Descriptions.Item>
               <Descriptions.Item label="Total Amount">
-                <span className="font-bold text-green-700">{formatCurrency(order.or_total)}</span>
+                <span className="font-bold text-green-700" suppressHydrationWarning>
+                  {formatCurrency(order.or_total)}
+                </span>
               </Descriptions.Item>
               <Descriptions.Item label="Payment Type">
                 <div className="flex items-center">
@@ -344,16 +352,8 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
             </Descriptions>
           </Card>
 
-          {/* Order Items - Now with scrollable table */}
-          <Card
-            title={`Order Items (${items.length})`}
-            size="small"
-            styles={{
-              maxHeight: '300px',
-              overflowY: 'auto',
-              padding: '12px',
-            }}
-          >
+          {/* Order Items */}
+          <Card title={`Order Items (${items.length})`} size="small">
             {items.length === 0 ? (
               <div className="text-center py-8">
                 <FiPackage className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -366,23 +366,18 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
                   dataSource={items.map((item, index) => ({ ...item, key: item.id || index }))}
                   pagination={false}
                   size="small"
-                  scroll={{ y: 200 }}
-                  summary={() => (
-                    <Table.Summary.Row>
-                      <Table.Summary.Cell index={0} colSpan={3}>
-                        <span className="font-semibold">Subtotal</span>
-                      </Table.Summary.Cell>
-                      <Table.Summary.Cell index={1}>
-                        <span className="font-semibold">{formatCurrency(calculateSubtotal())}</span>
-                      </Table.Summary.Cell>
-                    </Table.Summary.Row>
-                  )}
+                  scroll={{ y: 250 }}
                 />
 
                 {/* Order Summary */}
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex justify-end">
-                    <div className="w-64 space-y-2">
+                    <div className="w-72 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Subtotal</span>
+                        <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
+                      </div>
+
                       {Math.abs(calculateSubtotal() - parseFloat(order.or_total || 0)) > 0.01 && (
                         <div className="flex justify-between text-sm text-amber-600">
                           <span>Adjustments</span>
@@ -394,7 +389,9 @@ const ViewOrder = ({ orderId, isOpen, onClose, onRefresh }) => {
 
                       <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
                         <span className="text-gray-800">Total</span>
-                        <span className="text-green-700">{formatCurrency(order.or_total)}</span>
+                        <span className="text-green-700" suppressHydrationWarning>
+                          {formatCurrency(order.or_total)}
+                        </span>
                       </div>
                     </div>
                   </div>

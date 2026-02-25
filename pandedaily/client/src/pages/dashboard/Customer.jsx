@@ -17,20 +17,6 @@ const Customer = () => {
 
   // Function to open Google Maps with coordinates
   const openGoogleMaps = (latitude, longitude, address, customerId, customerName) => {
-    console.log('📍 Opening Google Maps for:', {
-      customerId,
-      customerName,
-      latitude,
-      longitude,
-      address,
-      latitudeType: typeof latitude,
-      longitudeType: typeof longitude,
-      latitudeValue: latitude,
-      longitudeValue: longitude,
-      hasValidCoordinates:
-        latitude && longitude && parseFloat(latitude) !== 0 && parseFloat(longitude) !== 0,
-    })
-
     if (!latitude || !longitude || parseFloat(latitude) === 0 || parseFloat(longitude) === 0) {
       console.warn('⚠️ Invalid coordinates:', { latitude, longitude })
       alert('No valid coordinates available for this customer')
@@ -40,13 +26,10 @@ const Customer = () => {
     const lat = parseFloat(latitude)
     const lng = parseFloat(longitude)
 
-    console.log('✅ Opening maps with coordinates:', { lat, lng })
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank')
   }
 
   const columnsWithRender = useMemo(() => {
-    console.log('🏗️ Building columns with customer data available')
-
     return customerColumns.map((col) => {
       // Base column with centered alignment
       const baseColumn = {
@@ -60,7 +43,6 @@ const Customer = () => {
           return {
             ...baseColumn,
             render: (value, row) => {
-              console.log(`📝 Rendering ID for customer ${row?.fullname || 'unknown'}:`, value)
               if (value === undefined || value === null) {
                 return <span className="font-mono font-semibold text-gray-400">N/A</span>
               }
@@ -124,33 +106,12 @@ const Customer = () => {
             ...baseColumn,
             width: '250px',
             render: (value, row) => {
-              // Log the raw row data for debugging
-              console.log(`📍 Address data for ${row?.fullname || 'unknown'}:`, {
-                id: row?.id,
-                name: row?.fullname,
-                address: value,
-                latitude: row?.latitude,
-                longitude: row?.longitude,
-                latitudeType: typeof row?.latitude,
-                longitudeType: typeof row?.longitude,
-                latitudeRaw: row?.latitude,
-                longitudeRaw: row?.longitude,
-                hasLatitude: !!row?.latitude,
-                hasLongitude: !!row?.longitude,
-                latitudeValue: row?.latitude ? parseFloat(row.latitude) : null,
-                longitudeValue: row?.longitude ? parseFloat(row.longitude) : null,
-                isValidLat: row?.latitude && parseFloat(row.latitude) !== 0,
-                isValidLng: row?.longitude && parseFloat(row.longitude) !== 0,
-              })
-
               // Check if we have valid coordinates
               const hasValidCoordinates =
                 row?.latitude &&
                 row?.longitude &&
                 parseFloat(row.latitude) !== 0 &&
                 parseFloat(row.longitude) !== 0
-
-              console.log(`✅ Has valid coordinates for ${row?.fullname}:`, hasValidCoordinates)
 
               if (!value || value === 'N/A') {
                 return <span className="text-gray-400">N/A</span>
@@ -204,12 +165,6 @@ const Customer = () => {
           return {
             ...baseColumn,
             render: (value, row) => {
-              console.log(`🌐 Latitude for ${row?.fullname || 'unknown'}:`, {
-                raw: value,
-                parsed: value ? parseFloat(value) : null,
-                isValid: value && parseFloat(value) !== 0,
-              })
-
               if (!value || parseFloat(value) === 0) {
                 return <span className="text-gray-400">N/A</span>
               }
@@ -227,12 +182,6 @@ const Customer = () => {
           return {
             ...baseColumn,
             render: (value, row) => {
-              console.log(`🌐 Longitude for ${row?.fullname || 'unknown'}:`, {
-                raw: value,
-                parsed: value ? parseFloat(value) : null,
-                isValid: value && parseFloat(value) !== 0,
-              })
-
               if (!value || parseFloat(value) === 0) {
                 return <span className="text-gray-400">N/A</span>
               }
@@ -319,21 +268,12 @@ const Customer = () => {
     setLoading(true)
     setError(null)
     try {
-      console.log('📡 Fetching customers...')
       const response = await getCustomers()
-      console.log('📡 API Response:', response)
 
       const data = response.data || response
-      console.log('📊 Raw customer data:', data)
 
       if (Array.isArray(data)) {
         const transformedData = data.map((customer) => {
-          console.log(`🔄 Transforming customer ${customer.id || 'new'}:`, {
-            original: customer,
-            latitude: customer.latitude,
-            longitude: customer.longitude,
-          })
-
           return {
             id: customer.id || 0,
             fullname: customer.fullname || 'Unknown',
@@ -350,21 +290,6 @@ const Customer = () => {
             ...customer,
           }
         })
-
-        console.log(
-          '✅ Transformed customers with coordinates:',
-          transformedData.map((c) => ({
-            id: c.id,
-            name: c.fullname,
-            lat: c.latitude,
-            lng: c.longitude,
-            hasValidCoords:
-              c.latitude &&
-              c.longitude &&
-              parseFloat(c.latitude) !== 0 &&
-              parseFloat(c.longitude) !== 0,
-          })),
-        )
 
         setCustomers(transformedData)
       } else {

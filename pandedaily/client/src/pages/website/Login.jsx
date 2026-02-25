@@ -46,14 +46,16 @@ const Login = () => {
       login({
         ...response.user,
         token: response.token,
-
         type: response.user.user_type,
       })
 
+      // Redirect based on user type
       if (response.user.user_type === 'admin') {
         navigate('/dashboard')
       } else if (response.user.user_type === 'customer') {
         navigate('/order')
+      } else if (response.user.user_type === 'rider') {
+        navigate('/rider/dashboard')
       } else {
         navigate('/')
       }

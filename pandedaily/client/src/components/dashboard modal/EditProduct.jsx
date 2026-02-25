@@ -32,13 +32,6 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated, categorie
   const productInfo = useMemo(() => {
     if (!productData) return null
 
-    console.log('EditProduct - productData:', {
-      id: productData.id,
-      name: productData.name,
-      category_id: productData.category_id,
-      category_name: productData.category_name,
-    })
-
     return {
       id: productData.id || 0,
       name: productData.name || '',
@@ -71,8 +64,6 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated, categorie
   // Initialize form when modal opens
   useEffect(() => {
     if (isOpen && productInfo && !formInitialized) {
-      console.log('Initializing form with productInfo:', productInfo)
-
       let categoryId = productInfo.category_id
       let selectedCategory = null
 
@@ -101,8 +92,6 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated, categorie
         status: productInfo.status,
         category: categoryId,
       }
-
-      console.log('Setting form values:', initialFormValues)
 
       setInitialValues(initialFormValues)
       setExistingImage(productInfo.image || '')
@@ -139,8 +128,6 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated, categorie
       return
     }
 
-    console.log('Submitting form with values:', values)
-
     setIsSubmitting(true)
 
     try {
@@ -156,10 +143,7 @@ const EditProduct = ({ isOpen, onClose, productData, onProductUpdated, categorie
         productUpdateData.image = imageBase64 || ''
       }
 
-      console.log('Sending update to backend:', productUpdateData)
-
       const response = await updateProduct(productInfo.id, productUpdateData)
-      console.log('Update response:', response)
 
       message.success('Product updated successfully!')
 

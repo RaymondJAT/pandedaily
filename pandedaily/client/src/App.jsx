@@ -10,6 +10,7 @@ import Product from './pages/dashboard/Product'
 import Inventory from './pages/dashboard/Inventory'
 import Orders from './pages/dashboard/Orders'
 import Delivery from './pages/dashboard/Delivery'
+import RoutePage from './pages/dashboard/RoutePage'
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="orders" element={<Orders />} />
             <Route path="delivery" element={<Delivery />} />
+            <Route path="route" element={<RoutePage />} />
           </Route>
 
           {/* Public Website Routes */}
