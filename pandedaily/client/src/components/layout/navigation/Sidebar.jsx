@@ -4,6 +4,8 @@ import { FiChevronsRight, FiChevronRight } from 'react-icons/fi'
 import { sidebarOptions } from '../../../routes/DashboardRoutes'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoImage from '../../../assets/pandesal.png'
+import { usePermissions } from '../../../context/PermissionContext' // Add this import
+import { Spin } from 'antd'
 
 const Sidebar = ({ open, setOpen }) => {
   const [expandedItems, setExpandedItems] = useState([])
@@ -11,6 +13,22 @@ const Sidebar = ({ open, setOpen }) => {
   const [popoutPosition, setPopoutPosition] = useState({ x: 0, y: 0 })
   const sidebarRef = useRef(null)
   const location = useLocation()
+  const { hasPermission, loading } = usePermissions() // Add this
+
+  // Filter sidebar options based on permissions
+  const filteredSidebarOptions = sidebarOptions.filter((option) => {
+    if (option.type === 'single' && option.routeName) {
+      return hasPermission(option.routeName)
+    }
+    if (option.type === 'dropdown' && option.items) {
+      // For dropdown, check if any child items are accessible
+      const hasAccessibleChildren = option.items.some((item) =>
+        item.routeName ? hasPermission(item.routeName) : true,
+      )
+      return hasAccessibleChildren
+    }
+    return true
+  })
 
   const toggleExpand = (title, event) => {
     // If sidebar is closed, show popout instead of expanding
@@ -26,10 +44,16 @@ const Sidebar = ({ open, setOpen }) => {
       if (popoutMenu?.title === title) {
         setPopoutMenu(null)
       } else {
-        const option = sidebarOptions.find((opt) => opt.title === title)
+        const option = filteredSidebarOptions.find((opt) => opt.title === title)
+        // Filter dropdown items by permissions
+        const accessibleItems =
+          option?.items?.filter((item) =>
+            item.routeName ? hasPermission(item.routeName) : true,
+          ) || []
+
         setPopoutMenu({
           title,
-          items: option?.items || [],
+          items: accessibleItems,
         })
       }
       return
@@ -81,7 +105,7 @@ const Sidebar = ({ open, setOpen }) => {
 
   // Auto-expand dropdown when on a child page
   useEffect(() => {
-    sidebarOptions.forEach((option) => {
+    filteredSidebarOptions.forEach((option) => {
       if (option.type === 'dropdown' && option.items) {
         const isActive = isParentActive(option.items)
         if (isActive && !expandedItems.includes(option.title)) {
@@ -89,7 +113,25 @@ const Sidebar = ({ open, setOpen }) => {
         }
       }
     })
-  }, [location.pathname]) // Re-run when location changes
+  }, [location.pathname, filteredSidebarOptions])
+
+  // Show loading state
+  if (loading) {
+    return (
+      <motion.nav
+        ref={sidebarRef}
+        className="sticky top-0 h-screen shrink-0 border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col items-center"
+        initial={false}
+        animate={{ width: open ? 225 : 56 }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        style={{ position: 'fixed', left: 0, zIndex: 40 }}
+      >
+        <div className="flex items-center justify-center h-full">
+          <Spin className="text-[#F5EFE7]" />
+        </div>
+      </motion.nav>
+    )
+  }
 
   return (
     <>
@@ -139,7 +181,7 @@ const Sidebar = ({ open, setOpen }) => {
 
         {/* Options */}
         <div className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-custom">
-          {sidebarOptions.map((option) => {
+          {filteredSidebarOptions.map((option) => {
             const isExpanded = expandedItems.includes(option.title)
 
             if (option.type === 'single') {
@@ -147,7 +189,7 @@ const Sidebar = ({ open, setOpen }) => {
                 <NavLink
                   key={option.title}
                   to={option.path}
-                  end // This makes it only active on exact match
+                  end
                   className={({ isActive }) =>
                     `relative flex h-10 w-full items-center rounded-md transition-colors sidebar-item ${
                       isActive ? 'bg-[#2A1803] text-[#F5EFE7]' : 'hover:bg-[#523010] text-[#F5EFE7]'
@@ -172,12 +214,23 @@ const Sidebar = ({ open, setOpen }) => {
               )
             }
 
+            // Filter dropdown items by permissions
+            const accessibleItems =
+              option.items?.filter((item) =>
+                item.routeName ? hasPermission(item.routeName) : true,
+              ) || []
+
+            // Don't render dropdown if no accessible items
+            if (accessibleItems.length === 0) {
+              return null
+            }
+
             return (
               <div key={option.title} className="space-y-1 sidebar-item">
                 <button
                   onClick={(e) => toggleExpand(option.title, e)}
                   className={`relative flex h-10 w-full items-center rounded-md transition-colors cursor-pointer text-[#F5EFE7] hover:bg-[#523010] ${
-                    isParentActive(option.items) ? 'bg-[#2A1803] text-[#F5EFE7]' : ''
+                    isParentActive(accessibleItems) ? 'bg-[#2A1803] text-[#F5EFE7]' : ''
                   }`}
                 >
                   <div className="relative flex items-center w-full">
@@ -226,11 +279,11 @@ const Sidebar = ({ open, setOpen }) => {
                       className="overflow-hidden"
                     >
                       <div className="ml-2 space-y-1 pl-2">
-                        {option.items.map((item) => (
+                        {accessibleItems.map((item) => (
                           <NavLink
                             key={item.label}
                             to={item.path}
-                            end={false} // Allow child routes to be considered active
+                            end={false}
                             className={({ isActive }) =>
                               `relative flex h-8 w-full items-center rounded-md transition-colors text-xs ${
                                 isActive
@@ -301,7 +354,7 @@ const Sidebar = ({ open, setOpen }) => {
 
       {/* Popout Menu when sidebar is closed */}
       <AnimatePresence>
-        {popoutMenu && (
+        {popoutMenu && popoutMenu.items.length > 0 && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, x: -10 }}
             animate={{ opacity: 1, scale: 1, x: 0 }}

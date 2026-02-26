@@ -13,8 +13,8 @@ import {
   Divider,
   Badge,
 } from 'antd'
-import { SaveOutlined, CloseOutlined, SearchOutlined, SwapOutlined } from '@ant-design/icons'
-import { getAllRoutes, updateRoutePermission, createRoute } from '../../services/api'
+import { SaveOutlined, CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { getAllRoutes, getAccessPermissions, updateAccessRoutePermission } from '../../services/api'
 
 const { Option } = Select
 const { Title, Text } = Typography
@@ -33,53 +33,51 @@ const EditRoutes = ({ isOpen, onClose, accessData, onRoutesUpdated }) => {
 
   useEffect(() => {
     if (isOpen && accessData?.id) {
-      fetchRoutes()
+      fetchRoutesWithPermissions()
     }
   }, [isOpen, accessData])
 
-  const fetchRoutes = async () => {
+  const fetchRoutesWithPermissions = async () => {
     setLoading(true)
     try {
+      // Get all routes
       const allRoutesResponse = await getAllRoutes()
       const allRoutes = allRoutesResponse.data || allRoutesResponse || []
 
-      const uniqueRouteNames = [
-        ...new Set(allRoutes.map((r) => r.mr_route_name || r.route_name || r.name)),
-      ].filter(Boolean)
+      // Get permissions for this access level
+      let accessPermissions = []
+      try {
+        const permissionsResponse = await getAccessPermissions(accessData.id)
+        accessPermissions = permissionsResponse.data || permissionsResponse || []
+      } catch (error) {
+        // No permissions found for this access level, using defaults
+      }
 
-      const accessRoutes = allRoutes.filter((route) => {
-        const routeAccessId = route.mr_access_id || route.access_id
-        return routeAccessId === accessData.id
-      })
-
+      // Create a map of permissions for this access level
       const permissionMap = new Map()
-      const routeIdMap = new Map()
-
-      accessRoutes.forEach((route) => {
-        const routeName = route.mr_route_name || route.route_name || route.name
-        const routeId = route.mr_id || route.id
-        const routeStatus = route.mr_status || route.status
-
-        permissionMap.set(routeName, routeStatus || 'NO-ACCESS')
-        routeIdMap.set(routeName, routeId)
+      accessPermissions.forEach((perm) => {
+        permissionMap.set(perm.route_id, perm.permission)
       })
 
-      // Create the combined list
-      const combinedRoutes = uniqueRouteNames.map((routeName) => {
-        const existingId = routeIdMap.get(routeName)
-        const existingPermission = permissionMap.get(routeName)
+      // Combine all routes with their permissions for this access level
+      const routesWithPermissions = allRoutes.map((route) => {
+        const routeId = route.mr_id || route.id
+        const routeName = route.mr_route_name || route.route_name || route.name
+        const defaultStatus = route.mr_status || route.status || 'NO-ACCESS'
+
+        // Get the permission for this access level, or use the default
+        const permission = permissionMap.has(routeId) ? permissionMap.get(routeId) : defaultStatus
 
         return {
-          key: existingId || `new-${routeName}-${Date.now()}`,
-          id: existingId,
+          key: routeId,
+          id: routeId,
           name: routeName,
-          permission: existingPermission || 'NO-ACCESS',
-          originalPermission: existingPermission || 'NO-ACCESS',
-          isNew: !existingId,
+          permission: permission,
+          originalPermission: permission,
         }
       })
 
-      setRoutes(combinedRoutes)
+      setRoutes(routesWithPermissions)
     } catch (error) {
       console.error('Error fetching routes:', error)
       message.error('Failed to load routes. Please try again.')
@@ -131,53 +129,29 @@ const EditRoutes = ({ isOpen, onClose, accessData, onRoutesUpdated }) => {
 
     setSaving(true)
     try {
-      const routesToUpdate = changedRoutes.filter((route) => route.id)
-      const routesToCreate = changedRoutes.filter((route) => !route.id)
-
-      const results = []
-
-      // Update existing routes
-      for (const route of routesToUpdate) {
+      // Update permissions for each changed route
+      const updatePromises = changedRoutes.map(async (route) => {
         try {
-          const result = await updateRoutePermission(route.id, {
-            access_id: accessData.id,
+          return await updateAccessRoutePermission(accessData.id, route.id, {
             status: route.permission,
           })
-          results.push(result)
         } catch (error) {
-          console.error(`Failed to update ${route.name}:`, error)
-          message.error(`Failed to update ${route.name}: ${error.message}`)
-          throw error
+          console.error(`Failed to update permission for ${route.name}:`, error)
+          throw new Error(`Failed to update ${route.name}: ${error.message}`)
         }
-      }
+      })
 
-      // Create new routes if any
-      for (const route of routesToCreate) {
-        try {
-          const result = await createRoute({
-            access_id: accessData.id,
-            route_name: route.name,
-            status: route.permission,
-          })
-          results.push(result)
-        } catch (error) {
-          console.error(`Failed to create ${route.name}:`, error)
-          message.error(`Failed to create ${route.name}: ${error.message}`)
-          throw error
-        }
-      }
+      await Promise.all(updatePromises)
 
-      // Show success message after all updates/creations are complete
-      message.success(`Successfully updated ${changedRoutes.length} routes`)
+      message.success(`Successfully updated permissions for ${changedRoutes.length} routes`)
 
       setSelectedRowKeys([])
-
-      await fetchRoutes()
+      await fetchRoutesWithPermissions()
       onRoutesUpdated?.()
       onClose()
     } catch (error) {
       console.error('Error saving route permissions:', error)
-      message.error('Failed to save changes. Please check console for details.')
+      // message.error('Failed to save changes. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -192,42 +166,38 @@ const EditRoutes = ({ isOpen, onClose, accessData, onRoutesUpdated }) => {
       render: (text, record) => (
         <Space>
           <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">{text}</code>
-          {record.isNew && (
-            <Tag color="blue" size="small">
-              New
+          {record.permission !== record.originalPermission && (
+            <Tag color="orange" size="small">
+              Modified
             </Tag>
           )}
         </Space>
       ),
     },
     {
-      title: 'Permission',
+      title: 'Access Level Permission',
       dataIndex: 'permission',
       key: 'permission',
       width: '40%',
       render: (permission, record) => (
-        <Space orientation="vertical" size="small">
-          <Select
-            value={permission}
-            onChange={(value) => handlePermissionChange(record.key, value)}
-            className="w-32"
-            size="middle"
-          >
-            {permissionOptions.map((opt) => (
-              <Option key={opt.value} value={opt.value}>
-                <Space>
-                  <Badge color={opt.color} />
-                  <span>{opt.label}</span>
-                </Space>
-              </Option>
-            ))}
-          </Select>
-          {record.permission !== record.originalPermission && (
-            <Tag color="orange" className="ml-2">
-              Modified
-            </Tag>
-          )}
-        </Space>
+        <Select
+          value={permission}
+          onChange={(value) => handlePermissionChange(record.key, value)}
+          className="w-32"
+          size="middle"
+          style={{
+            borderColor: permission !== record.originalPermission ? '#fa8c16' : undefined,
+          }}
+        >
+          {permissionOptions.map((opt) => (
+            <Option key={opt.value} value={opt.value}>
+              <Space>
+                <Badge color={opt.color} />
+                <span>{opt.label}</span>
+              </Space>
+            </Option>
+          ))}
+        </Select>
       ),
     },
   ]
@@ -245,7 +215,7 @@ const EditRoutes = ({ isOpen, onClose, accessData, onRoutesUpdated }) => {
             Configure Route Permissions
           </Title>
           <Text type="secondary">
-            Set access permissions for <strong>{accessData?.accessName}</strong>
+            Set permissions for <strong>{accessData?.accessName}</strong>
           </Text>
         </Space>
       }
@@ -320,6 +290,9 @@ const EditRoutes = ({ isOpen, onClose, accessData, onRoutesUpdated }) => {
                 record.permission !== record.originalPermission ? 'bg-orange-50' : ''
               }
               scroll={{ y: 350 }}
+              locale={{
+                emptyText: 'No routes found. Please create routes in the Routes page first.',
+              }}
             />
           </div>
 

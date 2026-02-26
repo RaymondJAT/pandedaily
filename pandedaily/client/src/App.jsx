@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { PermissionProvider } from './context/PermissionContext'
 import ProtectedRoute from './routes/ProtectedRoute'
 import WebsiteLayout from './components/layout/WebsiteLayout'
 import DashboardLayout from './components/layout/DashboardLayout'
@@ -16,29 +17,33 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          {/* Dashboard Routes */}
-          <Route
-            path="/dashboard/*"
-            element={
-              <ProtectedRoute allowedTypes={['admin']}>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="users" element={<Users />} />
-            <Route path="access" element={<Access />} />
-            <Route path="customer" element={<Customer />} />
-            <Route path="product" element={<Product />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="delivery" element={<Delivery />} />
-            <Route path="route" element={<RoutePage />} />
-          </Route>
+        <PermissionProvider>
+          {' '}
+          {/* Add PermissionProvider here */}
+          <Routes>
+            {/* Dashboard Routes */}
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute allowedTypes={['admin']}>
+                  <DashboardLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="users" element={<Users />} />
+              <Route path="access" element={<Access />} />
+              <Route path="customer" element={<Customer />} />
+              <Route path="product" element={<Product />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="delivery" element={<Delivery />} />
+              <Route path="route" element={<RoutePage />} />
+            </Route>
 
-          {/* Public Website Routes */}
-          <Route path="/*" element={<WebsiteLayout />} />
-        </Routes>
+            {/* Public Website Routes */}
+            <Route path="/*" element={<WebsiteLayout />} />
+          </Routes>
+        </PermissionProvider>
       </AuthProvider>
     </Router>
   )

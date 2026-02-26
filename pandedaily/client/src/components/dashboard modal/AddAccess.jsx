@@ -80,7 +80,7 @@ const AddAccess = ({ isOpen, onClose, onAccessAdded }) => {
       open={isOpen}
       onCancel={handleCancel}
       footer={null}
-      width={700} 
+      width={700}
       centered
       maskClosable={true}
       keyboard={true}

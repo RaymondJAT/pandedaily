@@ -1,5 +1,3 @@
-// api.js
-
 const API_URL = '/api'
 
 // Helper function for API calls
@@ -434,7 +432,7 @@ export const getAllRiderActivities = async () => {
   return fetchApi('/rider/activity/all')
 }
 
-// Get available riders (active riders)
+// Get available riders
 export const getAvailableRiders = async () => {
   const response = await fetchApi('/rider')
 
@@ -453,8 +451,8 @@ export const getRoutes = async () => {
 }
 
 export const createRoute = async (routeData) => {
+  // Only send route_name and status (access_id is no longer used)
   const dataToSend = {
-    access_id: routeData.access_id,
     route_name: routeData.route_name,
     status: routeData.status,
   }
@@ -479,25 +477,36 @@ export const getAllRoutes = async () => {
 
 export const getRoutesByAccess = async (accessId) => {
   const response = await fetchApi('/routes')
-  const allRoutes = response.data || response || []
-  return allRoutes.filter((route) => route.mr_access_id === accessId)
+  return response.data || response || []
 }
 
 export const updateRoutePermission = async (routeId, data) => {
-  const dataToSend = {
-    access_id: data.access_id,
-    status: data.status,
-  }
+  console.warn('updateRoutePermission needs a new endpoint for access permissions')
 
   try {
     const response = await fetchApi(`/routes/${routeId}`, {
       method: 'PUT',
-      body: JSON.stringify(dataToSend),
+      body: JSON.stringify({
+        route_name: data.route_name, // if updating route name
+        status: data.status, // if updating route status
+      }),
     })
-
     return response
   } catch (error) {
     console.error('Update route error:', error)
     throw error
   }
+}
+
+export const getAccessPermissions = async (accessId) => {
+  return fetchApi(`/permissions/access/${accessId}/routes`)
+}
+
+export const updateAccessRoutePermission = async (accessId, routeId, permissionData) => {
+  return fetchApi(`/permissions/access/${accessId}/routes/${routeId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      status: permissionData.status,
+    }),
+  })
 }

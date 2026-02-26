@@ -86,7 +86,9 @@ const Access = () => {
   }
 
   // Add handler for when routes are updated
-  const handleRoutesUpdated = () => {}
+  const handleRoutesUpdated = () => {
+    // message.success('Routes updated successfully')
+  }
 
   const handleAccessUpdated = () => {
     fetchAccessData()

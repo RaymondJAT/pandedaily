@@ -63,7 +63,7 @@ const RoutePage = () => {
   }
 
   const handleRouteAdded = () => {
-    message.success('Route added successfully')
+    // message.success('Route added successfully')
     fetchRouteData()
   }
 
