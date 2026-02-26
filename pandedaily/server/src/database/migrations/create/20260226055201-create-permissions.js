@@ -3,15 +3,15 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('master_route', {
-      mr_id: {
+    await queryInterface.createTable('permissions', {
+      pm_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
         primaryKey: true,
         allowNull: false,
         unique: true,
       },
-      mr_access_id: {
+      pm_access_id: {
         type: Sequelize.INTEGER,
         references: {
           model: 'master_access',
@@ -19,18 +19,25 @@ module.exports = {
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT',
-        allowNull: true,
-      },
-      mr_route_name: {
-        type: Sequelize.STRING(300),
         allowNull: false,
       },
-      mr_status: {
+      pm_route_id: {
+        type: Sequelize.INTEGER,
+
+        references: {
+          model: 'master_route',
+          key: 'mr_id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT',
+        allowNull: false,
+      },
+      pm_permission: {
         type: Sequelize.ENUM('FULL', 'NO-ACCESS'),
         defaultValue: 'NO-ACCESS',
         allowNull: false,
       },
-      mr_createddate: {
+      pm_createddate: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
@@ -39,6 +46,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('master_route')
+    await queryInterface.dropTable('permissions')
   },
 }

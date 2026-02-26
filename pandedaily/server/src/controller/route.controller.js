@@ -9,42 +9,42 @@ const getRoute = async (req, res) => {
     const data = await Query(statement, [], Master.master_route.prefix_)
     res.status(200).json({ message: 'Route data retrieved.', data })
   } catch (error) {
-    res.status(500).json({ message: 'Error retrieving user data.' })
+    res.status(500).json({ message: 'Error retrieving route data.' })
   }
 }
 
 // CREATE
 const addRoute = async (req, res) => {
-  const { access_id, route_name, status = 1 } = req.body
+  const { route_name, status = 'NO-ACCESS' } = req.body
 
-  console.log('Received create route request:', { access_id, route_name, status })
+  console.log('Received create route request:', { route_name, status })
 
-  if (!access_id || !route_name) {
+  if (!route_name) {
     return res.status(400).json({
-      message: 'Access ID and route name are required.',
+      message: 'Route name is required.',
     })
   }
 
   try {
-    // Check if access exists
-    const checkAccess = await Query(`SELECT ma_id FROM master_access WHERE ma_id = ?`, [access_id])
-    console.log('Access check result:', checkAccess)
-
-    if (checkAccess.length === 0) {
-      return res.status(404).json({
-        message: 'Access not found.',
-      })
-    }
-
-    // Check for duplicate
-    const checkDuplicate = await Query(
-      `SELECT mr_id FROM master_route WHERE mr_access_id = ? AND mr_route_name = ?`,
-      [access_id, route_name],
-    )
+    // Check for duplicate route name
+    const checkDuplicate = await Query(`SELECT mr_id FROM master_route WHERE mr_route_name = ?`, [
+      route_name.trim(),
+    ])
 
     if (checkDuplicate.length > 0) {
       return res.status(409).json({
-        message: 'Route with this name already exists for this access.',
+        message: 'Route with this name already exists.',
+      })
+    }
+
+    // Validate status
+    const validStatuses = ['FULL', 'NO-ACCESS']
+    const statusValue = status.toUpperCase()
+
+    if (!validStatuses.includes(statusValue)) {
+      return res.status(400).json({
+        message: `Status must be one of: ${validStatuses.join(', ')}`,
+        validStatuses,
       })
     }
 
@@ -52,18 +52,22 @@ const addRoute = async (req, res) => {
       INSERT INTO master_route (mr_access_id, mr_route_name, mr_status)
       VALUES (?, ?, ?)
     `
-    const data = await Query(statement, [access_id, route_name, status])
+    const data = await Query(statement, [null, route_name.trim(), statusValue])
     console.log('Insert result:', data)
 
-    res.status(200).json({
+    res.status(201).json({
       message: 'Route data added successfully.',
-      data,
-      insertedId: data.insertId,
+      data: {
+        mr_id: data.insertId,
+        mr_route_name: route_name.trim(),
+        mr_status: statusValue,
+        mr_access_id: null,
+      },
     })
   } catch (error) {
     console.error('Error adding route data:', error)
     console.error('Error SQL:', error.sql)
-    console.error('Error parameters:', [access_id, route_name, status])
+    console.error('Error parameters:', [route_name, status])
 
     res.status(500).json({
       message: 'Error adding route data.',
@@ -75,15 +79,15 @@ const addRoute = async (req, res) => {
 // UPDATE
 const updateRoute = async (req, res) => {
   const { id } = req.params
-  const { access_id, route_name, status } = req.body
+  const { route_name, status } = req.body
 
   if (!Number.isInteger(+id)) {
     return res.status(400).json({ message: 'Valid route ID is required.' })
   }
 
-  if (![access_id, route_name, status].some((v) => v !== undefined)) {
+  if (![route_name, status].some((v) => v !== undefined)) {
     return res.status(400).json({
-      message: 'At least one field (access_id, route_name, or status) is required.',
+      message: 'At least one field (route_name or status) is required.',
     })
   }
 
@@ -98,27 +102,22 @@ const updateRoute = async (req, res) => {
     const params = []
     const updatedFields = {}
 
-    if (access_id !== undefined) {
-      if (!Number.isInteger(+access_id)) {
-        return res.status(400).json({ message: 'access_id must be a valid number.' })
-      }
-
-      const [access] = await Query(`SELECT ma_id FROM master_access WHERE ma_id = ?`, [access_id])
-
-      if (!access) {
-        return res.status(404).json({ message: 'Access ID not found.' })
-      }
-
-      updates.push('mr_access_id = ?')
-      params.push(+access_id)
-      updatedFields.access_id = +access_id
-    }
-
-    // route_name
     if (route_name !== undefined) {
       const name = route_name.trim()
       if (!name) {
         return res.status(400).json({ message: 'route_name cannot be empty.' })
+      }
+
+      // Check for duplicate route name
+      const checkDuplicate = await Query(
+        `SELECT mr_id FROM master_route WHERE mr_route_name = ? AND mr_id != ?`,
+        [name, id],
+      )
+
+      if (checkDuplicate.length > 0) {
+        return res.status(409).json({
+          message: 'Route with this name already exists.',
+        })
       }
 
       updates.push('mr_route_name = ?')
@@ -126,9 +125,8 @@ const updateRoute = async (req, res) => {
       updatedFields.route_name = name
     }
 
-    // status
     if (status !== undefined) {
-      const validStatuses = ['FULL', 'VIEW', 'NO-ACCESS']
+      const validStatuses = ['FULL', 'NO-ACCESS']
       const value = status.trim().toUpperCase()
 
       if (!validStatuses.includes(value)) {
@@ -156,7 +154,7 @@ const updateRoute = async (req, res) => {
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Route with this name already exists for the given access.',
+        message: 'Route with this name already exists.',
       })
     }
 
