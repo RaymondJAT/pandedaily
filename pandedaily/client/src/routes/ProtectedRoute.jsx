@@ -34,7 +34,6 @@ const ProtectedRoute = ({ children, allowedTypes = [], requireAuth = false }) =>
   const isAuthenticated = !!user
   const userType = user?.user_type || (user?.c_id ? 'customer' : null)
 
-  // Case 1: Route requires authentication (like account settings)
   if (requireAuth) {
     if (!isAuthenticated) {
       return (
@@ -58,16 +57,12 @@ const ProtectedRoute = ({ children, allowedTypes = [], requireAuth = false }) =>
     return children
   }
 
-  // Case 2: Route accessible by both guests and registered users (like checkout)
   if (hasGuestInfo || isAuthenticated) {
-    // If user is authenticated but not in allowed types, still allow for checkout pages
     if (allowedTypes.length > 0 && isAuthenticated && !allowedTypes.includes(userType)) {
-      // Check if this is a checkout-related route that should be accessible
       const checkoutRoutes = ['/checkout', '/order/confirmation', '/order/payment']
       const isCheckoutRoute = checkoutRoutes.some((route) => location.pathname.includes(route))
 
       if (isCheckoutRoute) {
-        // Allow authenticated users to access checkout even if not in allowedTypes
         return children
       }
 
@@ -81,7 +76,6 @@ const ProtectedRoute = ({ children, allowedTypes = [], requireAuth = false }) =>
     return children
   }
 
-  // Case 3: No access - redirect based on route
   const isCheckoutRoute = ['/checkout', '/order/confirmation', '/order/payment'].some((route) =>
     location.pathname.includes(route),
   )

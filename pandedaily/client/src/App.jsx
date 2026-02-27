@@ -18,8 +18,6 @@ function App() {
     <Router>
       <AuthProvider>
         <PermissionProvider>
-          {' '}
-          {/* Add PermissionProvider here */}
           <Routes>
             {/* Dashboard Routes */}
             <Route

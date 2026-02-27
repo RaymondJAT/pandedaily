@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { getAccessPermissions } from '../services/api'
-import { getCurrentUser } from '../services/auth'
+import { useAuth } from './AuthContext'
 
 const PermissionContext = createContext()
 
@@ -10,15 +10,18 @@ export const PermissionProvider = ({ children }) => {
   const [permissions, setPermissions] = useState({})
   const [loading, setLoading] = useState(true)
   const [userAccess, setUserAccess] = useState(null)
+  const { user } = useAuth()
 
   useEffect(() => {
     fetchUserPermissions()
-  }, [])
+  }, [user])
 
   const fetchUserPermissions = async () => {
+    setLoading(true)
     try {
-      const user = getCurrentUser()
       if (!user || !user.access_id) {
+        setPermissions({})
+        setUserAccess(null)
         setLoading(false)
         return
       }
@@ -36,6 +39,7 @@ export const PermissionProvider = ({ children }) => {
       setPermissions(permissionMap)
     } catch (error) {
       console.error('Error fetching permissions:', error)
+      setPermissions({})
     } finally {
       setLoading(false)
     }

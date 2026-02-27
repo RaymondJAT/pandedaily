@@ -4,7 +4,7 @@ import { FiChevronsRight, FiChevronRight } from 'react-icons/fi'
 import { sidebarOptions } from '../../../routes/DashboardRoutes'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoImage from '../../../assets/pandesal.png'
-import { usePermissions } from '../../../context/PermissionContext' // Add this import
+import { usePermissions } from '../../../context/PermissionContext'
 import { Spin } from 'antd'
 
 const Sidebar = ({ open, setOpen }) => {
@@ -13,7 +13,7 @@ const Sidebar = ({ open, setOpen }) => {
   const [popoutPosition, setPopoutPosition] = useState({ x: 0, y: 0 })
   const sidebarRef = useRef(null)
   const location = useLocation()
-  const { hasPermission, loading } = usePermissions() // Add this
+  const { hasPermission, loading } = usePermissions()
 
   // Filter sidebar options based on permissions
   const filteredSidebarOptions = sidebarOptions.filter((option) => {
@@ -21,7 +21,6 @@ const Sidebar = ({ open, setOpen }) => {
       return hasPermission(option.routeName)
     }
     if (option.type === 'dropdown' && option.items) {
-      // For dropdown, check if any child items are accessible
       const hasAccessibleChildren = option.items.some((item) =>
         item.routeName ? hasPermission(item.routeName) : true,
       )
@@ -31,7 +30,6 @@ const Sidebar = ({ open, setOpen }) => {
   })
 
   const toggleExpand = (title, event) => {
-    // If sidebar is closed, show popout instead of expanding
     if (!open) {
       event?.stopPropagation()
       const rect = event.currentTarget.getBoundingClientRect()
@@ -40,12 +38,11 @@ const Sidebar = ({ open, setOpen }) => {
         y: rect.top,
       })
 
-      // Toggle popout for this item
       if (popoutMenu?.title === title) {
         setPopoutMenu(null)
       } else {
         const option = filteredSidebarOptions.find((opt) => opt.title === title)
-        // Filter dropdown items by permissions
+
         const accessibleItems =
           option?.items?.filter((item) =>
             item.routeName ? hasPermission(item.routeName) : true,
@@ -59,20 +56,18 @@ const Sidebar = ({ open, setOpen }) => {
       return
     }
 
-    // Normal expand behavior when sidebar is open
     setExpandedItems((prev) =>
       prev.includes(title) ? prev.filter((item) => item !== title) : [...prev, title],
     )
-    setPopoutMenu(null) // Close any open popout when expanding normally
+    setPopoutMenu(null)
   }
 
-  // Function to check if a path is active (used for dropdown parents)
+  // Function to check if a path is active
   const isParentActive = (items) => {
     return items.some((item) => {
       if (item.path === location.pathname) {
         return true
       }
-      // Handle nested routes
       if (location.pathname.startsWith(item.path + '/')) {
         return true
       }
@@ -80,7 +75,6 @@ const Sidebar = ({ open, setOpen }) => {
     })
   }
 
-  // Close popout when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -103,7 +97,6 @@ const Sidebar = ({ open, setOpen }) => {
     }
   }, [open])
 
-  // Auto-expand dropdown when on a child page
   useEffect(() => {
     filteredSidebarOptions.forEach((option) => {
       if (option.type === 'dropdown' && option.items) {
@@ -115,7 +108,6 @@ const Sidebar = ({ open, setOpen }) => {
     })
   }, [location.pathname, filteredSidebarOptions])
 
-  // Show loading state
   if (loading) {
     return (
       <motion.nav
@@ -214,13 +206,11 @@ const Sidebar = ({ open, setOpen }) => {
               )
             }
 
-            // Filter dropdown items by permissions
             const accessibleItems =
               option.items?.filter((item) =>
                 item.routeName ? hasPermission(item.routeName) : true,
               ) || []
 
-            // Don't render dropdown if no accessible items
             if (accessibleItems.length === 0) {
               return null
             }
@@ -404,24 +394,6 @@ const Sidebar = ({ open, setOpen }) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Custom scrollbar styling */}
-      <style>{`
-        .scrollbar-custom::-webkit-scrollbar {
-          width: 4px;
-        }
-        .scrollbar-custom::-webkit-scrollbar-track {
-          background: #523010;
-          border-radius: 4px;
-        }
-        .scrollbar-custom::-webkit-scrollbar-thumb {
-          background: #2a1803;
-          border-radius: 4px;
-        }
-        .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-          background: #1a1002;
-        }
-      `}</style>
     </>
   )
 }
