@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiPlus, FiRefreshCw, FiUser } from 'react-icons/fi'
+import { FiPlus, FiRefreshCw, FiUser, FiFilter, FiX } from 'react-icons/fi'
 import { getUsers } from '../../services/api'
 import { userColumns } from '../../mapping/userColumns'
 import AddUser from '../../components/dashboard modal/AddUser'
 import EditUser from '../../components/dashboard modal/EditUser'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const Users = () => {
   const [users, setUsers] = useState([])
@@ -16,6 +17,7 @@ const Users = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRows, setSelectedRows] = useState([])
   const [selectAll, setSelectAll] = useState(false)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -41,7 +43,7 @@ const Users = () => {
               }
               return (
                 <div className="flex justify-center">
-                  <span className="font-mono font-semibold text-blue-700">
+                  <span className="font-mono font-semibold text-blue-700 text-xs sm:text-sm">
                     U{value.toString().padStart(3, '0')}
                   </span>
                 </div>
@@ -53,11 +55,13 @@ const Users = () => {
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
-                  <FiUser className="w-4 h-4 text-[#9C4A15]" />
+              <div className="flex justify-center items-center gap-1 sm:gap-3">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
+                  <FiUser className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
                 </div>
-                <span className="font-medium text-gray-800">{value || 'N/A'}</span>
+                <span className="font-medium text-gray-800 text-xs sm:text-sm">
+                  {value || 'N/A'}
+                </span>
               </div>
             ),
           }
@@ -67,7 +71,7 @@ const Users = () => {
             ...baseColumn,
             render: (value) => (
               <div className="flex justify-center items-center gap-2">
-                <span className="text-gray-700">{value || 'N/A'}</span>
+                <span className="text-gray-700 text-xs sm:text-sm">{value || 'N/A'}</span>
               </div>
             ),
           }
@@ -77,7 +81,7 @@ const Users = () => {
             ...col,
             render: (value) => (
               <div className="flex justify-center items-center gap-2">
-                <span className="text-gray-700 truncate">{value || 'N/A'}</span>
+                <span className="text-gray-700 text-xs sm:text-sm">{value || 'N/A'}</span>
               </div>
             ),
           }
@@ -96,7 +100,7 @@ const Users = () => {
               return (
                 <div className="flex justify-center items-center gap-2">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold ${
                       levelColors[value] || 'bg-gray-100 text-gray-800 border border-gray-200'
                     }`}
                   >
@@ -137,9 +141,8 @@ const Users = () => {
 
               return (
                 <div className="flex justify-center items-center gap-2">
-                  <span className="text-sm">{config.icon}</span>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${config.color} ${config.border}`}
+                    className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${config.color} ${config.border}`}
                   >
                     {config.label}
                   </span>
@@ -157,7 +160,7 @@ const Users = () => {
               if (!value)
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">N/A</span>
+                    <span className="text-gray-400 text-xs">N/A</span>
                   </div>
                 )
 
@@ -176,15 +179,17 @@ const Users = () => {
                 return (
                   <div className="flex justify-center items-center gap-2">
                     <div className="flex flex-col items-center">
-                      <span className="text-gray-700 text-sm">{formattedDate}</span>
-                      <span className="text-gray-500 text-xs">{formattedTime}</span>
+                      <span className="text-gray-700 text-[10px] sm:text-xs">{formattedDate}</span>
+                      <span className="text-gray-500 text-[8px] sm:text-[10px]">
+                        {formattedTime}
+                      </span>
                     </div>
                   </div>
                 )
               } catch (err) {
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">Invalid date</span>
+                    <span className="text-gray-400 text-xs">Invalid date</span>
                   </div>
                 )
               }
@@ -208,6 +213,7 @@ const Users = () => {
 
       if (Array.isArray(data)) {
         const transformedData = data.map((user, index) => ({
+          id: user.mu_id || user.id || index + 1,
           mu_id: user.mu_id || user.id || index + 1,
           mu_fullname: user.mu_fullname || user.fullname || 'Unknown',
           mu_username: user.mu_username || user.username || 'N/A',
@@ -337,12 +343,18 @@ const Users = () => {
     )
   }
 
+  const clearFilters = () => {
+    setStatusFilter('')
+    setSearchQuery('')
+    setShowMobileFilters(false)
+  }
+
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading users...</p>
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">Loading users...</p>
         </div>
       </div>
     )
@@ -350,16 +362,16 @@ const Users = () => {
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-2xl mb-2">⚠️</div>
-          <p className="text-red-600 font-medium mb-2">Error loading users</p>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="h-full flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-xl sm:text-2xl mb-2">⚠️</div>
+          <p className="text-red-600 font-medium text-sm sm:text-base mb-2">Error loading users</p>
+          <p className="text-gray-600 text-xs sm:text-sm mb-4 wrap-break-words">{error}</p>
           <button
             onClick={fetchUsers}
-            className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-xs sm:text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
           >
-            <FiRefreshCw className="w-4 h-4" />
+            <FiRefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
             Retry
           </button>
         </div>
@@ -369,20 +381,37 @@ const Users = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 min-h-0 p-3">
+      <div className="flex-1 min-h-0 p-2 sm:p-3">
         {/* Main header section */}
-        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-3">
-          <div className="px-4 py-1">
+        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-2 sm:mb-3">
+          <div className="px-3 sm:px-4 py-2 sm:py-1">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-                <p className="text-gray-600">Manage system users and their access levels</p>
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">
+                  User Management
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">
+                  Manage system users and their access levels
+                </p>
               </div>
+
+              {/* Mobile filter toggle */}
+              <button
+                onClick={() => setShowMobileFilters(!showMobileFilters)}
+                className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Toggle filters"
+              >
+                <FiFilter className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
+            {/* Mobile description */}
+            <p className="text-xs text-gray-600 mt-1 sm:hidden">
+              Manage system users and access levels
+            </p>
           </div>
 
-          {/* Filters and search */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 pb-2 gap-3">
+          {/* Filters and search - Desktop */}
+          <div className="hidden md:flex flex-col md:flex-row justify-between items-start md:items-center px-4 pb-2 gap-3">
             <div className="flex flex-wrap gap-2">
               <select
                 className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
@@ -398,51 +427,121 @@ const Users = () => {
               </select>
             </div>
 
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Search by name, username, email, or access level..."
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-full md:w-64"
+                placeholder="Search users..."
+                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-64"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {(statusFilter || searchQuery) && (
+                <button
+                  onClick={clearFilters}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600"
+                  title="Clear filters"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Mobile filters - Slide down panel */}
+          <AnimatePresence>
+            {showMobileFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="md:hidden overflow-hidden"
+              >
+                <div className="px-3 pb-3 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Status Filter
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">All Status</option>
+                      {uniqueStatuses.map((status) => (
+                        <option key={status} value={status}>
+                          {formatStatusForDisplay(status)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+                    <input
+                      type="text"
+                      placeholder="Search by name, username, email..."
+                      className="w-full px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  {(statusFilter || searchQuery) && (
+                    <button
+                      onClick={clearFilters}
+                      className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Table container */}
-        <div className="h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
+        {/* Table container - Keep original table size */}
+        <div className="h-[calc(100vh-300px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={handleAddUser}
-                  className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-xs sm:text-sm flex items-center gap-2 transition-colors cursor-pointer flex-1 sm:flex-none justify-center"
                 >
-                  <FiPlus className="w-4 h-4" />
+                  <FiPlus className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>Add User</span>
                 </button>
               </div>
 
               {selectedRows.length > 0 && (
-                <div className="text-sm text-gray-600">
+                <div className="text-xs sm:text-sm text-gray-600 bg-blue-50 px-2 sm:px-3 py-1 rounded-full">
                   {selectedRows.length} user{selectedRows.length !== 1 ? 's' : ''} selected
                 </div>
               )}
             </div>
 
             {filteredAndSortedData.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
-                  <p className="text-gray-500 text-lg">No users found</p>
+                  <p className="text-gray-500 text-sm sm:text-base">No users found</p>
                   {searchQuery || statusFilter ? (
-                    <p className="text-gray-400 text-sm mt-2">
-                      Try adjusting your filters or search query
-                    </p>
+                    <>
+                      <p className="text-gray-400 text-xs sm:text-sm mt-2">
+                        Try adjusting your filters
+                      </p>
+                      <button
+                        onClick={clearFilters}
+                        className="mt-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm transition-colors"
+                      >
+                        Clear Filters
+                      </button>
+                    </>
                   ) : (
                     <button
                       onClick={handleAddUser}
-                      className="mt-4 px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm"
+                      className="mt-3 sm:mt-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg text-xs sm:text-sm"
                     >
                       Add your first user
                     </button>

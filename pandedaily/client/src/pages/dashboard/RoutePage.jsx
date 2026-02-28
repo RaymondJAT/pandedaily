@@ -29,7 +29,7 @@ const RoutePage = () => {
         const transformedData = data.map((route) => ({
           id: route.mr_id || route.id,
           routeName: route.mr_route_name || route.route_name || route.name,
-          createdAt: route.mr_created_at || route.created_at || new Date().toISOString(),
+          createdAt: route.mr_createddate || route.createddate || new Date().toISOString(),
           ...route,
         }))
 

@@ -30,7 +30,7 @@ export const inventoryColumns = [
     width: '140px',
   },
   {
-    key: 'date',
+    key: 'createddate',
     label: 'Last Updated',
     sortable: true,
     width: '150px',

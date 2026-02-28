@@ -191,6 +191,47 @@ const Inventory = () => {
             },
           }
 
+        case 'createddate':
+          return {
+            ...baseColumn,
+            render: (value) => {
+              if (!value)
+                return (
+                  <div className="flex justify-center">
+                    <span className="text-gray-400">N/A</span>
+                  </div>
+                )
+
+              try {
+                const date = new Date(value)
+                const formattedDate = date.toLocaleDateString('en-PH', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+                const formattedTime = date.toLocaleTimeString('en-PH', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+
+                return (
+                  <div className="flex justify-center items-center gap-2">
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-700 text-sm">{formattedDate}</span>
+                      <span className="text-gray-500 text-xs">{formattedTime}</span>
+                    </div>
+                  </div>
+                )
+              } catch (err) {
+                return (
+                  <div className="flex justify-center">
+                    <span className="text-gray-400">Invalid date</span>
+                  </div>
+                )
+              }
+            },
+          }
+
         case 'stock_change':
           return {
             ...baseColumn,
@@ -240,7 +281,7 @@ const Inventory = () => {
             current_stock: parseInt(item.current_stock || item.i_current_stock || 0),
             previous_stock: parseInt(item.previous_stock || item.i_previous_stock || 0),
             status: item.status || 'NEW',
-            date: item.date || item.i_date || new Date().toISOString(),
+            createddate: item.createddate || item.i_createddate || new Date().toISOString(),
             ...item,
           }))
           setInventory(transformedInventory)
@@ -383,10 +424,6 @@ const Inventory = () => {
 
   const handleAddInventory = () => {
     setShowAddModal(true)
-  }
-
-  const handleRefresh = () => {
-    fetchData()
   }
 
   if (loading) {

@@ -38,7 +38,7 @@ const Access = () => {
           id: access.ma_id || access.id,
           accessName: access.ma_name || access.name || 'Unknown',
           status: access.ma_status || access.status || 'Active',
-          createdAt: access.ma_created_at || access.created_at || new Date().toISOString(),
+          createdAt: access.ma_createddate || access.createddate || new Date().toISOString(),
           ...access,
         }))
 

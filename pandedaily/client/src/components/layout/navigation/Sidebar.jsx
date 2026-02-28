@@ -301,8 +301,8 @@ const Sidebar = ({ open, setOpen }) => {
           })}
         </div>
 
-        {/* Toggle */}
-        <div className="mt-2 border-t border-[#2A1803]">
+        {/* Toggle - Hidden on mobile and tablet screens */}
+        <div className="mt-2 border-t border-[#2A1803] hidden lg:block">
           <button
             onClick={() => {
               setOpen((pv) => !pv)
