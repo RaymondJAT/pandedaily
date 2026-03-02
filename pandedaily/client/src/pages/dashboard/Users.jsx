@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiPlus, FiRefreshCw, FiUser, FiFilter, FiX } from 'react-icons/fi'
+import { FiPlus, FiRefreshCw, FiUser, FiX } from 'react-icons/fi'
 import { getUsers } from '../../services/api'
 import { userColumns } from '../../mapping/userColumns'
 import AddUser from '../../components/dashboard modal/AddUser'
 import EditUser from '../../components/dashboard modal/EditUser'
-import { motion, AnimatePresence } from 'framer-motion'
 
 const Users = () => {
   const [users, setUsers] = useState([])
@@ -17,7 +16,6 @@ const Users = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRows, setSelectedRows] = useState([])
   const [selectAll, setSelectAll] = useState(false)
-  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -346,7 +344,6 @@ const Users = () => {
   const clearFilters = () => {
     setStatusFilter('')
     setSearchQuery('')
-    setShowMobileFilters(false)
   }
 
   if (loading) {
@@ -394,15 +391,6 @@ const Users = () => {
                   Manage system users and their access levels
                 </p>
               </div>
-
-              {/* Mobile filter toggle */}
-              <button
-                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Toggle filters"
-              >
-                <FiFilter className="w-5 h-5 text-gray-600" />
-              </button>
             </div>
             {/* Mobile description */}
             <p className="text-xs text-gray-600 mt-1 sm:hidden">
@@ -410,11 +398,11 @@ const Users = () => {
             </p>
           </div>
 
-          {/* Filters and search - Desktop */}
-          <div className="hidden md:flex flex-col md:flex-row justify-between items-start md:items-center px-4 pb-2 gap-3">
-            <div className="flex flex-wrap gap-2">
+          {/* Filters and search - Always visible on all screens */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-3 sm:px-4 pb-3 gap-3">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
               <select
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                className="px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-full md:w-auto"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -427,18 +415,20 @@ const Users = () => {
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Search users..."
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-64"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:flex-none">
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  className="w-full md:w-64 px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
               {(statusFilter || searchQuery) && (
                 <button
                   onClick={clearFilters}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600 shrink-0"
                   title="Clear filters"
                 >
                   <FiX className="w-4 h-4" />
@@ -446,63 +436,10 @@ const Users = () => {
               )}
             </div>
           </div>
-
-          {/* Mobile filters - Slide down panel */}
-          <AnimatePresence>
-            {showMobileFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="md:hidden overflow-hidden"
-              >
-                <div className="px-3 pb-3 space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Status Filter
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                      <option value="">All Status</option>
-                      {uniqueStatuses.map((status) => (
-                        <option key={status} value={status}>
-                          {formatStatusForDisplay(status)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
-                    <input
-                      type="text"
-                      placeholder="Search by name, username, email..."
-                      className="w-full px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-
-                  {(statusFilter || searchQuery) && (
-                    <button
-                      onClick={clearFilters}
-                      className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
-        {/* Table container - Keep original table size */}
-        <div className="h-[calc(100vh-300px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
+        {/* Table container - Optimized for mobile */}
+        <div className="h-[calc(100vh-250px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
               <div className="flex gap-2 w-full sm:w-auto">

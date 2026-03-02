@@ -7,7 +7,7 @@ import logoImage from '../../../assets/pandesal.png'
 import { usePermissions } from '../../../context/PermissionContext'
 import { Spin } from 'antd'
 
-const Sidebar = ({ open, setOpen }) => {
+const Sidebar = ({ open, setOpen, isMobile }) => {
   const [expandedItems, setExpandedItems] = useState([])
   const [popoutMenu, setPopoutMenu] = useState(null)
   const [popoutPosition, setPopoutPosition] = useState({ x: 0, y: 0 })
@@ -108,13 +108,21 @@ const Sidebar = ({ open, setOpen }) => {
     })
   }, [location.pathname, filteredSidebarOptions])
 
+  // Determine sidebar width based on screen size and open state
+  const getSidebarWidth = () => {
+    if (isMobile) {
+      return open ? 56 : 0 // On mobile, show only icons when open, hidden when closed
+    }
+    return open ? 225 : 56 // Desktop behavior
+  }
+
   if (loading) {
     return (
       <motion.nav
         ref={sidebarRef}
         className="sticky top-0 h-screen shrink-0 border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col items-center"
         initial={false}
-        animate={{ width: open ? 225 : 56 }}
+        animate={{ width: getSidebarWidth() }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
         style={{ position: 'fixed', left: 0, zIndex: 40 }}
       >
@@ -131,15 +139,20 @@ const Sidebar = ({ open, setOpen }) => {
         ref={sidebarRef}
         className="sticky top-0 h-screen shrink-0 border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col"
         initial={false}
-        animate={{ width: open ? 225 : 56 }}
+        animate={{ width: getSidebarWidth() }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        style={{ position: 'fixed', left: 0, zIndex: 40 }}
+        style={{
+          position: 'fixed',
+          left: 0,
+          zIndex: 40,
+          overflow: 'hidden',
+        }}
       >
-        {/* Title */}
+        {/* Logo - Always visible in all states (open or closed, mobile or desktop) */}
         <div className="mb-3 border-b border-[#2A1803] pb-3">
           <div className="flex cursor-pointer items-center justify-between rounded-md transition-colors hover:bg-[#523010]">
             <div className="flex items-center gap-2">
-              {/* Logo Container */}
+              {/* Logo Container - Always visible */}
               <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#2A1803] overflow-hidden p-1">
                 <img
                   src={logoImage}
@@ -148,7 +161,8 @@ const Sidebar = ({ open, setOpen }) => {
                 />
               </div>
 
-              {open && (
+              {/* Title text - Only show on desktop when open */}
+              {!isMobile && open && (
                 <div className="overflow-hidden font-[titleFont]">
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -191,7 +205,8 @@ const Sidebar = ({ open, setOpen }) => {
                   <div className="grid h-full w-10 place-content-center text-lg shrink-0">
                     <option.Icon className="text-[#F5EFE7]" />
                   </div>
-                  {open && (
+                  {/* Only show text on desktop when open */}
+                  {!isMobile && open && (
                     <motion.span
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -228,7 +243,8 @@ const Sidebar = ({ open, setOpen }) => {
                       <option.Icon className="text-[#F5EFE7]" />
                     </div>
 
-                    {open && (
+                    {/* Only show text and chevron on desktop when open */}
+                    {!isMobile && open && (
                       <>
                         <motion.span
                           initial={{ opacity: 0, x: -10 }}
@@ -258,9 +274,9 @@ const Sidebar = ({ open, setOpen }) => {
                   </div>
                 </button>
 
-                {/* Expanded menu when sidebar is open */}
+                {/* Expanded menu - Only show on desktop when open and expanded */}
                 <AnimatePresence>
-                  {open && isExpanded && (
+                  {!isMobile && open && isExpanded && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
@@ -342,9 +358,9 @@ const Sidebar = ({ open, setOpen }) => {
         </div>
       </motion.nav>
 
-      {/* Popout Menu when sidebar is closed */}
+      {/* Popout Menu when sidebar is closed - Only show on desktop */}
       <AnimatePresence>
-        {popoutMenu && popoutMenu.items.length > 0 && (
+        {!isMobile && popoutMenu && popoutMenu.items.length > 0 && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, x: -10 }}
             animate={{ opacity: 1, scale: 1, x: 0 }}

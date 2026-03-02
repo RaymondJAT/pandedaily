@@ -8,6 +8,7 @@ import {
   FiCreditCard,
   FiXCircle,
   FiPackage,
+  FiX,
 } from 'react-icons/fi'
 import { orderColumns } from '../../mapping/orderColumns'
 import { getOrders } from '../../services/api'
@@ -46,7 +47,7 @@ const Orders = () => {
               }
               return (
                 <div className="flex justify-center">
-                  <span className="font-mono font-semibold text-blue-700">
+                  <span className="font-mono font-semibold text-blue-700 text-xs sm:text-sm">
                     #{value.toString().padStart(5, '0')}
                   </span>
                 </div>
@@ -61,7 +62,7 @@ const Orders = () => {
               if (!value)
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">N/A</span>
+                    <span className="text-gray-400 text-xs">N/A</span>
                   </div>
                 )
 
@@ -80,14 +81,14 @@ const Orders = () => {
 
                 return (
                   <div className="flex flex-col items-center justify-center">
-                    <span className="text-gray-700 text-sm">{formattedDate}</span>
-                    <span className="text-gray-500 text-xs">{formattedTime}</span>
+                    <span className="text-gray-700 text-[10px] sm:text-sm">{formattedDate}</span>
+                    <span className="text-gray-500 text-[8px] sm:text-xs">{formattedTime}</span>
                   </div>
                 )
               } catch (err) {
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">Invalid date</span>
+                    <span className="text-gray-400 text-xs">Invalid date</span>
                   </div>
                 )
               }
@@ -98,9 +99,12 @@ const Orders = () => {
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-2">
-                <FiUser className="w-4 h-4 text-gray-400" />
-                <span className="font-medium text-gray-800 truncate" title={value}>
+              <div className="flex justify-center items-center gap-1 sm:gap-2">
+                <FiUser className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+                <span
+                  className="font-medium text-gray-800 text-xs sm:text-sm truncate max-w-20 sm:max-w-30"
+                  title={value}
+                >
                   {value || 'Guest Customer'}
                 </span>
               </div>
@@ -114,7 +118,7 @@ const Orders = () => {
               const amount = parseFloat(value || 0)
               return (
                 <div className="flex justify-center">
-                  <span className="font-bold text-green-700">
+                  <span className="font-bold text-green-700 text-xs sm:text-sm">
                     ₱
                     {amount.toLocaleString('en-PH', {
                       minimumFractionDigits: 2,
@@ -188,10 +192,10 @@ const Orders = () => {
               return (
                 <div className="flex justify-center">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1 ${config.bg} ${config.text} ${config.border}`}
+                    className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border flex items-center gap-1 ${config.bg} ${config.text} ${config.border}`}
                   >
                     <Icon className="w-3 h-3" />
-                    {config.label}
+                    <span className="truncate max-w-12.5 sm:max-w-none">{config.label}</span>
                   </span>
                 </div>
               )
@@ -202,9 +206,11 @@ const Orders = () => {
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-2">
-                <FiCreditCard className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-700">{value || 'N/A'}</span>
+              <div className="flex justify-center items-center gap-1 sm:gap-2">
+                <FiCreditCard className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+                <span className="text-gray-700 text-xs sm:text-sm truncate max-w-15 sm:max-w-20">
+                  {value || 'N/A'}
+                </span>
               </div>
             ),
           }
@@ -214,7 +220,10 @@ const Orders = () => {
             ...baseColumn,
             render: (value) => (
               <div className="flex justify-center">
-                <span className="font-mono text-sm text-gray-600 truncate" title={value}>
+                <span
+                  className="font-mono text-[10px] sm:text-sm text-gray-600 truncate max-w-17.5 sm:max-w-25"
+                  title={value}
+                >
                   {value || 'N/A'}
                 </span>
               </div>
@@ -239,6 +248,7 @@ const Orders = () => {
       if (Array.isArray(data)) {
         // Transform the data to ensure all fields exist
         const transformedData = data.map((order) => ({
+          id: order.or_id || order.id || 0,
           or_id: order.or_id || order.id || 0,
           or_createddate: order.or_createddate || order.createddate || order.created_at || '',
           or_customer_id: order.or_customer_id || order.customer_id || 0,
@@ -355,12 +365,18 @@ const Orders = () => {
     setSelectedRows(isSelected ? allIds : [])
   }
 
+  const clearFilters = () => {
+    setStatusFilter('')
+    setPaymentFilter('')
+    setSearchQuery('')
+  }
+
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading orders...</p>
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">Loading orders...</p>
         </div>
       </div>
     )
@@ -368,16 +384,17 @@ const Orders = () => {
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-2xl mb-2">⚠️</div>
-          <p className="text-red-600 font-medium mb-2">Error loading orders</p>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="h-full flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-xl sm:text-2xl mb-2">⚠️</div>
+          <p className="text-red-600 font-medium text-sm sm:text-base mb-2">Error loading orders</p>
+          <p className="text-gray-600 text-xs sm:text-sm mb-4 wrap-break-words">{error}</p>
           <button
             onClick={fetchOrders}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-xs sm:text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
           >
-            Retry
+            <FiX className="w-3 h-3 sm:w-4 sm:h-4 hidden" />
+            <span>Retry</span>
           </button>
         </div>
       </div>
@@ -386,76 +403,103 @@ const Orders = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 min-h-0 p-3">
+      <div className="flex-1 min-h-0 p-2 sm:p-3">
         {/* Main header section */}
-        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-3">
-          <div className="px-4 py-1">
-            <div className="flex justify-between items-center">
+        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-2 sm:mb-3">
+          <div className="px-3 sm:px-4 py-2 sm:py-1">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 text-center md:text-left">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 text-center sm:text-left">
                   Order Management
                 </h1>
-                <p className="text-gray-600 text-center md:text-left">
+                <p className="text-xs sm:text-sm text-gray-600 hidden sm:block text-center sm:text-left">
                   View all customer orders and track their status
                 </p>
               </div>
             </div>
+            {/* Mobile description */}
+            <p className="text-xs text-gray-600 mt-1 sm:hidden ">
+              Track customer orders and status
+            </p>
           </div>
 
           {/* Filters and search */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 pb-2 gap-3">
-            <div className="flex flex-wrap gap-2 justify-center md:justify-start w-full md:w-auto">
-              <select
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full md:w-auto"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All Status</option>
-                {uniqueStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-              </select>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-3 sm:px-4 pb-3 gap-3">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
+              <div className="flex flex-row gap-2 w-full sm:w-auto">
+                <select
+                  className="flex-1 px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] text-sm"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All Status</option>
+                  {uniqueStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </option>
+                  ))}
+                </select>
 
-              <select
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full md:w-auto"
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value)}
-              >
-                <option value="">All Payment Types</option>
-                {uniquePaymentTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+                <select
+                  className="flex-1 px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] text-sm"
+                  value={paymentFilter}
+                  onChange={(e) => setPaymentFilter(e.target.value)}
+                >
+                  <option value="">All Payment</option>
+                  {uniquePaymentTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center w-full md:w-auto">
-              <input
-                type="text"
-                placeholder="Search by Order ID, Customer, or Payment Ref..."
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:flex-none">
+                <input
+                  type="text"
+                  placeholder="Search orders..."
+                  className="w-full md:w-80 px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              {(statusFilter || paymentFilter || searchQuery) && (
+                <button
+                  onClick={clearFilters}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600 shrink-0"
+                  title="Clear filters"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Table container */}
-        <div className="h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
+        {/* Table container - Mobile optimized */}
+        <div className="h-[calc(100vh-250px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
             {filteredAndSortedData.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
-                  <p className="text-gray-500 text-lg">No orders found</p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    {searchQuery || statusFilter || paymentFilter
-                      ? 'Try adjusting your filters or search query'
-                      : 'No order data available'}
-                  </p>
+                  <p className="text-gray-500 text-sm sm:text-base">No orders found</p>
+                  {searchQuery || statusFilter || paymentFilter ? (
+                    <>
+                      <p className="text-gray-400 text-xs sm:text-sm mt-2">
+                        Try adjusting your filters
+                      </p>
+                      <button
+                        onClick={clearFilters}
+                        className="mt-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm transition-colors"
+                      >
+                        Clear Filters
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-gray-400 text-xs sm:text-sm mt-2">No order data available</p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -476,8 +520,8 @@ const Orders = () => {
                 showActions={true}
                 actionButtonProps={{
                   showView: true,
-                  onView: (id) => {
-                    setViewingOrderId(id)
+                  onView: (row) => {
+                    setViewingOrderId(row.or_id || row.id)
                     setIsViewModalOpen(true)
                   },
                 }}

@@ -4,6 +4,7 @@ import { PermissionProvider } from './context/PermissionContext'
 import ProtectedRoute from './routes/ProtectedRoute'
 import WebsiteLayout from './components/layout/WebsiteLayout'
 import DashboardLayout from './components/layout/DashboardLayout'
+import Dashboard from './pages/dashboard/Dashboard'
 import Users from './pages/dashboard/Users'
 import Access from './pages/dashboard/Access'
 import Customer from './pages/dashboard/Customer'
@@ -28,6 +29,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
+              <Route index element={<Dashboard />} />
               <Route path="users" element={<Users />} />
               <Route path="access" element={<Access />} />
               <Route path="customer" element={<Customer />} />

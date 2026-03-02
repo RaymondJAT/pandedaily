@@ -47,11 +47,11 @@ const Header = ({ sidebarOpen, onToggleSidebar }) => {
   }
 
   return (
-    <header className="bg-[#3F2305] border-b border-[#2A1803] h-16">
-      <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 h-full">
-        {/* Left side with menu button and title */}
+    <header className="bg-[#3F2305] border-b border-[#2A1803] h-16 w-full">
+      <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 h-full w-full">
+        {/* Left side with menu button */}
         <div className="flex items-center space-x-2 sm:space-x-4">
-          {/* Menu Toggle Button - Hidden on desktop, shown on mobile/tablet */}
+          {/* Menu Toggle Button - Always visible on mobile, hidden on desktop */}
           <button
             onClick={onToggleSidebar}
             className="p-1.5 sm:p-2 hover:bg-[#523010] rounded-lg transition-colors cursor-pointer lg:hidden"

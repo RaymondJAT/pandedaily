@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiPlus, FiRefreshCw, FiPackage, FiTrendingUp, FiTrendingDown, FiBox } from 'react-icons/fi'
+import {
+  FiPlus,
+  FiRefreshCw,
+  FiPackage,
+  FiTrendingUp,
+  FiTrendingDown,
+  FiBox,
+  FiX,
+} from 'react-icons/fi'
 import { getInventory, getInventoryHistory } from '../../services/api'
 import AddInventory from '../../components/dashboard modal/AddInventory'
 import EditInventory from '../../components/dashboard modal/EditInventory'
@@ -44,7 +52,7 @@ const Inventory = () => {
               const prefix = activeTab === 'current' ? 'I' : 'H'
               return (
                 <div className="flex justify-center">
-                  <span className="font-mono font-semibold text-blue-700">
+                  <span className="font-mono font-semibold text-blue-700 text-xs sm:text-sm">
                     {prefix}
                     {value.toString().padStart(3, '0')}
                   </span>
@@ -57,11 +65,13 @@ const Inventory = () => {
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
-                  <FiPackage className="w-4 h-4 text-[#9C4A15]" />
+              <div className="flex justify-center items-center gap-1 sm:gap-3">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
+                  <FiPackage className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
                 </div>
-                <span className="font-medium text-gray-800">{value || 'N/A'}</span>
+                <span className="font-medium text-gray-800 text-xs sm:text-sm truncate max-w-20 sm:max-w-30">
+                  {value || 'N/A'}
+                </span>
               </div>
             ),
           }
@@ -74,23 +84,23 @@ const Inventory = () => {
               const isLow = value <= 10
               const isOut = value === 0
               return (
-                <div className="flex justify-center items-center gap-2">
+                <div className="flex justify-center items-center gap-1 sm:gap-2">
                   <div className="relative">
                     <FiBox
-                      className={`w-5 h-5 ${
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${
                         isOut ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-green-500'
                       }`}
                     />
                     {(isLow || isOut) && (
                       <div
-                        className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+                        className={`absolute -top-1 -right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
                           isOut ? 'bg-red-500' : 'bg-amber-500'
                         }`}
                       ></div>
                     )}
                   </div>
                   <span
-                    className={`font-semibold ${
+                    className={`font-semibold text-xs sm:text-sm ${
                       isOut ? 'text-red-700' : isLow ? 'text-amber-700' : 'text-gray-800'
                     }`}
                   >
@@ -107,7 +117,7 @@ const Inventory = () => {
             ...baseColumn,
             render: (value) => (
               <div className="flex justify-center">
-                <span className="font-medium text-gray-600">{value || 0}</span>
+                <span className="font-medium text-gray-600 text-xs sm:text-sm">{value || 0}</span>
               </div>
             ),
           }
@@ -153,10 +163,10 @@ const Inventory = () => {
               return (
                 <div className="flex justify-center">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${config.color} ${config.border} flex items-center`}
+                    className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${config.color} ${config.border} flex items-center`}
                   >
                     {config.icon}
-                    {config.label}
+                    <span className="truncate max-w-12.5 sm:max-w-none">{config.label}</span>
                   </span>
                 </div>
               )
@@ -167,7 +177,7 @@ const Inventory = () => {
           return {
             ...baseColumn,
             render: (value) => {
-              if (!value) return <span className="text-gray-400">N/A</span>
+              if (!value) return <span className="text-gray-400 text-xs">N/A</span>
 
               const date = new Date(value)
               const formattedDate = date.toLocaleDateString('en-PH', {
@@ -183,8 +193,10 @@ const Inventory = () => {
               return (
                 <div className="flex justify-center items-center gap-2">
                   <div className="text-center">
-                    <div className="text-sm font-medium text-gray-800">{formattedDate}</div>
-                    <div className="text-xs text-gray-500">{formattedTime}</div>
+                    <div className="text-[10px] sm:text-sm font-medium text-gray-800">
+                      {formattedDate}
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-500">{formattedTime}</div>
                   </div>
                 </div>
               )
@@ -198,7 +210,7 @@ const Inventory = () => {
               if (!value)
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">N/A</span>
+                    <span className="text-gray-400 text-xs">N/A</span>
                   </div>
                 )
 
@@ -217,15 +229,17 @@ const Inventory = () => {
                 return (
                   <div className="flex justify-center items-center gap-2">
                     <div className="flex flex-col items-center">
-                      <span className="text-gray-700 text-sm">{formattedDate}</span>
-                      <span className="text-gray-500 text-xs">{formattedTime}</span>
+                      <span className="text-gray-700 text-[10px] sm:text-xs">{formattedDate}</span>
+                      <span className="text-gray-500 text-[8px] sm:text-[10px]">
+                        {formattedTime}
+                      </span>
                     </div>
                   </div>
                 )
               } catch (err) {
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">Invalid date</span>
+                    <span className="text-gray-400 text-xs">Invalid date</span>
                   </div>
                 )
               }
@@ -242,11 +256,11 @@ const Inventory = () => {
 
               return (
                 <div className="flex justify-center items-center gap-1">
-                  {isPositive && <FiTrendingUp className="w-4 h-4 text-green-500" />}
-                  {isNegative && <FiTrendingDown className="w-4 h-4 text-red-500" />}
-                  {change === 0 && <span className="w-4 h-4 text-gray-400">–</span>}
+                  {isPositive && <FiTrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />}
+                  {isNegative && <FiTrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />}
+                  {change === 0 && <span className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400">–</span>}
                   <span
-                    className={`font-semibold ${
+                    className={`font-semibold text-xs sm:text-sm ${
                       isPositive ? 'text-green-700' : isNegative ? 'text-red-700' : 'text-gray-700'
                     }`}
                   >
@@ -426,12 +440,17 @@ const Inventory = () => {
     setShowAddModal(true)
   }
 
+  const clearFilters = () => {
+    setStatusFilter('')
+    setSearchQuery('')
+  }
+
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
-          <p className="mt-4 text-gray-600">
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">
             Loading {activeTab === 'current' ? 'inventory' : 'history'}...
           </p>
         </div>
@@ -441,16 +460,18 @@ const Inventory = () => {
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-2xl mb-2">⚠️</div>
-          <p className="text-red-600 font-medium mb-2">Error loading inventory data</p>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="h-full flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-xl sm:text-2xl mb-2">⚠️</div>
+          <p className="text-red-600 font-medium text-sm sm:text-base mb-2">
+            Error loading inventory data
+          </p>
+          <p className="text-gray-600 text-xs sm:text-sm mb-4 wrap-break-words">{error}</p>
           <button
             onClick={fetchData}
-            className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-xs sm:text-sm flex items-center gap-2 transition-colors cursor-pointer mx-auto"
           >
-            <FiRefreshCw className="w-4 h-4" />
+            <FiRefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
             Retry
           </button>
         </div>
@@ -460,31 +481,35 @@ const Inventory = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 min-h-0 p-3">
+      <div className="flex-1 min-h-0 p-2 sm:p-3">
         {/* Main header section */}
-        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-3">
-          <div className="px-4 py-1">
-            <div className="flex justify-between items-center">
+        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-2 sm:mb-3">
+          <div className="px-3 sm:px-4 py-2 sm:py-1">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Inventory Management</h1>
-                <p className="text-gray-600">Track stock levels and inventory history</p>
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">
+                  Inventory Management
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                  Track stock levels and inventory history
+                </p>
               </div>
 
               {/* Tabs */}
-              <div className="flex rounded-lg border border-slate-400 overflow-hidden">
+              <div className="flex rounded-lg border border-slate-400 overflow-hidden w-full sm:w-auto">
                 <button
                   onClick={() => setActiveTab('current')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 sm:flex-none px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors ${
                     activeTab === 'current'
                       ? 'bg-[#9C4A15] text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  Current Inventory
+                  Current
                 </button>
                 <button
                   onClick={() => setActiveTab('history')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 sm:flex-none px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors ${
                     activeTab === 'history'
                       ? 'bg-[#9C4A15] text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -497,11 +522,11 @@ const Inventory = () => {
           </div>
 
           {/* Filters and search */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 pb-2 gap-3">
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-3 sm:px-4 pb-3 gap-3">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
               {activeTab === 'history' && (
                 <select
-                  className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                  className="w-full sm:w-auto px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -517,49 +542,74 @@ const Inventory = () => {
               {activeTab === 'current' && (
                 <button
                   onClick={handleAddInventory}
-                  className="px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm flex items-center gap-2 transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-3 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-xs sm:text-sm flex items-center gap-2 transition-colors cursor-pointer justify-center"
                 >
-                  <FiPlus className="w-4 h-4" />
+                  <FiPlus className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>Add Inventory</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder={`Search by ${activeTab === 'current' ? 'product name or stock...' : 'product, status, or date...'}`}
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-full md:w-64"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:flex-none">
+                <input
+                  type="text"
+                  placeholder={`Search ${activeTab === 'current' ? 'products...' : 'history...'}`}
+                  className="w-full md:w-80 px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              {(statusFilter || searchQuery) && (
+                <button
+                  onClick={clearFilters}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600 shrink-0"
+                  title="Clear filters"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Table container */}
-        <div className="h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
+        <div className="h-[calc(100vh-290px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
             {filteredAndSortedData.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
-                  <p className="text-gray-500 text-lg">
+                  <p className="text-gray-500 text-sm sm:text-base">
                     No {activeTab === 'current' ? 'inventory' : 'history'} found
                   </p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    {searchQuery || statusFilter
-                      ? 'Try adjusting your filters or search query'
-                      : activeTab === 'current'
-                        ? 'Add your first inventory record to get started'
-                        : 'No history records available'}
-                  </p>
-                  {activeTab === 'current' && !searchQuery && !statusFilter && (
-                    <button
-                      onClick={handleAddInventory}
-                      className="mt-4 px-4 py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C4A15] focus:ring-offset-2 text-sm"
-                    >
-                      Add inventory record
-                    </button>
+                  {searchQuery || statusFilter ? (
+                    <>
+                      <p className="text-gray-400 text-xs sm:text-sm mt-2">
+                        Try adjusting your filters
+                      </p>
+                      <button
+                        onClick={clearFilters}
+                        className="mt-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm transition-colors"
+                      >
+                        Clear Filters
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-gray-400 text-xs sm:text-sm mt-2">
+                        {activeTab === 'current'
+                          ? 'Add your first inventory record to get started'
+                          : 'No history records available'}
+                      </p>
+                      {activeTab === 'current' && (
+                        <button
+                          onClick={handleAddInventory}
+                          className="mt-3 sm:mt-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#9C4A15] hover:bg-[#8a3f12] text-[#F5EFE7] rounded-lg text-xs sm:text-sm"
+                        >
+                          Add inventory record
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

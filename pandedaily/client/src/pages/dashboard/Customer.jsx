@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
-import { FiUser, FiMail, FiPhone, FiMapPin, FiCalendar, FiExternalLink } from 'react-icons/fi'
+import { FiUser, FiMail, FiPhone, FiMapPin, FiExternalLink, FiFilter, FiX } from 'react-icons/fi'
 import { customerColumns } from '../../mapping/customerColumns'
 import { getCustomers } from '../../services/api'
 
@@ -48,7 +48,7 @@ const Customer = () => {
               }
               return (
                 <div className="flex justify-center">
-                  <span className="font-mono font-semibold text-blue-700">
+                  <span className="font-mono font-semibold text-blue-700 text-xs sm:text-sm">
                     {value.toString().padStart(3, '0')}
                   </span>
                 </div>
@@ -60,11 +60,13 @@ const Customer = () => {
           return {
             ...baseColumn,
             render: (value, row) => (
-              <div className="flex justify-center items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
-                  <FiUser className="w-4 h-4 text-[#9C4A15]" />
+              <div className="flex justify-center items-center gap-1 sm:gap-3">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#F5EFE7] flex items-center justify-center border border-[#9C4A15]/20">
+                  <FiUser className="w-3 h-3 sm:w-4 sm:h-4 text-[#9C4A15]" />
                 </div>
-                <span className="font-medium text-gray-800">{value || 'N/A'}</span>
+                <span className="font-medium text-gray-800 text-xs sm:text-sm">
+                  {value || 'N/A'}
+                </span>
               </div>
             ),
           }
@@ -74,7 +76,7 @@ const Customer = () => {
             ...baseColumn,
             render: (value) => (
               <div className="flex justify-center">
-                <span className="text-gray-700">{value || 'N/A'}</span>
+                <span className="text-gray-700 text-xs sm:text-sm">{value || 'N/A'}</span>
               </div>
             ),
           }
@@ -83,9 +85,11 @@ const Customer = () => {
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-2">
-                <FiMail className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-700 truncate">{value || 'N/A'}</span>
+              <div className="flex justify-center items-center gap-1 sm:gap-2">
+                <FiMail className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+                <span className="text-gray-700 text-xs sm:text-sm truncate max-w-25 sm:max-w-37.5">
+                  {value || 'N/A'}
+                </span>
               </div>
             ),
           }
@@ -94,9 +98,9 @@ const Customer = () => {
           return {
             ...baseColumn,
             render: (value) => (
-              <div className="flex justify-center items-center gap-2">
-                <FiPhone className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-700">{value || 'N/A'}</span>
+              <div className="flex justify-center items-center gap-1 sm:gap-2">
+                <FiPhone className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+                <span className="text-gray-700 text-xs sm:text-sm">{value || 'N/A'}</span>
               </div>
             ),
           }
@@ -114,10 +118,10 @@ const Customer = () => {
                 parseFloat(row.longitude) !== 0
 
               if (!value || value === 'N/A') {
-                return <span className="text-gray-400">N/A</span>
+                return <span className="text-gray-400 text-xs">N/A</span>
               }
 
-              const truncatedAddress = value.length > 50 ? value.substring(0, 47) + '...' : value
+              const truncatedAddress = value.length > 30 ? value.substring(0, 27) + '...' : value
 
               return (
                 <div
@@ -126,7 +130,7 @@ const Customer = () => {
                       ? openGoogleMaps(row.latitude, row.longitude, value, row.id, row.fullname)
                       : null
                   }
-                  className={`flex items-center gap-2 px-2 ${
+                  className={`flex items-center gap-1 sm:gap-2 px-1 sm:px-2 ${
                     hasValidCoordinates
                       ? 'cursor-pointer hover:bg-blue-50 rounded-lg transition-all duration-200 group'
                       : 'cursor-default'
@@ -138,14 +142,14 @@ const Customer = () => {
                   }
                 >
                   <FiMapPin
-                    className={`w-4 h-4 shrink-0 ${
+                    className={`w-3 h-3 sm:w-4 sm:h-4 shrink-0 ${
                       hasValidCoordinates
                         ? 'text-blue-500 group-hover:text-blue-600'
                         : 'text-gray-400'
                     }`}
                   />
                   <span
-                    className={`text-sm truncate ${
+                    className={`text-[10px] sm:text-sm truncate max-w-20 sm:max-w-37.5 ${
                       hasValidCoordinates
                         ? 'text-blue-600 group-hover:text-blue-700 group-hover:underline'
                         : 'text-gray-700'
@@ -154,7 +158,7 @@ const Customer = () => {
                     {truncatedAddress}
                   </span>
                   {hasValidCoordinates && (
-                    <FiExternalLink className="w-3 h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    <FiExternalLink className="w-2 h-2 sm:w-3 sm:h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                   )}
                 </div>
               )
@@ -166,12 +170,12 @@ const Customer = () => {
             ...baseColumn,
             render: (value, row) => {
               if (!value || parseFloat(value) === 0) {
-                return <span className="text-gray-400">N/A</span>
+                return <span className="text-gray-400 text-xs">N/A</span>
               }
               return (
                 <div className="flex justify-center">
-                  <span className="text-sm font-mono text-gray-600">
-                    {parseFloat(value).toFixed(6)}
+                  <span className="text-[10px] sm:text-xs font-mono text-gray-600">
+                    {parseFloat(value).toFixed(4)}
                   </span>
                 </div>
               )
@@ -183,12 +187,12 @@ const Customer = () => {
             ...baseColumn,
             render: (value, row) => {
               if (!value || parseFloat(value) === 0) {
-                return <span className="text-gray-400">N/A</span>
+                return <span className="text-gray-400 text-xs">N/A</span>
               }
               return (
                 <div className="flex justify-center">
-                  <span className="text-sm font-mono text-gray-600">
-                    {parseFloat(value).toFixed(6)}
+                  <span className="text-[10px] sm:text-xs font-mono text-gray-600">
+                    {parseFloat(value).toFixed(4)}
                   </span>
                 </div>
               )
@@ -203,7 +207,7 @@ const Customer = () => {
               return (
                 <div className="flex justify-center">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${
                       isRegistered
                         ? 'bg-green-100 text-green-800 border-green-200'
                         : 'bg-amber-100 text-amber-800 border-amber-200'
@@ -223,7 +227,7 @@ const Customer = () => {
               if (!value)
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">N/A</span>
+                    <span className="text-gray-400 text-xs">N/A</span>
                   </div>
                 )
 
@@ -242,15 +246,17 @@ const Customer = () => {
                 return (
                   <div className="flex justify-center items-center gap-2">
                     <div className="flex flex-col items-center">
-                      <span className="text-gray-700 text-sm">{formattedDate}</span>
-                      <span className="text-gray-500 text-xs">{formattedTime}</span>
+                      <span className="text-gray-700 text-[10px] sm:text-xs">{formattedDate}</span>
+                      <span className="text-gray-500 text-[8px] sm:text-[10px]">
+                        {formattedTime}
+                      </span>
                     </div>
                   </div>
                 )
               } catch (err) {
                 return (
                   <div className="flex justify-center">
-                    <span className="text-gray-400">Invalid date</span>
+                    <span className="text-gray-400 text-xs">Invalid date</span>
                   </div>
                 )
               }
@@ -310,6 +316,11 @@ const Customer = () => {
   useEffect(() => {
     fetchCustomers()
   }, [fetchCustomers])
+
+  const clearFilters = () => {
+    setStatusFilter('')
+    setSearchQuery('')
+  }
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -382,10 +393,10 @@ const Customer = () => {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading customers...</p>
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#9C4A15] mx-auto"></div>
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">Loading customers...</p>
         </div>
       </div>
     )
@@ -393,11 +404,13 @@ const Customer = () => {
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-2xl mb-2">⚠️</div>
-          <p className="text-red-600 font-medium mb-2">Error loading customers</p>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="h-full flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-xl sm:text-2xl mb-2">⚠️</div>
+          <p className="text-red-600 font-medium text-sm sm:text-base mb-2">
+            Error loading customers
+          </p>
+          <p className="text-gray-600 text-xs sm:text-sm mb-4 wrap-break-words">{error}</p>
         </div>
       </div>
     )
@@ -405,23 +418,31 @@ const Customer = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 min-h-0 p-3">
+      <div className="flex-1 min-h-0 p-2 sm:p-3">
         {/* Main header section */}
-        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-3">
-          <div className="px-4 py-1">
+        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-2 sm:mb-3">
+          <div className="px-3 sm:px-4 py-2 sm:py-1">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Customer Management</h1>
-                <p className="text-gray-600">View all customer accounts and their information</p>
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">
+                  Customer Management
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">
+                  View all customer accounts and their information
+                </p>
               </div>
             </div>
+            {/* Mobile description */}
+            <p className="text-xs text-gray-600 mt-1 sm:hidden">
+              View all customer accounts and information
+            </p>
           </div>
 
-          {/* Filters and search */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-4 pb-2 gap-3">
-            <div className="flex flex-wrap gap-2">
+          {/* Filters and search - Always visible */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-3 sm:px-4 pb-3 gap-3">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
               <select
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                className="px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-full md:w-auto"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -431,30 +452,53 @@ const Customer = () => {
               </select>
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="text"
-                placeholder="Search by name, username, email, contact, or address..."
-                className="px-4 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm w-full md:w-64"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:flex-none">
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  className="w-full md:w-80 px-3 py-2 border border-slate-400 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              {(statusFilter || searchQuery) && (
+                <button
+                  onClick={clearFilters}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-sm text-gray-600 shrink-0"
+                  title="Clear filters"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Table container */}
-        <div className="h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
+        {/* Table container - Mobile optimized */}
+        <div className="h-[calc(100vh-250px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
             {filteredAndSortedData.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
-                  <p className="text-gray-500 text-lg">No customers found</p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    {searchQuery || statusFilter
-                      ? 'Try adjusting your filters or search query'
-                      : 'No customer data available'}
-                  </p>
+                  <p className="text-gray-500 text-sm sm:text-base">No customers found</p>
+                  {searchQuery || statusFilter ? (
+                    <>
+                      <p className="text-gray-400 text-xs sm:text-sm mt-2">
+                        Try adjusting your filters
+                      </p>
+                      <button
+                        onClick={clearFilters}
+                        className="mt-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs sm:text-sm transition-colors"
+                      >
+                        Clear Filters
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-gray-400 text-xs sm:text-sm mt-2">
+                      No customer data available
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
