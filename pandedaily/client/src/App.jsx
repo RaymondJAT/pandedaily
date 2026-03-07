@@ -24,7 +24,7 @@ function App() {
             <Route
               path="/dashboard/*"
               element={
-                <ProtectedRoute allowedTypes={['admin']}>
+                <ProtectedRoute allowedAccessIds={[1]}>
                   <DashboardLayout />
                 </ProtectedRoute>
               }

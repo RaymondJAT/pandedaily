@@ -15,7 +15,11 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
   const location = useLocation()
   const { hasPermission, loading } = usePermissions()
 
-  // Filter sidebar options based on permissions
+  // Close popout when route changes
+  useEffect(() => {
+    setPopoutMenu(null)
+  }, [location.pathname])
+
   const filteredSidebarOptions = sidebarOptions.filter((option) => {
     if (option.type === 'single' && option.routeName) {
       return hasPermission(option.routeName)
@@ -30,19 +34,27 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
   })
 
   const toggleExpand = (title, event) => {
-    if (!open) {
-      event?.stopPropagation()
+    event?.stopPropagation()
+
+    if (isMobile) {
       const rect = event.currentTarget.getBoundingClientRect()
-      setPopoutPosition({
-        x: rect.right + 5,
-        y: rect.top,
-      })
+
+      // Calculate position based on screen edges
+      let x = rect.right + 5
+      let y = rect.top
+
+      // Adjust if popout would go off screen
+      const popoutWidth = 200
+      if (x + popoutWidth > window.innerWidth) {
+        x = rect.left - popoutWidth - 5
+      }
+
+      setPopoutPosition({ x, y })
 
       if (popoutMenu?.title === title) {
         setPopoutMenu(null)
       } else {
         const option = filteredSidebarOptions.find((opt) => opt.title === title)
-
         const accessibleItems =
           option?.items?.filter((item) =>
             item.routeName ? hasPermission(item.routeName) : true,
@@ -56,13 +68,38 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
       return
     }
 
+    // Desktop behavior
+    if (!open) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      setPopoutPosition({
+        x: rect.right + 5,
+        y: rect.top,
+      })
+
+      if (popoutMenu?.title === title) {
+        setPopoutMenu(null)
+      } else {
+        const option = filteredSidebarOptions.find((opt) => opt.title === title)
+        const accessibleItems =
+          option?.items?.filter((item) =>
+            item.routeName ? hasPermission(item.routeName) : true,
+          ) || []
+
+        setPopoutMenu({
+          title,
+          items: accessibleItems,
+        })
+      }
+      return
+    }
+
+    // Desktop with open sidebar
     setExpandedItems((prev) =>
       prev.includes(title) ? prev.filter((item) => item !== title) : [...prev, title],
     )
     setPopoutMenu(null)
   }
 
-  // Function to check if a path is active
   const isParentActive = (items) => {
     return items.some((item) => {
       if (item.path === location.pathname) {
@@ -90,69 +127,55 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [popoutMenu])
 
-  // Close popout when sidebar opens
   useEffect(() => {
-    if (open) {
+    if (open && !isMobile) {
       setPopoutMenu(null)
     }
-  }, [open])
+  }, [open, isMobile])
 
   useEffect(() => {
     filteredSidebarOptions.forEach((option) => {
       if (option.type === 'dropdown' && option.items) {
         const isActive = isParentActive(option.items)
-        if (isActive && !expandedItems.includes(option.title)) {
+        if (isActive && !expandedItems.includes(option.title) && !isMobile) {
           setExpandedItems((prev) => [...prev, option.title])
         }
       }
     })
-  }, [location.pathname, filteredSidebarOptions])
-
-  // Determine sidebar width based on screen size and open state
-  const getSidebarWidth = () => {
-    if (isMobile) {
-      return open ? 56 : 0 // On mobile, show only icons when open, hidden when closed
-    }
-    return open ? 225 : 56 // Desktop behavior
-  }
+  }, [location.pathname, filteredSidebarOptions, isMobile])
 
   if (loading) {
     return (
-      <motion.nav
+      <div
         ref={sidebarRef}
-        className="sticky top-0 h-screen shrink-0 border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col items-center"
-        initial={false}
-        animate={{ width: getSidebarWidth() }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        style={{ position: 'fixed', left: 0, zIndex: 40 }}
+        className="sticky top-0 h-screen border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col items-center"
+        style={{
+          width: '100%',
+          height: '100vh',
+        }}
       >
         <div className="flex items-center justify-center h-full">
           <Spin className="text-[#F5EFE7]" />
         </div>
-      </motion.nav>
+      </div>
     )
   }
 
   return (
     <>
-      <motion.nav
+      {/* Main sidebar */}
+      <nav
         ref={sidebarRef}
-        className="sticky top-0 h-screen shrink-0 border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col"
-        initial={false}
-        animate={{ width: getSidebarWidth() }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        className="sticky top-0 h-screen border-r border-[#2A1803] bg-[#3F2305] p-2 flex flex-col"
         style={{
-          position: 'fixed',
-          left: 0,
-          zIndex: 40,
+          width: '100%',
+          height: '100vh',
           overflow: 'hidden',
         }}
       >
-        {/* Logo - Always visible in all states (open or closed, mobile or desktop) */}
         <div className="mb-3 border-b border-[#2A1803] pb-3">
           <div className="flex cursor-pointer items-center justify-between rounded-md transition-colors hover:bg-[#523010]">
             <div className="flex items-center gap-2">
-              {/* Logo Container - Always visible */}
               <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#2A1803] overflow-hidden p-1">
                 <img
                   src={logoImage}
@@ -161,15 +184,14 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                 />
               </div>
 
-              {/* Title text - Only show on desktop when open */}
               {!isMobile && open && (
                 <div className="overflow-hidden font-[titleFont]">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key="title-content"
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
                       className="whitespace-nowrap pt-2"
                     >
@@ -196,6 +218,7 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                   key={option.title}
                   to={option.path}
                   end
+                  onClick={() => setPopoutMenu(null)}
                   className={({ isActive }) =>
                     `relative flex h-10 w-full items-center rounded-md transition-colors sidebar-item ${
                       isActive ? 'bg-[#2A1803] text-[#F5EFE7]' : 'hover:bg-[#523010] text-[#F5EFE7]'
@@ -205,12 +228,11 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                   <div className="grid h-full w-10 place-content-center text-lg shrink-0">
                     <option.Icon className="text-[#F5EFE7]" />
                   </div>
-                  {/* Only show text on desktop when open */}
                   {!isMobile && open && (
                     <motion.span
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
                       className="text-sm font-medium whitespace-nowrap text-[#F5EFE7]"
                     >
@@ -243,13 +265,12 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                       <option.Icon className="text-[#F5EFE7]" />
                     </div>
 
-                    {/* Only show text and chevron on desktop when open */}
                     {!isMobile && open && (
                       <>
                         <motion.span
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="text-sm font-medium flex-1 text-left whitespace-nowrap"
                         >
@@ -274,7 +295,6 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                   </div>
                 </button>
 
-                {/* Expanded menu - Only show on desktop when open and expanded */}
                 <AnimatePresence>
                   {!isMobile && open && isExpanded && (
                     <motion.div
@@ -290,6 +310,7 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                             key={item.label}
                             to={item.path}
                             end={false}
+                            onClick={() => setPopoutMenu(null)}
                             className={({ isActive }) =>
                               `relative flex h-8 w-full items-center rounded-md transition-colors text-xs ${
                                 isActive
@@ -317,7 +338,7 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
           })}
         </div>
 
-        {/* Toggle - Hidden on mobile and tablet screens */}
+        {/* Toggle */}
         <div className="mt-2 border-t border-[#2A1803] hidden lg:block">
           <button
             onClick={() => {
@@ -342,9 +363,9 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
                   {open && (
                     <motion.span
                       key="hide-text"
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
                       className="text-sm font-medium whitespace-nowrap text-[#F5EFE7]"
                     >
@@ -356,20 +377,21 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
             </div>
           </button>
         </div>
-      </motion.nav>
+      </nav>
 
-      {/* Popout Menu when sidebar is closed - Only show on desktop */}
+      {/* Popout Menu */}
       <AnimatePresence>
-        {!isMobile && popoutMenu && popoutMenu.items.length > 0 && (
+        {popoutMenu && popoutMenu.items.length > 0 && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, x: -10 }}
             animate={{ opacity: 1, scale: 1, x: 0 }}
             exit={{ opacity: 0, scale: 0.95, x: -10 }}
             transition={{ duration: 0.15 }}
-            className="fixed z-50 popout-menu"
+            className="fixed z-100 popout-menu"
             style={{
               left: popoutPosition.x,
               top: popoutPosition.y,
+              maxWidth: 'calc(100vw - 20px)',
             }}
           >
             <div className="bg-[#3F2305] rounded-lg shadow-xl border border-[#2A1803] min-w-48 overflow-hidden">
@@ -379,20 +401,20 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
               </div>
 
               {/* Popout menu items */}
-              <div className="py-2">
+              <div className="py-2 max-h-[70vh] overflow-y-auto">
                 {popoutMenu.items.map((item) => (
                   <NavLink
                     key={item.label}
                     to={item.path}
                     end={false}
+                    onClick={() => {
+                      setPopoutMenu(null)
+                    }}
                     className={({ isActive }) =>
                       `flex items-center justify-between px-4 py-2.5 text-sm transition-colors text-[#F5EFE7] ${
                         isActive ? 'bg-[#2A1803] text-[#F5EFE7] font-medium' : 'hover:bg-[#523010]'
                       }`
                     }
-                    onClick={() => {
-                      setPopoutMenu(null)
-                    }}
                   >
                     <span>{item.label}</span>
                     {item.notifs && (
@@ -405,7 +427,6 @@ const Sidebar = ({ open, setOpen, isMobile }) => {
               </div>
             </div>
 
-            {/* Arrow pointing to the sidebar button */}
             <div className="absolute -left-2 top-4 w-0 h-0 border-t-[6px] border-b-[6px] border-r-[6px] border-t-transparent border-b-transparent border-r-[#3F2305]"></div>
           </motion.div>
         )}

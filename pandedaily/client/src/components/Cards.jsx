@@ -11,34 +11,20 @@ const Cards = ({ cardData }) => {
     )
   }
 
-  // Determine grid columns based on number of cards
-  const getGridCols = () => {
-    const count = cardData.length
-
-    if (count === 1) return 'grid-cols-1'
-    if (count === 2) return 'grid-cols-1 sm:grid-cols-2'
-    if (count === 3) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-    if (count >= 4) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
-
-    return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
-  }
-
-  // Get span classes for individual cards when there are 2 or 3 cards
+  // Get span classes for individual cards when there are odd numbers
   const getCardSpan = (index) => {
     const count = cardData.length
 
-    if (count === 2) {
-      // Both cards take half width on small+ screens
-      return ''
+    if (count === 3) {
+      if (index === 0) {
+        return 'col-span-2 sm:col-span-1'
+      }
     }
 
-    if (count === 3) {
-      // First card spans 2 columns on small, 1 column on large
-      if (index === 0) {
-        return 'sm:col-span-2 lg:col-span-1'
+    if (count === 5) {
+      if (index === 4) {
+        return 'col-span-2 sm:col-span-1'
       }
-      // Other cards take normal space
-      return ''
     }
 
     return ''
@@ -46,7 +32,7 @@ const Cards = ({ cardData }) => {
 
   return (
     <div className="w-full">
-      <div className={`grid gap-2 sm:gap-3 ${getGridCols()} w-full`}>
+      <div className={`grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 w-full`}>
         {cardData.map((card, index) => (
           <div key={index} className={getCardSpan(index)}>
             <Card
@@ -75,7 +61,6 @@ const Card = ({ title, count, Icon, color, isCurrency }) => {
 
   const colors = colorClasses[color] || colorClasses.rose
 
-  // Format the count and total with peso sign if it's currency
   const formatValue = (value) => {
     if (isCurrency) {
       return `₱${value}`

@@ -8,7 +8,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check localStorage on initial load
     const storedUser = localStorage.getItem('user')
 
     if (storedUser) {
@@ -24,18 +23,21 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const login = (userData) => {
-    // Store user in localStorage
     localStorage.setItem('user', JSON.stringify(userData))
     localStorage.setItem('token', userData.token)
+
+    if (userData.access_id) {
+      localStorage.setItem('userAccessId', userData.access_id.toString())
+    } else {
+      localStorage.removeItem('userAccessId')
+    }
 
     setUser(userData)
   }
 
   const clearAuthData = () => {
-    // Clear all auth-related localStorage items
     localStorage.removeItem('user')
     localStorage.removeItem('token')
-    // Clear any other auth-related items
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
     localStorage.removeItem('userFullName')
@@ -55,6 +57,11 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const isAdmin = user?.access_id === 1
+  const isDeveloper = user?.access_id === 2
+  const isRider = user?.access_id === 3
+  const isCustomer = !user?.access_id
+
   return (
     <AuthContext.Provider
       value={{
@@ -63,8 +70,11 @@ export const AuthProvider = ({ children }) => {
         logout,
         loading,
         isAuthenticated: !!user,
-        isAdmin: user?.user_type === 'admin',
-        isCustomer: user?.user_type === 'customer',
+        isAdmin,
+        isDeveloper,
+        isRider,
+        isCustomer,
+        accessId: user?.access_id,
       }}
     >
       {children}

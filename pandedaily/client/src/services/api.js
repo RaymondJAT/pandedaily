@@ -18,6 +18,8 @@ const fetchApi = async (endpoint, options = {}) => {
     const cleanEndpoint = endpoint.startsWith('/api') ? endpoint.substring(4) : endpoint
     const fullUrl = `${API_URL}${cleanEndpoint}`
 
+    console.log(`Fetching: ${fullUrl}`, options.method || 'GET')
+
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
@@ -26,12 +28,26 @@ const fetchApi = async (endpoint, options = {}) => {
       },
     })
 
-    const data = await response.json()
-
+    // Check if response is OK before trying to parse JSON
     if (!response.ok) {
-      throw new Error(data.message || `API error: ${response.status}`)
+      // Try to get error message from response
+      let errorMessage = `API error: ${response.status}`
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.message || errorMessage
+      } catch {
+        // If response is not JSON, get text
+        try {
+          const text = await response.text()
+          errorMessage = text || errorMessage
+        } catch {
+          // Ignore
+        }
+      }
+      throw new Error(errorMessage)
     }
 
+    const data = await response.json()
     return data
   } catch (error) {
     console.error(`API call failed for ${endpoint}:`, error)

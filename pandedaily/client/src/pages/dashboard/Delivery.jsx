@@ -2,15 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import PlatformTable from '../../components/PlatformTable'
 import {
   FiPackage,
-  FiMapPin,
   FiUser,
   FiTruck,
   FiClock,
   FiCheckCircle,
   FiAlertCircle,
-  FiCalendar,
   FiPhone,
-  FiHome,
   FiX,
 } from 'react-icons/fi'
 import { deliveryColumns } from '../../mapping/deliveryColumns'
@@ -255,14 +252,10 @@ const Delivery = () => {
     setError(null)
     try {
       const response = await getDeliveries()
-
-      // Handle different response structures
       const data = response.data || response
 
       if (Array.isArray(data)) {
-        // Transform the data to ensure consistent field names
         const transformedData = data.map((delivery) => ({
-          // Delivery fields
           id: delivery.d_id || delivery.id || 0,
           d_id: delivery.d_id || delivery.id || 0,
           d_delivery_schedule_id: delivery.d_delivery_schedule_id || delivery.schedule_id || 0,
@@ -270,8 +263,6 @@ const Delivery = () => {
           d_status: delivery.d_status || delivery.status || 'PENDING',
           d_createddate:
             delivery.d_createddate || delivery.createddate || delivery.created_at || '',
-
-          // Schedule fields
           schedule_id: delivery.schedule_id || delivery.ds_id || 0,
           schedule_name: delivery.schedule_name || delivery.ds_name || '',
           schedule_date: delivery.schedule_date || delivery.ds_date || '',
@@ -281,24 +272,16 @@ const Delivery = () => {
               : '',
           schedule_status: delivery.schedule_status || delivery.ds_status || '',
           schedule_cutoff: delivery.schedule_cutoff || delivery.ds_cutoff || '',
-
-          // Order fields
           order_id: delivery.order_id || delivery.or_id || 0,
           order_total: delivery.order_total || delivery.or_total || 0,
           order_status: delivery.order_status || delivery.or_status || '',
           order_date: delivery.order_date || delivery.or_createddate || '',
-
-          // Customer fields
           customer_name: delivery.customer_name || delivery.c_fullname || 'Guest Customer',
           customer_address: delivery.customer_address || delivery.c_address || '',
           customer_contact: delivery.customer_contact || delivery.c_contact || '',
-
-          // Rider fields
           rider_name: delivery.rider_name || delivery.r_fullname || '',
           rider_contact: delivery.rider_contact || delivery.r_contact || '',
           rider_status: delivery.rider_status || delivery.r_status || '',
-
-          // Keep original data
           ...delivery,
         }))
 
@@ -343,17 +326,14 @@ const Delivery = () => {
 
     let filtered = [...deliveries]
 
-    // Status filter
     if (statusFilter !== '') {
       filtered = filtered.filter((item) => item.d_status === statusFilter)
     }
 
-    // Schedule status filter
     if (scheduleFilter !== '') {
       filtered = filtered.filter((item) => item.schedule_status === scheduleFilter)
     }
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -366,7 +346,6 @@ const Delivery = () => {
       )
     }
 
-    // Sorting with null-safe comparison
     return filtered.sort((a, b) => {
       if (sortKey === 'd_id' || sortKey === 'order_id') {
         const aId = a[sortKey] || 0
@@ -417,18 +396,14 @@ const Delivery = () => {
 
   const handleAssignRider = async (delivery) => {
     try {
-      // Extract the actual ID
       const actualId =
         typeof delivery === 'object' ? delivery.d_id || delivery.id || delivery : delivery
-
-      // Fetch full delivery details before opening modal
       const response = await getDeliveryById(actualId)
       const deliveryData = response.data || response
       setSelectedDelivery(deliveryData)
       setIsAssignRiderModalOpen(true)
     } catch (err) {
       console.error('Error fetching delivery details:', err)
-      // Still open modal with basic data if full fetch fails
       setSelectedDelivery(delivery)
       setIsAssignRiderModalOpen(true)
     }
@@ -475,7 +450,6 @@ const Delivery = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 p-2 sm:p-3">
-        {/* Main header section */}
         <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-2 sm:mb-3">
           <div className="px-3 sm:px-4 py-2 sm:py-1">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -493,7 +467,6 @@ const Delivery = () => {
             </p>
           </div>
 
-          {/* Filters and search */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-3 sm:px-4 pb-3 gap-3">
             <div className="flex flex-wrap gap-2 w-full md:w-auto">
               <div className="flex flex-row gap-2 w-full sm:w-auto">
@@ -502,7 +475,7 @@ const Delivery = () => {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
-                  <option value="">All Delivery</option>
+                  <option value="">All Status</option>
                   {uniqueStatuses.map((status) => (
                     <option key={status} value={status}>
                       {status.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
@@ -548,7 +521,6 @@ const Delivery = () => {
           </div>
         </div>
 
-        {/* Table container - Mobile optimized */}
         <div className="h-[calc(100vh-250px)] sm:h-[calc(100vh-280px)] lg:h-[calc(100vh-250px)] xl:h-[calc(100vh-220px)] overflow-hidden">
           <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
             {filteredAndSortedData.length === 0 ? (
@@ -606,7 +578,6 @@ const Delivery = () => {
         </div>
       </div>
 
-      {/* Modals */}
       {isViewModalOpen && (
         <ViewDelivery
           deliveryId={viewingDeliveryId}

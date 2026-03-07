@@ -1,19 +1,26 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import Sidebar from './navigation/Sidebar'
 import Header from './Header'
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const DashboardLayout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const { user, logout } = useAuth()
 
   // Check if mobile on mount and when window resizes
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024) // lg breakpoint
+      const mobile = window.innerWidth < 1024
+      setIsMobile(mobile)
+
+      // Set initial state immediately
+      if (mobile) {
+        setIsSidebarOpen(false)
+      } else {
+        setIsSidebarOpen(true)
+      }
     }
 
     checkMobile()
@@ -21,55 +28,78 @@ const DashboardLayout = () => {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // On mobile, sidebar should be closed by default
-  useEffect(() => {
+  // Get sidebar width based on state
+  const getSidebarWidth = () => {
     if (isMobile) {
-      setIsSidebarOpen(false)
-    } else {
-      setIsSidebarOpen(true)
+      return 56
     }
-  }, [isMobile])
+    return isSidebarOpen ? 225 : 56
+  }
 
-  // Calculate margin based on screen size and sidebar state
   const getMarginLeft = () => {
     if (isMobile) {
-      return isSidebarOpen ? 56 : 0 // On mobile, margin for icons or no margin
+      return isSidebarOpen ? 56 : 0
     }
-    return isSidebarOpen ? 225 : 56 // Desktop behavior
+    return isSidebarOpen ? 225 : 56
   }
 
   return (
     <div className="h-screen overflow-hidden bg-[#F5EFE7] font-mono">
-      {/* Sidebar - Conditionally render on mobile */}
-      <AnimatePresence mode="wait">
-        {(isMobile ? isSidebarOpen : true) && (
-          <Sidebar open={isSidebarOpen} setOpen={setIsSidebarOpen} isMobile={isMobile} />
-        )}
-      </AnimatePresence>
-
-      {/* Main content area */}
-      <motion.div
-        className="h-screen flex flex-col"
-        animate={{
-          marginLeft: getMarginLeft(),
+      {/* Sidebar Container */}
+      <div
+        className="fixed left-0 top-0 z-40"
+        style={{
+          ...(!isMobile
+            ? {
+                width: getSidebarWidth(),
+                transition: 'width 0.3s ease-in-out',
+              }
+            : {
+                width: 56,
+                left: isSidebarOpen ? 0 : -56,
+                transition: 'left 0.3s ease-in-out',
+              }),
         }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
       >
-        {/* Header */}
-        <div className="h-16 shrink-0">
-          <Header
-            sidebarOpen={isSidebarOpen}
-            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-            user={user}
-            onLogout={logout}
-          />
-        </div>
+        <Sidebar open={isSidebarOpen} setOpen={setIsSidebarOpen} isMobile={isMobile} />
+      </div>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          <Outlet />
-        </div>
-      </motion.div>
+      {/* Header */}
+      <div
+        className="fixed top-0 z-30 h-16"
+        style={{
+          ...(!isMobile
+            ? {
+                left: getSidebarWidth(),
+                right: 0,
+                transition: 'left 0.3s ease-in-out',
+              }
+            : {
+                left: isSidebarOpen ? 56 : 0,
+                right: 0,
+                transition: 'left 0.3s ease-in-out',
+              }),
+        }}
+      >
+        <Header
+          sidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          user={user}
+          onLogout={logout}
+        />
+      </div>
+
+      {/* Main Content Area */}
+      <div
+        className="h-screen overflow-auto"
+        style={{
+          marginLeft: getMarginLeft(),
+          transition: 'margin-left 0.3s ease-in-out',
+          paddingTop: '64px',
+        }}
+      >
+        <Outlet />
+      </div>
     </div>
   )
 }

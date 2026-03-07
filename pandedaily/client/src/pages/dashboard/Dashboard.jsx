@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Cards from '../../components/Cards'
 import PlatformTable from '../../components/PlatformTable'
 import {
@@ -28,8 +28,9 @@ import {
 const Dashboard = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 })
+  const chartContainerRef = useRef(null)
 
-  // Sample data for the new card layout
   const [stats] = useState({
     ordersToday: 28,
     salesToday: 45600,
@@ -39,7 +40,6 @@ const Dashboard = () => {
     newInquiries: 5,
   })
 
-  // Sample sales overview data (last 7 days)
   const salesData = [
     { day: 'Mon', sales: 12500, orders: 18 },
     { day: 'Tue', sales: 15200, orders: 22 },
@@ -50,7 +50,6 @@ const Dashboard = () => {
     { day: 'Sun', sales: 19800, orders: 24 },
   ]
 
-  // Sample category distribution data
   const categoryData = [
     { name: 'Breads', value: 45 },
     { name: 'Pastries', value: 30 },
@@ -60,7 +59,6 @@ const Dashboard = () => {
 
   const COLORS = ['#9C4A15', '#F5EFE7', '#D9D2C9', '#2A1803']
 
-  // Sample recent orders with proper id field for PlatformTable
   const recentOrders = [
     {
       id: 'ORD-001',
@@ -104,7 +102,6 @@ const Dashboard = () => {
     },
   ]
 
-  // Sample pending deliveries with proper id field for PlatformTable
   const pendingDeliveries = [
     {
       id: 'DEL-001',
@@ -135,7 +132,6 @@ const Dashboard = () => {
     },
   ]
 
-  // Define columns for Recent Orders table (matching Users style)
   const orderColumns = [
     {
       key: 'id',
@@ -298,7 +294,6 @@ const Dashboard = () => {
     },
   ]
 
-  // Simulate refresh function
   const handleRefresh = () => {
     setLoading(true)
     setTimeout(() => {
@@ -347,6 +342,25 @@ const Dashboard = () => {
     },
   ]
 
+  // Effect to update chart dimensions on resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (chartContainerRef.current) {
+        const { width, height } = chartContainerRef.current.getBoundingClientRect()
+        setChartDimensions({ width, height })
+      }
+    }
+
+    // Initial update
+    updateDimensions()
+
+    // Add resize listener
+    window.addEventListener('resize', updateDimensions)
+
+    // Cleanup
+    return () => window.removeEventListener('resize', updateDimensions)
+  }, [])
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center p-4">
@@ -382,8 +396,7 @@ const Dashboard = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 p-2 sm:p-3 overflow-auto">
-        {/* Welcome Section */}
-        <div className="bg-component shadow-lg rounded-lg border border-slate-400 mb-3">
+        <div className="bg-component shadow-xl rounded-lg border border-slate-400 mb-3">
           <div className="px-3 sm:px-4 py-2 sm:py-1">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
@@ -400,88 +413,104 @@ const Dashboard = () => {
 
         <Cards cardData={cardData} />
 
-        {/* Charts Section - 70/30 split */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-3">
-          {/* Sales Overview Chart Container - 70% width on large screens */}
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-3" ref={chartContainerRef}>
+          {/* Sales Overview */}
           <div className="lg:col-span-8 h-80 sm:h-96 overflow-hidden">
-            <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-3">
+            <div className="bg-component shadow-xl rounded-lg border border-slate-400 h-full flex flex-col p-3">
               <div className="mb-3">
                 <h3 className="text-sm sm:text-base font-semibold text-gray-800">Sales Overview</h3>
               </div>
-              <div className="flex-1 min-h-0 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={salesData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="left" width={45} tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="right" orientation="right" width={45} tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      formatter={(value, name) => {
-                        if (name === 'sales') return [`₱${value.toLocaleString()}`, 'Sales']
-                        return [value, 'Orders']
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="sales"
-                      stroke="#9C4A15"
-                      name="Sales (₱)"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="orders"
-                      stroke="#2A1803"
-                      name="Orders"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="flex-1 min-h-0 w-full min-w-0">
+                {chartDimensions.width > 0 && chartDimensions.height > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={salesData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                      <YAxis yAxisId="left" width={45} tick={{ fontSize: 12 }} />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        width={45}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => {
+                          if (name === 'sales') return [`₱${value.toLocaleString()}`, 'Sales']
+                          return [value, 'Orders']
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="sales"
+                        stroke="#9C4A15"
+                        name="Sales (₱)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="orders"
+                        stroke="#2A1803"
+                        name="Orders"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="animate-pulse text-gray-400">Loading chart...</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Category Distribution Chart Container - 30% width on large screens */}
+          {/* Category Distribution */}
           <div className="lg:col-span-4 h-80 sm:h-96 overflow-hidden">
-            <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-3">
+            <div className="bg-component shadow-xl rounded-lg border border-slate-400 h-full flex flex-col p-3">
               <div className="mb-3">
                 <h3 className="text-sm sm:text-base font-semibold text-gray-800">
                   Sales by Category
                 </h3>
               </div>
-              <div className="flex-1 min-h-0 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => {
-                        // Only show labels on larger screens
-                        if (window.innerWidth < 1024) return null
-                        return `${name} ${(percent * 100).toFixed(0)}%`
-                      }}
-                      outerRadius="70%"
-                      innerRadius="30%"
-                      fill="#8884d8"
-                      dataKey="value"
-                      paddingAngle={2}
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="flex-1 min-h-0 flex items-center justify-center min-w-0">
+                {chartDimensions.width > 0 && chartDimensions.height > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => {
+                          if (window.innerWidth < 1024) return null
+                          return `${name} ${(percent * 100).toFixed(0)}%`
+                        }}
+                        outerRadius="70%"
+                        innerRadius="30%"
+                        fill="#8884d8"
+                        dataKey="value"
+                        paddingAngle={2}
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="animate-pulse text-gray-400">Loading chart...</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -489,9 +518,9 @@ const Dashboard = () => {
 
         {/* Tables Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
-          {/* Recent Orders Table Container */}
+          {/* Recent Orders */}
           <div className="h-80 sm:h-96 overflow-hidden">
-            <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
+            <div className="bg-component shadow-xl rounded-lg border border-slate-400 h-full flex flex-col p-2">
               <div className="px-2 py-1 mb-2">
                 <h2 className="text-sm sm:text-base font-semibold text-gray-800">Recent Orders</h2>
               </div>
@@ -506,9 +535,9 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Pending Deliveries Table Container */}
+          {/* Pending Deliveries */}
           <div className="h-80 sm:h-96 overflow-hidden">
-            <div className="bg-component shadow-lg rounded-lg border border-slate-400 h-full flex flex-col p-2">
+            <div className="bg-component shadow-xl rounded-lg border border-slate-400 h-full flex flex-col p-2">
               <div className="px-2 py-1 mb-2">
                 <h2 className="text-sm sm:text-base font-semibold text-gray-800">
                   Pending Deliveries
