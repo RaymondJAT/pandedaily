@@ -3,16 +3,10 @@ const { Query, Transaction } = require('../database/utility/queries.util')
 
 // GET ALL
 const getDelivery = async (req, res) => {
-  const { access_id } = req.context
+  const { access_id, id: userId } = req.context
 
   try {
-    if (access_id !== 1) {
-      return res.status(403).json({
-        message: 'You are not allowed to access delivery data.',
-      })
-    }
-
-    const statement = `
+    let statement = `
       SELECT 
         d.*,
         ds.ds_id as schedule_id,
@@ -38,10 +32,39 @@ const getDelivery = async (req, res) => {
       INNER JOIN orders o ON ds.ds_order_id = o.or_id
       INNER JOIN customer c ON o.or_customer_id = c.c_id
       LEFT JOIN rider r ON d.d_rider_id = r.r_id
-      ORDER BY d.d_createddate DESC
     `
+    const params = []
 
-    const data = await Query(statement, [], Delivery.delivery.prefix_)
+    if (access_id === 3) {
+      const userQuery = await Query(`SELECT mu_username FROM master_user WHERE mu_id = ?`, [userId])
+
+      if (userQuery.length > 0) {
+        const username = userQuery[0].mu_username
+
+        const riderQuery = await Query(`SELECT r_id FROM rider WHERE r_username = ?`, [username])
+
+        if (riderQuery.length > 0) {
+          statement += ` WHERE d.d_rider_id = ?`
+          params.push(riderQuery[0].r_id)
+        } else {
+          return res.status(200).json({
+            message: 'No rider profile found for this user.',
+            count: 0,
+            data: [],
+          })
+        }
+      } else {
+        return res.status(200).json({
+          message: 'User not found.',
+          count: 0,
+          data: [],
+        })
+      }
+    }
+
+    statement += ` ORDER BY d.d_createddate DESC`
+
+    const data = await Query(statement, params, Delivery.delivery.prefix_)
 
     res.status(200).json({
       message: 'Deliveries retrieved successfully.',
@@ -58,6 +81,7 @@ const getDeliveryActivities = async (req, res) => {
   const { access_id } = req.context
 
   try {
+    // Only admin can access delivery activities
     if (access_id !== 1) {
       return res.status(403).json({
         message: 'You are not allowed to access delivery activity data.',
@@ -123,17 +147,10 @@ const getDeliveryActivities = async (req, res) => {
 // GET BY ID
 const getDeliveryById = async (req, res) => {
   const { id } = req.params
-  const { access_id } = req.context
+  const { access_id, id: userId } = req.context
 
   try {
-    if (access_id !== 1) {
-      return res.status(403).json({
-        message: 'You are not allowed to access delivery data.',
-      })
-    }
-
-    // Get delivery with schedule, order, customer, and rider info
-    const deliveryStatement = `
+    let deliveryStatement = `
       SELECT 
         d.*,
         ds.ds_id as schedule_id,
@@ -167,7 +184,34 @@ const getDeliveryById = async (req, res) => {
       WHERE d.d_id = ?
     `
 
-    const deliveryData = await Query(deliveryStatement, [id], Delivery.delivery.prefix_)
+    const params = [id]
+
+    if (access_id === 3) {
+      // Get the rider record for this user
+      const userQuery = await Query(`SELECT mu_username FROM master_user WHERE mu_id = ?`, [userId])
+
+      if (userQuery.length > 0) {
+        const username = userQuery[0].mu_username
+
+        // Try to find rider by username
+        const riderQuery = await Query(`SELECT r_id FROM rider WHERE r_username = ?`, [username])
+
+        if (riderQuery.length > 0) {
+          deliveryStatement += ` AND d.d_rider_id = ?`
+          params.push(riderQuery[0].r_id)
+        } else {
+          return res.status(403).json({
+            message: 'You are not allowed to access this delivery.',
+          })
+        }
+      } else {
+        return res.status(403).json({
+          message: 'User not found.',
+        })
+      }
+    }
+
+    const deliveryData = await Query(deliveryStatement, params, Delivery.delivery.prefix_)
 
     if (!deliveryData.length) {
       return res.status(404).json({ message: 'No delivery found.' })
@@ -284,7 +328,6 @@ const getDeliveryActivitiesById = async (req, res) => {
       })
     }
 
-    // Parse JSON arrays
     const parsedData = data.map((row) => ({
       ...row,
       images: row.images ? JSON.parse(row.images) : [],
@@ -306,6 +349,14 @@ const getDeliveryActivitiesById = async (req, res) => {
 // CREATE
 const addDelivery = async (req, res) => {
   const { delivery_schedule_id, rider_id } = req.body
+  const { access_id } = req.context
+
+  // Only admin can create deliveries
+  if (access_id !== 1) {
+    return res.status(403).json({
+      message: 'You are not allowed to create deliveries.',
+    })
+  }
 
   if (!delivery_schedule_id || !rider_id) {
     return res.status(400).json({
@@ -452,6 +503,7 @@ const addDelivery = async (req, res) => {
 const addDeliveryImages = async (req, res) => {
   const { activityId } = req.params
   const { images } = req.body
+  const { access_id, id: userId } = req.context
 
   if (!images || !Array.isArray(images) || images.length === 0) {
     return res.status(400).json({
@@ -460,13 +512,46 @@ const addDeliveryImages = async (req, res) => {
   }
 
   try {
-    // Check if activity exists
-    const activityCheck = await Query('SELECT da_id FROM delivery_activity WHERE da_id = ?', [
-      activityId,
-    ])
+    // Check if activity exists and get delivery info
+    const activityCheck = await Query(
+      `SELECT da.da_id, da.da_delivery_id, d.d_rider_id 
+       FROM delivery_activity da
+       INNER JOIN delivery d ON da.da_delivery_id = d.d_id
+       WHERE da.da_id = ?`,
+      [activityId],
+    )
 
     if (!activityCheck.length) {
       return res.status(404).json({ message: 'Delivery activity not found.' })
+    }
+
+    const activity = activityCheck[0]
+
+    // Check permissions
+    if (access_id === 3) {
+      // If rider, check if this is their delivery
+      const userQuery = await Query(`SELECT mu_username FROM master_user WHERE mu_id = ?`, [userId])
+
+      if (userQuery.length > 0) {
+        const username = userQuery[0].mu_username
+
+        // Try to find rider by username
+        const riderQuery = await Query(`SELECT r_id FROM rider WHERE r_username = ?`, [username])
+
+        if (riderQuery.length === 0 || riderQuery[0].r_id !== activity.d_rider_id) {
+          return res.status(403).json({
+            message: 'You are not allowed to add images to this delivery.',
+          })
+        }
+      } else {
+        return res.status(403).json({
+          message: 'You are not allowed to add images to this delivery.',
+        })
+      }
+    } else if (access_id !== 1) {
+      return res.status(403).json({
+        message: 'You are not allowed to add delivery images.',
+      })
     }
 
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
@@ -505,10 +590,18 @@ const addDeliveryImages = async (req, res) => {
   }
 }
 
-// ASSIGN RIDER TO EXISTING DELIVERY
+// ASSIGN RIDER TO EXISTING DELIVERY - Only Admin
 const assignRider = async (req, res) => {
   const { id } = req.params
   const { rider_id } = req.body
+  const { access_id } = req.context
+
+  // Only admin can assign riders
+  if (access_id !== 1) {
+    return res.status(403).json({
+      message: 'You are not allowed to assign riders.',
+    })
+  }
 
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ message: 'Valid delivery ID is required.' })
@@ -595,7 +688,7 @@ const assignRider = async (req, res) => {
       })
     }
 
-    // Update order status to FOR-PICK-UP (changed from OUT-FOR-DELIVERY)
+    // Update order status to FOR-PICK-UP
     if (delivery.order_status !== 'FOR-PICK-UP') {
       queries.push({
         sql: `
@@ -652,13 +745,14 @@ const assignRider = async (req, res) => {
 const updateDeliveryStatus = async (req, res) => {
   const { id } = req.params
   const { status, remarks, images } = req.body
+  const { access_id, id: userId } = req.context
 
   const validStatuses = ['PENDING', 'FOR-PICK-UP', 'OUT-FOR-DELIVERY', 'COMPLETE']
 
-  // Map delivery status to schedule status - FIXED to match actual ENUM values
+  // Map delivery status to schedule status
   const scheduleStatusMap = {
-    PENDING: 'PENDING', // When delivery is PENDING, schedule should be PENDING
-    'FOR-PICK-UP': 'FOR-PICK-UP', // When delivery is FOR-PICK-UP, schedule should be FOR-PICK-UP
+    PENDING: 'PENDING',
+    'FOR-PICK-UP': 'FOR-PICK-UP',
     'OUT-FOR-DELIVERY': 'OUT-FOR-DELIVERY',
     COMPLETE: 'COMPLETE',
   }
@@ -707,6 +801,33 @@ const updateDeliveryStatus = async (req, res) => {
 
     const delivery = currentDelivery[0]
     const previousStatus = delivery.d_status
+
+    // Admin or the assigned Rider
+    if (access_id === 3) {
+      // If rider, check if this is their delivery
+      const userQuery = await Query(`SELECT mu_username FROM master_user WHERE mu_id = ?`, [userId])
+
+      if (userQuery.length > 0) {
+        const username = userQuery[0].mu_username
+
+        // Try to find rider by username
+        const riderQuery = await Query(`SELECT r_id FROM rider WHERE r_username = ?`, [username])
+
+        if (riderQuery.length === 0 || riderQuery[0].r_id !== delivery.d_rider_id) {
+          return res.status(403).json({
+            message: 'You are not allowed to update this delivery.',
+          })
+        }
+      } else {
+        return res.status(403).json({
+          message: 'You are not allowed to update this delivery.',
+        })
+      }
+    } else if (access_id !== 1) {
+      return res.status(403).json({
+        message: 'You are not allowed to update deliveries.',
+      })
+    }
 
     // Don't allow updating to same status
     if (previousStatus === status) {
