@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { FaMapMarkerAlt, FaSpinner } from 'react-icons/fa'
 import { motion, AnimatePresence } from 'framer-motion'
-import { geocodeAddress } from '../../services/api' // Import your geocoding function
+import { geocodeAddress } from '../../services/api'
 
 const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) => {
   const [query, setQuery] = useState(value || '')
@@ -9,10 +9,11 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
   const [isLoading, setIsLoading] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [error, setError] = useState(null)
   const wrapperRef = useRef(null)
   const timeoutRef = useRef(null)
 
-  // Update query when value changes from parent (e.g., from map click)
+  // Update query when value changes from parent
   useEffect(() => {
     if (value !== query) {
       setQuery(value || '')
@@ -38,26 +39,46 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
     }
 
     setIsLoading(true)
+    setError(null)
+
     try {
-      // Use your backend geocoding service
       const result = await geocodeAddress(searchQuery)
 
       if (result.success) {
-        // Format the response to match your suggestions structure
-        const formattedSuggestion = {
-          id: `${result.lat}-${result.lng}`,
-          fullAddress: result.displayName,
-          lat: result.lat,
-          lng: result.lng,
-          name: result.displayName.split(',')[0] || result.displayName,
+        // For Nominatim, we need to get multiple results
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5`,
+          {
+            headers: {
+              'User-Agent': 'PandeDaily/1.0',
+              'Accept-Language': 'en',
+            },
+          },
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          const formattedSuggestions = data.map((item) => ({
+            id: `${item.lat}-${item.lon}`,
+            fullAddress: item.display_name,
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+            name: item.display_name.split(',')[0] || item.display_name,
+          }))
+          setSuggestions(formattedSuggestions)
+          setError(null)
+        } else {
+          setSuggestions([])
+          setError('No addresses found')
         }
-        setSuggestions([formattedSuggestion])
       } else {
         setSuggestions([])
+        setError(result.message || 'No addresses found')
       }
     } catch (error) {
       console.error('Error fetching suggestions:', error)
       setSuggestions([])
+      setError('Unable to search for addresses. Please click on the map.')
     } finally {
       setIsLoading(false)
     }
@@ -83,7 +104,7 @@ const AddressAutocomplete = ({ value, onChange, onLocationSelect, disabled }) =>
         setSuggestions([])
         setShowSuggestions(false)
       }
-    }, 500) // Increased to 500ms to reduce API calls
+    }, 500)
   }
 
   // Handle suggestion selection

@@ -72,15 +72,27 @@ const fetchRaw = async (url, options = {}) => {
 export const geocodeAddress = async (address) => {
   try {
     const encodedAddress = encodeURIComponent(address)
-    // Use /geocode/search (not /api/geocode/search) because API_URL adds /api
-    const response = await fetchRaw(`/geocode/search?q=${encodedAddress}`)
+    console.log('Geocoding address:', address)
+
+    // Use Nominatim API directly (public, no auth required)
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`,
+      {
+        headers: {
+          'User-Agent': 'PandeDaily/1.0', // Required by Nominatim
+          'Accept-Language': 'en',
+        },
+      },
+    )
+
+    console.log('Geocoding response status:', response.status)
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.message || 'Geocoding service error')
+      throw new Error(`Geocoding error: ${response.status}`)
     }
 
     const data = await response.json()
+    console.log('Geocoding success:', data)
 
     if (data && data.length > 0) {
       return {
@@ -101,6 +113,7 @@ export const geocodeAddress = async (address) => {
     return {
       success: false,
       message: error.message || 'Error finding address coordinates',
+      error: error.message,
     }
   }
 }
@@ -108,14 +121,25 @@ export const geocodeAddress = async (address) => {
 // Reverse geocoding: Coordinates -> Address
 export const reverseGeocode = async (lat, lng) => {
   try {
-    // Use /geocode/reverse (not /api/geocode/reverse)
-    const response = await fetchRaw(`/geocode/reverse?lat=${lat}&lng=${lng}`)
+    console.log('Reverse geocoding:', { lat, lng })
+
+    // Use Nominatim API directly (public, no auth required)
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      {
+        headers: {
+          'User-Agent': 'PandeDaily/1.0', // Required by Nominatim
+          'Accept-Language': 'en',
+        },
+      },
+    )
 
     if (!response.ok) {
-      throw new Error('Failed to fetch address')
+      throw new Error(`Reverse geocoding error: ${response.status}`)
     }
 
     const data = await response.json()
+    console.log('Reverse geocoding success:', data)
 
     return {
       lat: Number(lat),

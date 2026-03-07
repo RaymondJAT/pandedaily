@@ -63,6 +63,7 @@ const LocationMap = ({ onLocationSelect, selectedLocation }) => {
       })
     } catch (err) {
       console.error('Reverse geocoding error:', err)
+      // Fallback: use coordinates as address
       onLocationSelect?.({
         lat: Number(lat),
         lng: Number(lng),
